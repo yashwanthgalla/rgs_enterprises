@@ -28,43 +28,69 @@ public class AdminInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Admin 1 (Primary)
-        userRepository.findByUsername(adminUsername).ifPresentOrElse(
-                user -> {
-                    user.setPasswordHash(passwordEncoder.encode(adminPassword));
-                    userRepository.save(user);
-                    log.info("Admin user [{}] credentials verified and synchronized.", adminUsername);
-                },
-                () -> {
-                    AppUser newAdmin = AppUser.builder()
-                            .username(adminUsername)
-                            .passwordHash(passwordEncoder.encode(adminPassword))
-                            .fullName("Primary Administrator")
-                            .role(Role.ADMIN)
-                            .build();
-                    userRepository.save(newAdmin);
-                    log.info("Initialized new Admin user [{}] from configuration.", adminUsername);
-                }
-        );
+        // Admin 1 (Sai Babu P)
+        userRepository.findByEmailIgnoreCase("rgsenterprise2026@gmail.com")
+                .or(() -> userRepository.findByUsernameIgnoreCase("Sai Babu P"))
+                .or(() -> userRepository.findByUsernameIgnoreCase("admin"))
+                .ifPresentOrElse(
+                        user -> {
+                            if (user.isMustChangePassword()) {
+                                user.setPasswordHash(passwordEncoder.encode("Admin@1"));
+                                user.setUsername("Sai Babu P");
+                                user.setEmail("rgsenterprise2026@gmail.com");
+                                user.setFullName("Sai Babu P");
+                                user.setMustChangePassword(true);
+                                userRepository.save(user);
+                                log.info("Admin 1 [Sai Babu P] default credentials synced (password change pending).");
+                            } else {
+                                log.info("Admin 1 [{}] already has personalized password.", user.getUsername());
+                            }
+                        },
+                        () -> {
+                            AppUser newAdmin1 = AppUser.builder()
+                                    .username("Sai Babu P")
+                                    .email("rgsenterprise2026@gmail.com")
+                                    .passwordHash(passwordEncoder.encode("Admin@1"))
+                                    .fullName("Sai Babu P")
+                                    .mustChangePassword(true)
+                                    .role(Role.ADMIN)
+                                    .build();
+                            userRepository.save(newAdmin1);
+                            log.info("Initialized Admin 1 [Sai Babu P] with default credentials.");
+                        }
+                );
 
-        // Admin 2 (Co-Administrator)
-        userRepository.findByUsername("admin2").ifPresentOrElse(
-                user -> {
-                    user.setPasswordHash(passwordEncoder.encode(adminPassword));
-                    userRepository.save(user);
-                    log.info("Secondary Admin [admin2] verified.");
-                },
-                () -> {
-                    AppUser newAdmin2 = AppUser.builder()
-                            .username("admin2")
-                            .passwordHash(passwordEncoder.encode(adminPassword))
-                            .fullName("Co-Administrator")
-                            .role(Role.ADMIN)
-                            .build();
-                    userRepository.save(newAdmin2);
-                    log.info("Initialized secondary Admin user [admin2].");
-                }
-        );
+        // Admin 2 (B Chandrasekhar)
+        userRepository.findByEmailIgnoreCase("bschandrasekhar4@gmail.com")
+                .or(() -> userRepository.findByUsernameIgnoreCase("B Chandrasekhar"))
+                .or(() -> userRepository.findByUsernameIgnoreCase("admin2"))
+                .ifPresentOrElse(
+                        user -> {
+                            if (user.isMustChangePassword()) {
+                                user.setPasswordHash(passwordEncoder.encode("Admin@2"));
+                                user.setUsername("B Chandrasekhar");
+                                user.setEmail("bschandrasekhar4@gmail.com");
+                                user.setFullName("B Chandrasekhar");
+                                user.setMustChangePassword(true);
+                                userRepository.save(user);
+                                log.info("Admin 2 [B Chandrasekhar] default credentials synced (password change pending).");
+                            } else {
+                                log.info("Admin 2 [{}] already has personalized password.", user.getUsername());
+                            }
+                        },
+                        () -> {
+                            AppUser newAdmin2 = AppUser.builder()
+                                    .username("B Chandrasekhar")
+                                    .email("bschandrasekhar4@gmail.com")
+                                    .passwordHash(passwordEncoder.encode("Admin@2"))
+                                    .fullName("B Chandrasekhar")
+                                    .mustChangePassword(true)
+                                    .role(Role.ADMIN)
+                                    .build();
+                            userRepository.save(newAdmin2);
+                            log.info("Initialized Admin 2 [B Chandrasekhar] with default credentials.");
+                        }
+                );
 
         // Ensure all active godowns with monthly rent have an active rent roll entry
         try {

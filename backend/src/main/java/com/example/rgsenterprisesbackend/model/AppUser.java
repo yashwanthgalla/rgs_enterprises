@@ -23,11 +23,18 @@ public class AppUser {
     @Column(nullable = false, unique = true, length = 100)
     private String username;
 
+    @Column(length = 150)
+    private String email;
+
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
+
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = true;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)

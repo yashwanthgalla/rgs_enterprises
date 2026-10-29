@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, Save, Building, Image, Mail, Phone, Shield } from 'lucide-react';
+import { Sliders, Save, Building, Image, Mail, Phone, Shield, User, KeyRound } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import { apiClient } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { FormField } from '../components/ui/FormField';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../components/ui/Toast';
+import { ApiResponse, AuthResponse } from '../types';
 
 export const Settings: React.FC = () => {
   const { settings, updateSettings } = useSettings();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [companyName, setCompanyName] = useState(settings.companyName);
@@ -20,6 +22,15 @@ export const Settings: React.FC = () => {
   const [contactPhone, setContactPhone] = useState(settings.contactPhone || '');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Profile & Credentials State
+  const [profileUsername, setProfileUsername] = useState(user?.username || '');
+  const [profileEmail, setProfileEmail] = useState(user?.email || '');
+  const [profileFullName, setProfileFullName] = useState(user?.fullName || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   useEffect(() => {
     setCompanyName(settings.companyName);
     setLogoUrl(settings.logoUrl || '');
@@ -27,6 +38,14 @@ export const Settings: React.FC = () => {
     setContactEmail(settings.contactEmail || '');
     setContactPhone(settings.contactPhone || '');
   }, [settings]);
+
+  useEffect(() => {
+    if (user) {
+      setProfileUsername(user.username);
+      setProfileEmail(user.email || '');
+      setProfileFullName(user.fullName || '');
+    }
+  }, [user]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,17 +66,137 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword && newPassword !== confirmPassword) {
+      toastError('New password and confirmation do not match.');
+      return;
+    }
+    if (newPassword && newPassword.length < 6) {
+      toastError('New password must be at least 6 characters.');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const res = await apiClient.put<ApiResponse<AuthResponse>>('/auth/profile', {
+        username: profileUsername.trim(),
+        email: profileEmail.trim(),
+        fullName: profileFullName.trim(),
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined,
+      });
+
+      if (res.data.success && res.data.data) {
+        updateUser(res.data.data.user, res.data.data.token);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        toastSuccess('Administrator profile & credentials updated successfully!');
+      }
+    } catch (err: any) {
+      toastError(err.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-apple-text dark:text-apple-darkText">
-          Organization Settings & Branding
+          Organization Settings & Profile
         </h1>
         <p className="text-sm text-apple-secondary dark:text-apple-darkSecondary mt-1">
-          Customize portfolio branding, company title, currency formats, and contact details.
+          Customize portfolio branding, company title, currency formats, and administrator credentials.
         </p>
       </div>
 
+      {/* Row 1: Profile & Credentials Customization */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
+          <div className="p-2.5 rounded-xl bg-apple-accent/10 text-apple-accent">
+            <KeyRound className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-apple-text dark:text-apple-darkText">
+              Administrator Profile & Security Credentials
+            </h2>
+            <p className="text-xs text-apple-secondary">
+              Update your username, email address, and personal password.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleUpdateProfile} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <FormField
+              label="Username"
+              required
+              value={profileUsername}
+              onChange={(e) => setProfileUsername(e.target.value)}
+              placeholder="e.g. Sai Babu P"
+            />
+            <FormField
+              label="Email Address"
+              type="email"
+              required
+              value={profileEmail}
+              onChange={(e) => setProfileEmail(e.target.value)}
+              placeholder="e.g. rgsenterprise2026@gmail.com"
+            />
+            <FormField
+              label="Full Name / Display Name"
+              required
+              value={profileFullName}
+              onChange={(e) => setProfileFullName(e.target.value)}
+              placeholder="e.g. Sai Babu P"
+            />
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-apple-bg dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-3">
+            <span className="text-xs font-semibold text-apple-text dark:text-apple-darkText block">
+              Change Password (leave blank if not changing)
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField
+                label="Current Password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+              />
+              <FormField
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min 6 characters"
+              />
+              <FormField
+                label="Confirm New Password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat new password"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isSavingProfile}
+              icon={<Save className="w-4 h-4" />}
+            >
+              Update Profile & Credentials
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Row 2: Organization Branding & Configuration */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profile Card */}
         <Card className="md:col-span-1 p-5 flex flex-col justify-between">
@@ -71,6 +210,11 @@ export const Settings: React.FC = () => {
             <p className="text-xs text-apple-secondary dark:text-apple-darkSecondary font-mono mt-0.5">
               @{user?.username}
             </p>
+            {user?.email && (
+              <p className="text-xs text-apple-secondary dark:text-apple-darkSecondary mt-0.5 truncate">
+                {user.email}
+              </p>
+            )}
             <div className="mt-3">
               <Badge variant="accent">{user?.role || 'ADMIN'}</Badge>
             </div>
@@ -135,7 +279,7 @@ export const Settings: React.FC = () => {
                 isLoading={isSaving}
                 icon={<Save className="w-4 h-4" />}
               >
-                Save Settings
+                Save Branding Settings
               </Button>
             </div>
           </form>
@@ -144,4 +288,5 @@ export const Settings: React.FC = () => {
     </div>
   );
 };
+
 

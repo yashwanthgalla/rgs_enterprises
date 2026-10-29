@@ -35,5 +35,15 @@ public class AuthController {
         UserResponse response = authService.getCurrentUser(userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
+
+    @PutMapping("/profile")
+    @Operation(summary = "Update user profile, username, email, and password")
+    public ResponseEntity<ApiResponse<LoginResponse>> updateProfile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody com.example.rgsenterprisesbackend.dto.UpdateProfileRequest request
+    ) {
+        LoginResponse response = authService.updateProfile(userDetails.getUsername(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Profile updated successfully", response));
+    }
 }
 

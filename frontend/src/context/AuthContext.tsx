@@ -5,8 +5,9 @@ import { User, AuthResponse, ApiResponse } from '../types';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<AuthResponse>;
   logout: () => void;
+  updateUser: (updatedUser: User, newToken?: string) => void;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -42,14 +43,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     verifyAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string): Promise<AuthResponse> => {
     const res = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', { username, password });
     if (res.data.success && res.data.data) {
-      const { token: jwtToken, user: userData } = res.data.data;
+      const authData = res.data.data;
+      const { token: jwtToken, user: userData } = authData;
       setToken(jwtToken);
       setUser(userData);
       localStorage.setItem('rgs_token', jwtToken);
       localStorage.setItem('rgs_user', JSON.stringify(userData));
+      return authData;
+    }
+    throw new Error('Authentication failed');
+  };
+
+  const updateUser = (updatedUser: User, newToken?: string) => {
+    setUser(updatedUser);
+    localStorage.setItem('rgs_user', JSON.stringify(updatedUser));
+    if (newToken) {
+      setToken(newToken);
+      localStorage.setItem('rgs_token', newToken);
     }
   };
 
@@ -67,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         login,
         logout,
+        updateUser,
         isLoading,
         isAuthenticated: !!token && !!user,
       }}

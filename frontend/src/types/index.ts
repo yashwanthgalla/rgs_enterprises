@@ -5,8 +5,10 @@ export type Role = 'ADMIN' | 'VIEWER';
 export interface User {
   id: number;
   username: string;
+  email?: string;
   fullName: string;
   role: Role;
+  mustChangePassword?: boolean;
   createdAt: string;
 }
 
@@ -14,6 +16,7 @@ export interface AuthResponse {
   token: string;
   tokenType: string;
   expiresIn: number;
+  mustChangePassword?: boolean;
   user: User;
 }
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Warehouse, ArrowRight, ShieldCheck, KeyRound, User, Mail, Lock } from 'lucide-react';
+import { Warehouse, ArrowRight, KeyRound, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { apiClient } from '../lib/api';
@@ -11,8 +11,8 @@ import { useToast } from '../components/ui/Toast';
 import { ApiResponse, AuthResponse } from '../types';
 
 export const Login: React.FC = () => {
-  const [username, setUsername] = useState('Sai Babu P');
-  const [password, setPassword] = useState('Admin@1');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // First-time Password Change Modal State
@@ -139,64 +139,6 @@ export const Login: React.FC = () => {
               </Button>
             </div>
           </form>
-
-          {/* Default Administrator Quick Selectors */}
-          <div className="mt-8 pt-6 border-t border-black/[0.06] dark:border-white/[0.08]">
-            <div className="p-3.5 rounded-xl bg-apple-bg dark:bg-white/[0.04] text-xs text-apple-secondary dark:text-apple-darkSecondary">
-              <div className="flex items-center gap-2 mb-2 font-semibold text-apple-text dark:text-apple-darkText">
-                <ShieldCheck className="w-4 h-4 text-apple-accent" />
-                <span>Authorized Administrator Accounts:</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('Sai Babu P');
-                    setPassword('Admin@1');
-                  }}
-                  className={`p-2.5 rounded-xl text-left border transition-all ${
-                    username === 'Sai Babu P' || username === 'rgsenterprise2026@gmail.com'
-                      ? 'border-apple-accent bg-apple-accent/10 text-apple-accent font-medium shadow-sm'
-                      : 'border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <span className="block font-semibold">Admin 1</span>
-                  <span className="text-[11px] text-apple-text dark:text-apple-darkText font-medium block truncate">
-                    Sai Babu P
-                  </span>
-                  <span className="text-[10px] text-apple-secondary block truncate">
-                    rgsenterprise2026@gmail.com
-                  </span>
-                  <span className="text-[10px] font-mono text-apple-accent mt-0.5 block">Pass: Admin@1</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('B Chandrasekhar');
-                    setPassword('Admin@2');
-                  }}
-                  className={`p-2.5 rounded-xl text-left border transition-all ${
-                    username === 'B Chandrasekhar' || username === 'bschandrasekhar4@gmail.com'
-                      ? 'border-apple-accent bg-apple-accent/10 text-apple-accent font-medium shadow-sm'
-                      : 'border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <span className="block font-semibold">Admin 2</span>
-                  <span className="text-[11px] text-apple-text dark:text-apple-darkText font-medium block truncate">
-                    B Chandrasekhar
-                  </span>
-                  <span className="text-[10px] text-apple-secondary block truncate">
-                    bschandrasekhar4@gmail.com
-                  </span>
-                  <span className="text-[10px] font-mono text-apple-accent mt-0.5 block">Pass: Admin@2</span>
-                </button>
-              </div>
-              <p className="text-[11px] text-apple-secondary mt-2.5 text-center">
-                * You will be prompted to set your personal password upon initial sign-in.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Security badge */}

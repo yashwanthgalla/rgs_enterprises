@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --apple-bg: #F5F5F7;
+    --apple-surface: #FFFFFF;
+    --apple-text: #1D1D1F;
+    --apple-secondary: #6E6E73;
+    --apple-border: rgba(0, 0, 0, 0.08);
+    --apple-accent: #0071E3;
+    --apple-success: #34C759;
+    --apple-warning: #FF9F0A;
+    --apple-danger: #FF3B30;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --apple-bg: #000000;
+      --apple-surface: #1C1C1E;
+      --apple-text: #F5F5F7;
+      --apple-secondary: #86868B;
+      --apple-border: rgba(255, 255, 255, 0.12);
+      --apple-accent: #2997FF;
+    }
+  }
+
+  body {
+    background-color: var(--apple-bg);
+    color: var(--apple-text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+  }
+}
+
+/* Apple-style custom glass blur */
+.glass-nav {
+  background-color: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-nav {
+    background-color: rgba(28, 28, 30, 0.82);
+  }
+}
+
+/* Smooth sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}

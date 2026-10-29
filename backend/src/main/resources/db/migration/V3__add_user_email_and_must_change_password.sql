@@ -12,3 +12,4 @@ WHERE username = 'admin' OR email = 'rgsenterprise2026@gmail.com';
 UPDATE app_user 
 SET email = 'bschandrasekhar4@gmail.com', username = 'B Chandrasekhar', full_name = 'B Chandrasekhar'
 WHERE username = 'admin2' OR email = 'bschandrasekhar4@gmail.com';
+

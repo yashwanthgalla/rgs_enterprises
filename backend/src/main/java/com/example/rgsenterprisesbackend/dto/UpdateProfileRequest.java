@@ -7,3 +7,4 @@ public record UpdateProfileRequest(
         String currentPassword,
         String newPassword
 ) {}
+

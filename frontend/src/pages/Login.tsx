@@ -62,12 +62,8 @@ export const Login: React.FC = () => {
       <div className="relative w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-2 rounded-3xl bg-white dark:bg-[#1C1C1E] border border-black/10 dark:border-white/10 shadow-apple-md mb-4 animate-scaleUp">
-            <img
-              src="/rgs-enterprises-logo.png"
-              alt="RGS Enterprises"
-              className="w-16 h-16 object-contain rounded-2xl"
-            />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-apple-accent text-white shadow-apple-md mb-4 animate-scaleUp">
+            <Building2 className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
             {settings.companyName || 'RGS ENTERPRISES'}

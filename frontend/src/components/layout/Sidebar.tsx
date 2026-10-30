@@ -56,13 +56,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         )}
       >
         {/* Brand Header */}
-        <div className="p-5 pb-4 flex items-center gap-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-          <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/10 p-1 border border-black/10 dark:border-white/10 shadow-apple-sm flex items-center justify-center shrink-0">
-            <img
-              src={settings.logoUrl || '/rgs-enterprises-logo.png'}
-              alt="RGS Logo"
-              className="w-full h-full object-contain rounded-lg"
-            />
+        <div className="p-6 pb-5 flex items-center gap-3 border-b border-black/[0.06] dark:border-white/[0.08]">
+          <div className="w-10 h-10 rounded-2xl bg-apple-accent text-white flex items-center justify-center shadow-apple-sm font-bold">
+            <Building2 className="w-5 h-5" />
           </div>
           <div className="overflow-hidden">
             <h1 className="text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100 truncate">

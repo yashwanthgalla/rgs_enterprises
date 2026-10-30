@@ -13,7 +13,6 @@ const defaultSettings: AppSettings = {
   companyTagline: 'Industrial Godown & Warehouse Assets Management',
   contactEmail: 'rgsenterprise2026@gmail.com',
   currency: '₹',
-  logoUrl: '/rgs-enterprises-logo.png',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

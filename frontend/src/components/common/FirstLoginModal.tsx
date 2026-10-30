@@ -43,7 +43,9 @@ export const FirstLoginModal: React.FC = () => {
     setLoading(true);
     try {
       const res = await authApi.updateProfile({
+        username: username.trim() || undefined,
         newUsername: username.trim() || undefined,
+        email: email.trim() || undefined,
         newEmail: email.trim() || undefined,
         currentPassword,
         newPassword,

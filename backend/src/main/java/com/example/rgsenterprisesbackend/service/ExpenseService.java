@@ -48,8 +48,14 @@ public class ExpenseService {
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request) {
-        Godown godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId())
-                .orElseThrow(() -> new ResourceNotFoundException("Godown not found with ID: " + request.godownId()));
+        Godown godown = null;
+        if (request.godownId() != null) {
+            godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId()).orElse(null);
+        }
+        if (godown == null) {
+            godown = godownRepository.findByIsDeletedFalse().stream().findFirst()
+                    .orElseThrow(() -> new com.example.rgsenterprisesbackend.exception.BadRequestException("Please register at least one Godown before recording expenses."));
+        }
 
         Expense expense = Expense.builder()
                 .godown(godown)

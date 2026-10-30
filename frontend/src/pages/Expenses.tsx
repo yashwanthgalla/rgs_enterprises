@@ -71,7 +71,13 @@ export const Expenses: React.FC = () => {
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.amount) {
-      error('Please fill required fields');
+      error('Please fill required fields (Title and Amount)');
+      return;
+    }
+
+    const targetGodownId = formData.godownId ? Number(formData.godownId) : (godowns[0] ? godowns[0].id : null);
+    if (!targetGodownId) {
+      error('Please register a Godown property before adding operating bills.');
       return;
     }
 
@@ -79,7 +85,7 @@ export const Expenses: React.FC = () => {
     try {
       await expenseApi.create({
         title: formData.title,
-        godownId: formData.godownId ? Number(formData.godownId) : null,
+        godownId: targetGodownId,
         category: formData.category,
         amount: Number(formData.amount),
         expenseDate: formData.expenseDate,
@@ -149,7 +155,7 @@ export const Expenses: React.FC = () => {
           onClick={() => {
             setFormData({
               title: '',
-              godownId: '',
+              godownId: godowns[0] ? String(godowns[0].id) : '',
               category: 'ELECTRICITY',
               amount: '',
               expenseDate: new Date().toISOString().slice(0, 10),
@@ -336,7 +342,7 @@ export const Expenses: React.FC = () => {
             />
           </FormField>
 
-          <FormField label="Facility">
+          <FormField label="Godown Facility" hint={godowns.length === 0 ? "Add your first godown in Godowns tab" : undefined}>
             <Select
               value={formData.godownId}
               onChange={(e) => setFormData({ ...formData, godownId: e.target.value })}

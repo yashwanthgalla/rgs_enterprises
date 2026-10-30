@@ -36,7 +36,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         String identifier = request.username().trim();
         AppUser user = userRepository.findByUsernameOrEmailIgnoreCase(identifier)
-                .orElseThrow(() -> new ResourceNotFoundException("Invalid credentials: user not found"));
+                .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Invalid username or password"));
 
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(user.getUsername(), request.password())
@@ -100,30 +100,31 @@ public class AuthService {
         }
 
         // 2. Username update logic
-        if (request.username() != null && !request.username().isBlank()) {
-            String newUsername = request.username().trim();
-            if (!newUsername.equalsIgnoreCase(user.getUsername())) {
-                if (userRepository.existsByUsernameIgnoreCaseAndIdNot(newUsername, user.getId())) {
-                    throw new BadRequestException("Username '" + newUsername + "' is already in use");
+        String targetUsername = request.getEffectiveUsername();
+        if (targetUsername != null && !targetUsername.isBlank()) {
+            if (!targetUsername.equalsIgnoreCase(user.getUsername())) {
+                if (userRepository.existsByUsernameIgnoreCaseAndIdNot(targetUsername, user.getId())) {
+                    throw new BadRequestException("Username '" + targetUsername + "' is already in use");
                 }
-                user.setUsername(newUsername);
+                user.setUsername(targetUsername);
             }
         }
 
         // 3. Email update logic
-        if (request.email() != null && !request.email().isBlank()) {
-            String newEmail = request.email().trim();
-            if (user.getEmail() == null || !newEmail.equalsIgnoreCase(user.getEmail())) {
-                if (userRepository.existsByEmailIgnoreCaseAndIdNot(newEmail, user.getId())) {
-                    throw new BadRequestException("Email '" + newEmail + "' is already in use");
+        String targetEmail = request.getEffectiveEmail();
+        if (targetEmail != null && !targetEmail.isBlank()) {
+            if (user.getEmail() == null || !targetEmail.equalsIgnoreCase(user.getEmail())) {
+                if (userRepository.existsByEmailIgnoreCaseAndIdNot(targetEmail, user.getId())) {
+                    throw new BadRequestException("Email '" + targetEmail + "' is already in use");
                 }
-                user.setEmail(newEmail);
+                user.setEmail(targetEmail);
             }
         }
 
         // 4. Full name update logic
-        if (request.fullName() != null && !request.fullName().isBlank()) {
-            user.setFullName(request.fullName().trim());
+        String targetFullName = request.getEffectiveFullName();
+        if (targetFullName != null && !targetFullName.isBlank()) {
+            user.setFullName(targetFullName);
         }
 
         AppUser saved = userRepository.save(user);

@@ -34,7 +34,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("Login with valid seeded credentials returns JWT token")
     void login_validCredentials_returnsJwt() throws Exception {
-        LoginRequest request = new LoginRequest("admin", "Admin@12345");
+        LoginRequest request = new LoginRequest("Sai Babu P", "Admin@1");
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -42,14 +42,14 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.token").isString())
-                .andExpect(jsonPath("$.data.user.username").value("admin"))
+                .andExpect(jsonPath("$.data.user.username").value("Sai Babu P"))
                 .andExpect(jsonPath("$.data.user.role").value("ADMIN"));
     }
 
     @Test
     @DisplayName("Login with incorrect credentials returns 401 Unauthorized")
     void login_invalidCredentials_returns401() throws Exception {
-        LoginRequest request = new LoginRequest("admin", "WrongPassword999");
+        LoginRequest request = new LoginRequest("Sai Babu P", "WrongPassword999");
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -11,7 +11,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record ExpenseRequest(
-        @NotNull(message = "Godown ID is required")
         Long godownId,
 
         @NotNull(message = "Category is required")

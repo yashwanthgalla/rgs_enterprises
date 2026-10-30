@@ -62,8 +62,11 @@ export const Settings: React.FC = () => {
     setProfileLoading(true);
     try {
       const payload: any = {
+        username: profileData.username.trim() || undefined,
         newUsername: profileData.username.trim() || undefined,
+        email: profileData.email.trim() || undefined,
         newEmail: profileData.email.trim() || undefined,
+        fullName: profileData.fullName.trim() || undefined,
         newFullName: profileData.fullName.trim() || undefined,
       };
 

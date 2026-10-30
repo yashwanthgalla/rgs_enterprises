@@ -32,8 +32,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const data: any = await settingsApi.get();
         if (data) {
-          setSettings((prev) => ({ ...prev, ...data }));
-          localStorage.setItem('appSettings', JSON.stringify(data));
+          const normalized = {
+            ...data,
+            currency: data.currency || data.defaultCurrency || '₹',
+            contactEmail: data.contactEmail || data.alertEmail || 'rgsenterprise2026@gmail.com',
+          };
+          setSettings((prev) => ({ ...prev, ...normalized }));
+          localStorage.setItem('appSettings', JSON.stringify(normalized));
         }
       } catch {
         // Keep defaults if not loaded
@@ -54,10 +59,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const formatCurrency = (amount: number | undefined | null): string => {
+    const symbol = settings?.currency || (settings as any)?.defaultCurrency || '₹';
     if (amount === undefined || amount === null || isNaN(amount)) {
-      return `${settings.currency}0`;
+      return `${symbol}0`;
     }
-    return `${settings.currency}${amount.toLocaleString('en-IN')}`;
+    return `${symbol}${amount.toLocaleString('en-IN')}`;
   };
 
   return (

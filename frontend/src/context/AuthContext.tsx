@@ -69,15 +69,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: { username: string; password: string }): Promise<AuthResponse> => {
     const res = await authApi.login(credentials);
-    const authData = res as AuthResponse;
+    const authData = res as any;
     const newToken = authData.token;
+    const userPayload = authData.user || authData;
     const userObj: User = {
-      id: 1,
-      username: authData.username,
-      email: authData.email,
-      fullName: authData.fullName || authData.username,
-      role: (authData.role as any) || 'ADMIN',
-      mustChangePassword: authData.mustChangePassword,
+      id: userPayload.id || 1,
+      username: userPayload.username,
+      email: userPayload.email,
+      fullName: userPayload.fullName || userPayload.username,
+      role: (userPayload.role as any) || 'ADMIN',
+      mustChangePassword: !!(authData.mustChangePassword ?? userPayload.mustChangePassword),
     };
 
     localStorage.setItem('token', newToken);

@@ -74,7 +74,7 @@ export const Login: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="p-8 rounded-3xl bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-apple-modal animate-scaleUp">
+        <div className="p-8 rounded-3xl glass-card shadow-apple-modal animate-scaleUp">
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Sign In

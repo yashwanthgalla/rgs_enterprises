@@ -62,7 +62,7 @@ export const Modal: React.FC<ModalProps> = ({
       <div
         className={twMerge(
           clsx(
-            'relative w-full rounded-3xl bg-white dark:bg-[#1C1C1E] border border-black/10 dark:border-white/10 shadow-apple-modal overflow-hidden z-10 animate-scaleUp max-h-[90vh] flex flex-col',
+            'relative w-full rounded-3xl glass-modal overflow-hidden z-10 animate-scaleUp max-h-[90vh] flex flex-col',
             maxWidths[maxWidth]
           )
         )}

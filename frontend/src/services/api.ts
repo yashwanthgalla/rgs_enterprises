@@ -189,3 +189,4 @@ export const settingsApi = {
   get: () => api.get('/settings').then(unwrap),
   update: (data: any) => api.put('/settings', data).then(unwrap),
 };
+

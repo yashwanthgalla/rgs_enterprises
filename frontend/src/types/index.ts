@@ -129,3 +129,4 @@ export interface DashboardMetrics {
   totalExpensesThisMonth: number;
   netRevenueThisMonth: number;
 }
+

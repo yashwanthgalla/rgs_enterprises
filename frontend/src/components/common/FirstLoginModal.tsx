@@ -179,3 +179,4 @@ export const FirstLoginModal: React.FC = () => {
     </Modal>
   );
 };
+

@@ -456,3 +456,4 @@ export const RentLedger: React.FC = () => {
     </div>
   );
 };
+

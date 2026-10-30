@@ -433,3 +433,4 @@ export const Expenses: React.FC = () => {
     </div>
   );
 };
+

@@ -232,6 +232,22 @@ export const Settings: React.FC = () => {
         </div>
 
         <form onSubmit={handleCompanySubmit} className="space-y-4 mt-5">
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08]">
+            <img
+              src="/rgs-enterprises-logo.png"
+              alt="Brand Logo"
+              className="w-14 h-14 object-contain rounded-xl bg-white dark:bg-white/10 p-1 border border-black/10 dark:border-white/10 shadow-apple-sm shrink-0"
+            />
+            <div>
+              <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                Official Company Logo
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Active in sidebar, login screen, and favicon (/rgs-enterprises-logo.png)
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Organization Name" required>
               <Input
@@ -279,3 +295,4 @@ export const Settings: React.FC = () => {
     </div>
   );
 };
+

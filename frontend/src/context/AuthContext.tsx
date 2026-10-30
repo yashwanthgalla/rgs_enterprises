@@ -1,88 +1,124 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient } from '../lib/api';
-import { User, AuthResponse, ApiResponse } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { User, AuthResponse } from '../types';
+import { authApi } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<AuthResponse>;
-  logout: () => void;
-  updateUser: (updatedUser: User, newToken?: string) => void;
-  isLoading: boolean;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  mustChangePassword: boolean;
+  login: (credentials: { username: string; password: string }) => Promise<AuthResponse>;
+  logout: () => void;
+  updateUser: (updatedUser: Partial<User>) => void;
+  setMustChangePassword: (must: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('rgs_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('rgs_token'));
+
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('token');
+  });
+
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? !!JSON.parse(savedUser).mustChangePassword : false;
+    } catch {
+      return false;
+    }
+  });
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Validate session on mount
   useEffect(() => {
-    const verifyAuth = async () => {
-      const storedToken = localStorage.getItem('rgs_token');
-      if (storedToken) {
+    const initAuth = async () => {
+      const savedToken = localStorage.getItem('token');
+      if (savedToken) {
         try {
-          const res = await apiClient.get<ApiResponse<User>>('/auth/me');
-          if (res.data.success && res.data.data) {
-            setUser(res.data.data);
-            localStorage.setItem('rgs_user', JSON.stringify(res.data.data));
+          const userData = (await authApi.me()) as any;
+          if (userData) {
+            setUser(userData);
+            setMustChangePassword(!!userData.mustChangePassword);
+            localStorage.setItem('user', JSON.stringify(userData));
           }
         } catch {
-          // Token is invalid/expired
-          logout();
+          // Token expired or invalid
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setToken(null);
+          setUser(null);
         }
       }
       setIsLoading(false);
     };
 
-    verifyAuth();
+    initAuth();
   }, []);
 
-  const login = async (username: string, password: string): Promise<AuthResponse> => {
-    const res = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', { username, password });
-    if (res.data.success && res.data.data) {
-      const authData = res.data.data;
-      const { token: jwtToken, user: userData } = authData;
-      setToken(jwtToken);
-      setUser(userData);
-      localStorage.setItem('rgs_token', jwtToken);
-      localStorage.setItem('rgs_user', JSON.stringify(userData));
-      return authData;
-    }
-    throw new Error('Authentication failed');
+  const login = async (credentials: { username: string; password: string }): Promise<AuthResponse> => {
+    const res = await authApi.login(credentials);
+    const authData = res as AuthResponse;
+    const newToken = authData.token;
+    const userObj: User = {
+      id: 1,
+      username: authData.username,
+      email: authData.email,
+      fullName: authData.fullName || authData.username,
+      role: (authData.role as any) || 'ADMIN',
+      mustChangePassword: authData.mustChangePassword,
+    };
+
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userObj));
+    setToken(newToken);
+    setUser(userObj);
+    setMustChangePassword(!!authData.mustChangePassword);
+
+    return authData;
   };
 
-  const updateUser = (updatedUser: User, newToken?: string) => {
-    setUser(updatedUser);
-    localStorage.setItem('rgs_user', JSON.stringify(updatedUser));
-    if (newToken) {
-      setToken(newToken);
-      localStorage.setItem('rgs_token', newToken);
-    }
-  };
-
-  const logout = () => {
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setToken(null);
     setUser(null);
-    localStorage.removeItem('rgs_token');
-    localStorage.removeItem('rgs_user');
-  };
+    setMustChangePassword(false);
+    window.location.href = '/login';
+  }, []);
+
+  const updateUser = useCallback((updatedFields: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updatedFields };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
+        isAuthenticated: !!token && !!user,
+        isLoading,
+        mustChangePassword,
         login,
         logout,
         updateUser,
-        isLoading,
-        isAuthenticated: !!token && !!user,
+        setMustChangePassword,
       }}
     >
       {children}
@@ -97,4 +133,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

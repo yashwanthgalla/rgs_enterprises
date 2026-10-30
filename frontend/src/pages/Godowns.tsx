@@ -1,560 +1,474 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Warehouse,
   Plus,
-  MapPin,
-  Maximize2,
-  Calendar,
-  User,
-  Trash2,
-  Edit,
-  ArrowRight,
-  Shield,
   Search,
+  Filter,
+  MapPin,
+  Square,
+  Users,
+  IndianRupee,
+  MoreVertical,
+  ExternalLink,
+  Edit,
+  Trash2,
 } from 'lucide-react';
-import { apiClient } from '../lib/api';
-import { Godown, GodownStatus, ApiResponse, PagedResponse } from '../types';
-import { formatINR, formatSqft, formatDate } from '../lib/utils';
 import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Sheet } from '../components/ui/Sheet';
-import { FormField } from '../components/ui/FormField';
-import { SegmentedControl } from '../components/ui/SegmentedControl';
-import { useToast } from '../components/ui/Toast';
+import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { FormField, Input, Select, Textarea } from '../components/ui/Input';
+import { useSettings } from '../context/SettingsContext';
+import { useToast } from '../context/ToastContext';
+import { godownApi } from '../services/api';
+import { Godown } from '../types';
 
 export const Godowns: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { formatCurrency } = useSettings();
+  const { success, error } = useToast();
 
-  const [selectedCity, setSelectedCity] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [editingGodown, setEditingGodown] = useState<Godown | null>(null);
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Form State
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingGodown, setEditingGodown] = useState<Godown | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    city: 'Hyderabad',
-    state: 'Telangana',
-    address: '',
-    pincode: '',
-    sizeSqft: 20000,
-    status: 'ACTIVE' as GodownStatus,
+    location: '',
+    capacitySqFt: '',
+    occupiedSqFt: '',
+    monthlyRent: '',
     currentTenant: '',
     tenantPhone: '',
     tenantEmail: '',
-    leaseStartDate: '',
-    leaseEndDate: '',
-    monthlyRent: 200000,
-    securityAdvance: 800000,
+    status: 'ACTIVE',
     notes: '',
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch Cities
-  const { data: citiesData } = useQuery({
-    queryKey: ['godownCities'],
-    queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<string[]>>('/godowns/cities');
-      return res.data.data;
-    },
-  });
+  const fetchGodowns = async () => {
+    setLoading(true);
+    try {
+      const res: any = await godownApi.getAll(0, 100);
+      const data = Array.isArray(res) ? res : res?.content || [];
+      setGodowns(data);
+    } catch (err: any) {
+      error('Failed to load godowns: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Fetch Godowns
-  const { data: godownsData, isLoading } = useQuery({
-    queryKey: ['godowns', selectedCity, selectedStatus, searchQuery],
-    queryFn: async () => {
-      const params: Record<string, string | number> = { size: 50 };
-      if (selectedCity !== 'ALL') params.city = selectedCity;
-      if (selectedStatus !== 'ALL') params.status = selectedStatus;
-      if (searchQuery) params.query = searchQuery;
+  useEffect(() => {
+    fetchGodowns();
+  }, []);
 
-      const res = await apiClient.get<ApiResponse<PagedResponse<Godown>>>('/godowns', { params });
-      return res.data.data.content;
-    },
-  });
-
-  // Create/Update Mutation
-  const saveMutation = useMutation({
-    mutationFn: async (payload: typeof formData) => {
-      const sanitized = {
-        ...payload,
-        leaseStartDate: payload.leaseStartDate ? payload.leaseStartDate : null,
-        leaseEndDate: payload.leaseEndDate ? payload.leaseEndDate : null,
-        currentTenant: payload.currentTenant ? payload.currentTenant : null,
-        tenantPhone: payload.tenantPhone ? payload.tenantPhone : null,
-        tenantEmail: payload.tenantEmail ? payload.tenantEmail : null,
-        pincode: payload.pincode ? payload.pincode : null,
-        notes: payload.notes ? payload.notes : null,
-      };
-      if (editingGodown) {
-        return apiClient.put(`/godowns/${editingGodown.id}`, sanitized);
-      } else {
-        return apiClient.post('/godowns', sanitized);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess(editingGodown ? 'Godown updated successfully' : 'Godown created successfully');
-      setIsSheetOpen(false);
-      resetForm();
-    },
-    onError: (err: any) => {
-      toastError(err.response?.data?.message || 'Failed to save godown record');
-    },
-  });
-
-  // Delete Mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return apiClient.delete(`/godowns/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess('Godown deleted successfully');
-    },
-    onError: (err: any) => {
-      toastError(err.response?.data?.message || 'Cannot delete godown: child records exist.');
-    },
-  });
-
-  const resetForm = () => {
+  const openCreateModal = () => {
     setEditingGodown(null);
     setFormData({
       name: '',
       code: '',
-      city: 'Hyderabad',
-      state: 'Telangana',
-      address: '',
-      pincode: '',
-      sizeSqft: 20000,
-      status: 'ACTIVE',
+      location: '',
+      capacitySqFt: '',
+      occupiedSqFt: '',
+      monthlyRent: '',
       currentTenant: '',
       tenantPhone: '',
       tenantEmail: '',
-      leaseStartDate: '',
-      leaseEndDate: '',
-      monthlyRent: 200000,
-      securityAdvance: 800000,
+      status: 'ACTIVE',
       notes: '',
     });
+    setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (godown: Godown, e: React.MouseEvent) => {
+  const openEditModal = (g: Godown, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingGodown(godown);
+    setEditingGodown(g);
     setFormData({
-      name: godown.name,
-      code: godown.code,
-      city: godown.city,
-      state: godown.state,
-      address: godown.address,
-      pincode: godown.pincode || '',
-      sizeSqft: godown.sizeSqft,
-      status: godown.status,
-      currentTenant: godown.currentTenant || '',
-      tenantPhone: godown.tenantPhone || '',
-      tenantEmail: godown.tenantEmail || '',
-      leaseStartDate: godown.leaseStartDate || '',
-      leaseEndDate: godown.leaseEndDate || '',
-      monthlyRent: godown.monthlyRent,
-      securityAdvance: godown.securityAdvance,
-      notes: godown.notes || '',
+      name: g.name || '',
+      code: g.code || '',
+      location: g.location || '',
+      capacitySqFt: String(g.capacitySqFt || ''),
+      occupiedSqFt: String(g.occupiedSqFt || ''),
+      monthlyRent: String(g.monthlyRent || ''),
+      currentTenant: g.currentTenant || '',
+      tenantPhone: g.tenantPhone || '',
+      tenantEmail: g.tenantEmail || '',
+      status: g.status || 'ACTIVE',
+      notes: g.notes || '',
     });
-    setIsSheetOpen(true);
+    setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number, e: React.MouseEvent) => {
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this godown? It will be blocked if child records exist.')) {
-      deleteMutation.mutate(id);
+    if (!window.confirm('Are you sure you want to delete this godown? This will delete associated records.')) {
+      return;
+    }
+    try {
+      await godownApi.delete(id);
+      success('Godown deleted successfully');
+      setGodowns((prev) => prev.filter((g) => g.id !== id));
+    } catch (err: any) {
+      error('Failed to delete godown: ' + (err.message || 'Unknown error'));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveMutation.mutate(formData);
+    if (!formData.name || !formData.location || !formData.capacitySqFt || !formData.monthlyRent) {
+      error('Please fill in all required fields.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: formData.name,
+        code: formData.code || undefined,
+        location: formData.location,
+        capacitySqFt: Number(formData.capacitySqFt),
+        occupiedSqFt: formData.occupiedSqFt ? Number(formData.occupiedSqFt) : 0,
+        monthlyRent: Number(formData.monthlyRent),
+        currentTenant: formData.currentTenant || null,
+        tenantPhone: formData.tenantPhone || null,
+        tenantEmail: formData.tenantEmail || null,
+        status: formData.status,
+        notes: formData.notes || null,
+      };
+
+      if (editingGodown) {
+        await godownApi.update(editingGodown.id, payload);
+        success('Godown updated successfully');
+      } else {
+        await godownApi.create(payload);
+        success('Godown created successfully');
+      }
+
+      setIsModalOpen(false);
+      fetchGodowns();
+    } catch (err: any) {
+      error('Operation failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const cities = ['ALL', ...(citiesData || ['Hyderabad', 'Vijayawada', 'Visakhapatnam', 'Guntur', 'Warangal', 'Tirupati'])];
+  const filteredGodowns = godowns.filter((g) => {
+    const matchesSearch =
+      g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (g.currentTenant && g.currentTenant.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
+    <div className="space-y-6 animate-fadeIn">
+      {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-apple-text dark:text-apple-darkText">
-            Godown Locations
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+            Godowns & Warehouses
           </h1>
-          <p className="text-sm text-apple-secondary dark:text-apple-darkSecondary mt-1">
-            Browse, inspect, and configure warehouse facilities across all regions.
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Manage physical warehouses, lease contracts, and square footage capacity
           </p>
         </div>
 
         <Button
-          variant="primary"
-          onClick={() => {
-            resetForm();
-            setIsSheetOpen(true);
-          }}
+          onClick={openCreateModal}
           icon={<Plus className="w-4 h-4" />}
+          className="rounded-xl shadow-apple-sm"
         >
           Add New Godown
         </Button>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Status Segmented Control */}
-        <SegmentedControl
-          value={selectedStatus}
-          onChange={setSelectedStatus}
-          options={[
-            { value: 'ALL', label: 'All Units' },
-            { value: 'ACTIVE', label: 'Active Leased' },
-            { value: 'VACANT', label: 'Vacant' },
-            { value: 'UNDER_MAINTENANCE', label: 'Maintenance' },
-          ]}
-        />
-
-        {/* Search input */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-apple-secondary pointer-events-none" />
-          <input
-            type="text"
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <Input
+            placeholder="Search by godown name, location, or tenant..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search name, code, tenant..."
-            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm rounded-full border border-apple-border dark:border-apple-darkBorder bg-white/80 dark:bg-apple-darkSurface text-apple-text dark:text-apple-darkText placeholder:text-apple-secondary/60 focus:outline-none focus:ring-2 focus:ring-apple-accent/20 focus:border-apple-accent transition-all"
+            className="pl-9"
           />
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
         </div>
-      </div>
 
-      {/* City Pills Horizontal Scroll */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-        <span className="text-apple-secondary dark:text-apple-darkSecondary font-semibold uppercase tracking-wider shrink-0 mr-1">
-          City:
-        </span>
-        {cities.map((city) => (
-          <button
-            key={city}
-            type="button"
-            onClick={() => setSelectedCity(city)}
-            className={`px-3 py-1.5 rounded-full font-medium transition-all shrink-0 ${
-              selectedCity === city
-                ? 'bg-apple-text text-white dark:bg-white dark:text-apple-text shadow-sm'
-                : 'bg-black/[0.04] dark:bg-white/[0.06] text-apple-secondary dark:text-apple-darkSecondary hover:text-apple-text dark:hover:text-apple-darkText'
-            }`}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-40"
           >
-            {city}
-          </button>
-        ))}
+            <option value="ALL">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="MAINTENANCE">Maintenance</option>
+            <option value="INACTIVE">Inactive</option>
+          </Select>
+        </div>
       </div>
 
-      {/* Godowns Fleet Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-64 rounded-apple-lg bg-black/5 dark:bg-white/5 animate-pulse" />
-          ))}
+      {/* Grid of Godown Cards */}
+      {loading ? (
+        <div className="py-20 text-center text-xs text-gray-400">
+          <div className="w-6 h-6 border-2 border-apple-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          Loading warehouse facilities...
         </div>
-      ) : (godownsData || []).length === 0 ? (
-        <Card className="text-center py-16">
-          <Warehouse className="w-12 h-12 text-apple-secondary opacity-40 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-apple-text dark:text-apple-darkText">
+      ) : filteredGodowns.length === 0 ? (
+        <Card className="p-12 text-center text-xs text-gray-400">
+          <Warehouse className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+          <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
             No godowns found
-          </h3>
-          <p className="text-xs text-apple-secondary dark:text-apple-darkSecondary max-w-sm mx-auto mt-1 mb-6">
-            No warehouses matched your search or selected city filter.
           </p>
-          <Button
-            size="sm"
-            onClick={() => {
-              setSelectedCity('ALL');
-              setSelectedStatus('ALL');
-              setSearchQuery('');
-            }}
-          >
-            Clear Filters
-          </Button>
+          <p className="mt-1">
+            {searchQuery
+              ? 'Try modifying your search filter.'
+              : 'Add your first warehouse property to get started.'}
+          </p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {(godownsData || []).map((g) => (
-            <Card
-              key={g.id}
-              onClick={() => navigate(`/godowns/${g.id}`)}
-              className="cursor-pointer hover:shadow-apple-card hover:-translate-y-0.5 transition-all flex flex-col justify-between group"
-            >
-              <div>
-                {/* Header: Name, Code & Status */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div>
-                    <h3 className="font-semibold text-base text-apple-text dark:text-apple-darkText group-hover:text-apple-accent transition-colors">
-                      {g.name}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-xs text-apple-secondary dark:text-apple-darkSecondary mt-0.5">
-                      <span className="font-mono">{g.code}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-0.5">
-                        <MapPin className="w-3 h-3" />
-                        {g.city}, {g.state}
-                      </span>
+          {filteredGodowns.map((g) => {
+            const occupancyPct = g.capacitySqFt > 0 ? Math.round(((g.occupiedSqFt || 0) / g.capacitySqFt) * 100) : 0;
+            return (
+              <Card
+                key={g.id}
+                hoverable
+                onClick={() => navigate(`/godowns/${g.id}`)}
+                className="p-5 flex flex-col justify-between cursor-pointer group"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 group-hover:text-apple-accent transition-colors">
+                          {g.name}
+                        </h3>
+                        {g.code && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-gray-500">
+                            {g.code}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span>{g.location}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Badge
+                        variant={g.status === 'ACTIVE' ? 'success' : g.status === 'MAINTENANCE' ? 'warning' : 'neutral'}
+                        size="sm"
+                      >
+                        {g.status}
+                      </Badge>
+                      <button
+                        onClick={(e) => openEditModal(g, e)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-black/5 dark:hover:text-gray-200 dark:hover:bg-white/10 transition-colors"
+                        title="Edit Godown"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(g.id, e)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                        title="Delete Godown"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <Badge
-                    variant={
-                      g.status === 'ACTIVE'
-                        ? 'success'
-                        : g.status === 'VACANT'
-                        ? 'warning'
-                        : 'neutral'
-                    }
-                  >
-                    {g.status}
-                  </Badge>
-                </div>
 
-                {/* Tenant / Lessee Information */}
-                <div className="my-3.5 p-3 rounded-xl bg-apple-bg dark:bg-white/[0.03] border border-black/[0.03] dark:border-white/[0.05] space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-apple-secondary dark:text-apple-darkSecondary flex items-center gap-1">
-                      <User className="w-3 h-3" /> Tenant:
-                    </span>
-                    <span className="font-medium text-apple-text dark:text-apple-darkText truncate max-w-[150px]">
-                      {g.currentTenant || 'Vacant / Available'}
-                    </span>
+                  {/* Capacity Bar */}
+                  <div className="mt-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03]">
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <Square className="w-3.5 h-3.5" />
+                        <span>Capacity: {g.capacitySqFt.toLocaleString('en-IN')} sq.ft</span>
+                      </span>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">
+                        {occupancyPct}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-apple-accent rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(occupancyPct, 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  {g.leaseEndDate && (
+
+                  {/* Tenant Details */}
+                  <div className="mt-4 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
                     <div className="flex items-center justify-between">
-                      <span className="text-apple-secondary dark:text-apple-darkSecondary flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> Lease Expiry:
-                      </span>
-                      <span className="font-medium text-apple-text dark:text-apple-darkText">
-                        {formatDate(g.leaseEndDate)}
+                      <span className="text-gray-400">Current Tenant:</span>
+                      <span className="font-semibold truncate max-w-[160px]">
+                        {g.currentTenant || <span className="text-gray-400 italic font-normal">Vacant</span>}
                       </span>
                     </div>
-                  )}
+                    {g.tenantPhone && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Phone:</span>
+                        <span>{g.tenantPhone}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Key Metrics */}
-                <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
+                {/* Footer Rent & Action */}
+                <div className="mt-5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
                   <div>
-                    <span className="text-apple-secondary dark:text-apple-darkSecondary block text-[10px] uppercase font-semibold">
-                      Floor Area
-                    </span>
-                    <span className="font-medium text-apple-text dark:text-apple-darkText">
-                      {formatSqft(g.sizeSqft)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-apple-secondary dark:text-apple-darkSecondary block text-[10px] uppercase font-semibold">
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wider block">
                       Monthly Rent
                     </span>
-                    <span className="font-semibold text-apple-accent">
-                      {formatINR(g.monthlyRent)}/mo
+                    <span className="text-base font-bold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(g.monthlyRent)}
                     </span>
                   </div>
-                </div>
-              </div>
 
-              {/* Card Footer Actions */}
-              <div className="flex items-center justify-between pt-3 mt-3 border-t border-black/[0.04] dark:border-white/[0.06]">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={(e) => handleOpenEdit(g, e)}
-                    className="p-1.5 rounded-lg text-apple-secondary hover:text-apple-text hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
-                    title="Edit Facility"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDelete(g.id, e)}
-                    className="p-1.5 rounded-lg text-apple-secondary hover:text-apple-danger hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
-                    title="Delete Facility"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[10px] text-apple-secondary dark:text-apple-darkSecondary ml-1">
-                    Edited by: <strong className="font-semibold text-apple-text dark:text-apple-darkText">{g.lastEditedBy || 'admin'}</strong>
+                  <span className="text-xs text-apple-accent font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                    <span>Manage Hub</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </span>
                 </div>
-
-                <span className="text-xs font-semibold text-apple-accent group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-                  Facility Hub <ArrowRight className="w-3 h-3" />
-                </span>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Add / Edit Godown Sheet Drawer */}
-      <Sheet
-        isOpen={isSheetOpen}
-        onClose={() => setIsSheetOpen(false)}
-        title={editingGodown ? 'Edit Godown Location' : 'New Godown Facility'}
-        description="Configure warehouse specifications, tenant lease terms, and financial targets."
+      {/* Add / Edit Godown Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingGodown ? 'Edit Godown Property' : 'Add New Godown Property'}
+        description="Fill in facility measurements, tenancy, and monthly billing rates."
+        maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField
-            label="Godown Name"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g. Patancheru Central Hub"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField label="Godown Name" required>
+              <Input
+                placeholder="e.g. Unit A - Auto Logistics"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Facility Code"
-              required
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-              placeholder="e.g. GDN-HYD-07"
-            />
-            <FormField
-              label="Status"
-              as="select"
-              required
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as GodownStatus })}
-              options={[
-                { value: 'ACTIVE', label: 'Active Leased' },
-                { value: 'VACANT', label: 'Vacant / Ready' },
-                { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
-              ]}
-            />
+            <FormField label="Facility Code">
+              <Input
+                placeholder="e.g. GDW-01"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              />
+            </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="City"
+          <FormField label="Location / Address" required>
+            <Input
+              placeholder="e.g. Plot 42, IDA Cherlapally, Hyderabad"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               required
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              placeholder="e.g. Hyderabad"
             />
-            <FormField
-              label="State"
-              required
-              value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-              placeholder="Telangana / Andhra Pradesh"
-            />
+          </FormField>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <FormField label="Total Capacity (sq.ft)" required>
+              <Input
+                type="number"
+                placeholder="e.g. 15000"
+                value={formData.capacitySqFt}
+                onChange={(e) => setFormData({ ...formData, capacitySqFt: e.target.value })}
+                required
+              />
+            </FormField>
+
+            <FormField label="Occupied (sq.ft)">
+              <Input
+                type="number"
+                placeholder="e.g. 15000"
+                value={formData.occupiedSqFt}
+                onChange={(e) => setFormData({ ...formData, occupiedSqFt: e.target.value })}
+              />
+            </FormField>
+
+            <FormField label="Monthly Rent (₹)" required>
+              <Input
+                type="number"
+                placeholder="e.g. 75000"
+                value={formData.monthlyRent}
+                onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
+                required
+              />
+            </FormField>
           </div>
 
-          <FormField
-            label="Address"
-            as="textarea"
-            required
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            placeholder="Full physical plot / survey number & road address"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <FormField label="Current Tenant">
+              <Input
+                placeholder="e.g. Reliance Retail"
+                value={formData.currentTenant}
+                onChange={(e) => setFormData({ ...formData, currentTenant: e.target.value })}
+              />
+            </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Pincode"
-              value={formData.pincode}
-              onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-              placeholder="e.g. 500032"
-            />
-            <FormField
-              label="Size (sq ft)"
-              type="number"
-              required
-              value={formData.sizeSqft}
-              onChange={(e) => setFormData({ ...formData, sizeSqft: Number(e.target.value) })}
-            />
-          </div>
-
-          <div className="pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
-            <h4 className="text-xs font-semibold uppercase text-apple-secondary dark:text-apple-darkSecondary mb-3">
-              Lease & Tenant Details
-            </h4>
-            <FormField
-              label="Current Tenant / Lessee"
-              value={formData.currentTenant}
-              onChange={(e) => setFormData({ ...formData, currentTenant: e.target.value })}
-              placeholder="e.g. Flipkart India Pvt Ltd"
-            />
-
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <FormField
-                label="Tenant Phone"
+            <FormField label="Tenant Phone">
+              <Input
+                placeholder="e.g. +91 98765 43210"
                 value={formData.tenantPhone}
                 onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-                placeholder="+91 98490 12345"
               />
-              <FormField
-                label="Tenant Email"
-                value={formData.tenantEmail}
-                onChange={(e) => setFormData({ ...formData, tenantEmail: e.target.value })}
-                placeholder="logistics@tenant.com"
-              />
-            </div>
+            </FormField>
 
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <FormField
-                label="Lease Start Date"
-                type="date"
-                value={formData.leaseStartDate}
-                onChange={(e) => setFormData({ ...formData, leaseStartDate: e.target.value })}
-              />
-              <FormField
-                label="Lease End Date"
-                type="date"
-                value={formData.leaseEndDate}
-                onChange={(e) => setFormData({ ...formData, leaseEndDate: e.target.value })}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <FormField
-                label="Monthly Rent (INR)"
-                type="number"
-                required
-                value={formData.monthlyRent}
-                onChange={(e) => setFormData({ ...formData, monthlyRent: Number(e.target.value) })}
-              />
-              <FormField
-                label="Security Advance (INR)"
-                type="number"
-                required
-                value={formData.securityAdvance}
-                onChange={(e) => setFormData({ ...formData, securityAdvance: Number(e.target.value) })}
-                hint="Tracked separately from expenses"
-              />
-            </div>
+            <FormField label="Facility Status">
+              <Select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="MAINTENANCE">MAINTENANCE</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </Select>
+            </FormField>
           </div>
 
-          <FormField
-            label="Internal Notes"
-            as="textarea"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Loading bays, clear height, floor strength, sub-station details..."
-          />
+          <FormField label="Internal Notes & Lease terms">
+            <Textarea
+              placeholder="Key specifications, power capacity, lease expiration dates..."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            />
+          </FormField>
 
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setIsSheetOpen(false)}>
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsModalOpen(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" isLoading={saveMutation.isPending}>
-              {editingGodown ? 'Save Changes' : 'Create Godown'}
+            <Button
+              type="submit"
+              loading={submitting}
+            >
+              {editingGodown ? 'Update Godown' : 'Create Godown'}
             </Button>
           </div>
         </form>
-      </Sheet>
+      </Modal>
     </div>
   );
 };
-

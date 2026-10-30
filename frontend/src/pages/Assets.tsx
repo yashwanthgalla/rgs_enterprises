@@ -1,453 +1,374 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
 import {
   Wrench,
+  Search,
   Plus,
   ShieldAlert,
-  ShieldCheck,
   Calendar,
-  Search,
+  Building,
   Trash2,
-  Edit,
-  Tag,
+  CheckCircle2,
 } from 'lucide-react';
-import { apiClient } from '../lib/api';
-import { Asset, AssetCondition, Godown, ApiResponse, PagedResponse } from '../types';
-import { formatINR, formatDate } from '../lib/utils';
 import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { DataTable, Column } from '../components/ui/DataTable';
-import { Sheet } from '../components/ui/Sheet';
-import { FormField } from '../components/ui/FormField';
-import { SegmentedControl } from '../components/ui/SegmentedControl';
-import { useToast } from '../components/ui/Toast';
+import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { FormField, Input, Select, Textarea } from '../components/ui/Input';
+import { useSettings } from '../context/SettingsContext';
+import { useToast } from '../context/ToastContext';
+import { assetApi, godownApi } from '../services/api';
+import { Asset, Godown } from '../types';
 
 export const Assets: React.FC = () => {
-  const queryClient = useQueryClient();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { formatCurrency } = useSettings();
+  const { success, error } = useToast();
 
-  const [selectedCondition, setSelectedCondition] = useState<string>('ALL');
-  const [selectedGodownId, setSelectedGodownId] = useState<string>('ALL');
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-  // Modals
+  // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-
-  // Form State
   const [formData, setFormData] = useState({
-    godownId: '' as number | '',
     name: '',
-    category: 'Material Handling',
+    godownId: '',
+    category: 'CCTV',
     serialNumber: '',
-    quantity: 1,
-    cost: 150000,
-    condition: 'GOOD' as AssetCondition,
-    purchaseDate: new Date().toISOString().split('T')[0],
-    warrantyExpiryDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+    purchaseDate: new Date().toISOString().slice(0, 10),
+    purchaseCost: '',
+    warrantyExpiry: '',
+    status: 'OPERATIONAL',
     notes: '',
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch Godowns
-  const { data: godowns } = useQuery({
-    queryKey: ['activeGodownsDropdown'],
-    queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<Godown[]>>('/godowns/all');
-      return res.data.data;
-    },
-  });
+  const fetchAssets = async () => {
+    setLoading(true);
+    try {
+      const [aRes, gRes] = await Promise.all([
+        assetApi.getAll({ size: 100 }),
+        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
+      ]);
 
-  // Fetch Assets
-  const { data: assetsData, isLoading } = useQuery({
-    queryKey: ['assets', selectedCondition, selectedGodownId, searchQuery, page],
-    queryFn: async () => {
-      const params: Record<string, string | number> = {
-        page,
-        size: 15,
-      };
-      if (selectedCondition !== 'ALL') params.condition = selectedCondition;
-      if (selectedGodownId !== 'ALL') params.godownId = selectedGodownId;
-      if (searchQuery) params.query = searchQuery;
+      const assetList = Array.isArray(aRes) ? aRes : (aRes as any)?.content || [];
+      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
 
-      const res = await apiClient.get<ApiResponse<PagedResponse<Asset>>>('/assets', { params });
-      return res.data.data;
-    },
-  });
-
-  // Save Mutation
-  const saveMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      if (editingAsset) {
-        return apiClient.put(`/assets/${editingAsset.id}`, payload);
-      } else {
-        return apiClient.post('/assets', payload);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess(editingAsset ? 'Equipment updated' : 'Asset registered successfully');
-      setIsModalOpen(false);
-      resetForm();
-    },
-    onError: (err: any) => {
-      toastError(err.response?.data?.message || 'Failed to save asset');
-    },
-  });
-
-  // Delete Mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return apiClient.delete(`/assets/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess('Asset deleted');
-    },
-  });
-
-  const resetForm = () => {
-    setEditingAsset(null);
-    setFormData({
-      godownId: '',
-      name: '',
-      category: 'Material Handling',
-      serialNumber: '',
-      quantity: 1,
-      cost: 150000,
-      condition: 'GOOD',
-      purchaseDate: new Date().toISOString().split('T')[0],
-      warrantyExpiryDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
-      notes: '',
-    });
+      setAssets(assetList);
+      setGodowns(gList);
+    } catch (err: any) {
+      error('Failed to load assets: ' + (err.message || 'Error'));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOpenEdit = (asset: Asset) => {
-    setEditingAsset(asset);
-    setFormData({
-      godownId: asset.godownId,
-      name: asset.name,
-      category: asset.category,
-      serialNumber: asset.serialNumber || '',
-      quantity: asset.quantity,
-      cost: asset.cost,
-      condition: asset.condition,
-      purchaseDate: asset.purchaseDate || '',
-      warrantyExpiryDate: asset.warrantyExpiryDate || '',
-      notes: asset.notes || '',
-    });
-    setIsModalOpen(true);
-  };
+  useEffect(() => {
+    fetchAssets();
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.godownId) {
-      toastError('Please select a godown facility');
+    if (!formData.name || !formData.godownId) {
+      error('Please provide asset name and facility');
       return;
     }
-    saveMutation.mutate({
-      ...formData,
-      godownId: Number(formData.godownId),
-    });
+
+    setSubmitting(true);
+    try {
+      await assetApi.create({
+        name: formData.name,
+        godownId: Number(formData.godownId),
+        category: formData.category,
+        serialNumber: formData.serialNumber || undefined,
+        purchaseDate: formData.purchaseDate || undefined,
+        purchaseCost: formData.purchaseCost ? Number(formData.purchaseCost) : undefined,
+        warrantyExpiry: formData.warrantyExpiry || undefined,
+        status: formData.status,
+        notes: formData.notes || undefined,
+      });
+
+      success('Equipment record registered');
+      setIsModalOpen(false);
+      fetchAssets();
+    } catch (err: any) {
+      error('Failed to create asset: ' + (err.message || 'Error'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const columns: Column<Asset>[] = [
-    {
-      key: 'name',
-      header: 'Equipment Name & S/N',
-      render: (item) => (
-        <div>
-          <span className="font-semibold text-apple-text dark:text-apple-darkText block">
-            {item.name}
-          </span>
-          <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary font-mono">
-            {item.serialNumber ? `S/N: ${item.serialNumber}` : 'No Serial #'}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'godown',
-      header: 'Location',
-      render: (item) => (
-        <div>
-          <span className="font-medium text-apple-text dark:text-apple-darkText block">
-            {item.godownName}
-          </span>
-          <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary font-mono">
-            {item.godownCode}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'category',
-      header: 'Category',
-      render: (item) => <Badge variant="neutral">{item.category}</Badge>,
-    },
-    {
-      key: 'quantity',
-      header: 'Qty',
-      render: (item) => <span className="font-semibold">{item.quantity}</span>,
-    },
-    {
-      key: 'cost',
-      header: 'Unit Cost',
-      render: (item) => <span className="font-bold">{formatINR(item.cost)}</span>,
-    },
-    {
-      key: 'condition',
-      header: 'Condition',
-      render: (item) => (
-        <Badge
-          variant={
-            item.condition === 'EXCELLENT' || item.condition === 'GOOD'
-              ? 'success'
-              : item.condition === 'FAIR'
-              ? 'warning'
-              : 'danger'
-          }
-        >
-          {item.condition}
-        </Badge>
-      ),
-    },
-    {
-      key: 'warranty',
-      header: 'Warranty Status',
-      render: (item) => {
-        if (!item.warrantyExpiryDate) return <span className="text-apple-secondary text-xs">—</span>;
-        const isExpired = new Date(item.warrantyExpiryDate) < new Date();
-        return (
-          <span
-            className={`text-xs flex items-center gap-1 font-medium ${
-              isExpired
-                ? 'text-rose-600 dark:text-rose-400'
-                : 'text-apple-secondary dark:text-apple-darkSecondary'
-            }`}
-          >
-            {isExpired ? <ShieldAlert className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
-            {formatDate(item.warrantyExpiryDate)}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      className: 'text-right',
-      render: (item) => (
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            type="button"
-            onClick={() => handleOpenEdit(item)}
-            className="p-1 rounded-md text-apple-secondary hover:text-apple-text"
-          >
-            <Edit className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Delete this asset?')) deleteMutation.mutate(item.id);
-            }}
-            className="p-1 rounded-md text-apple-secondary hover:text-apple-danger"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const handleDeleteAsset = async (id: number) => {
+    if (!window.confirm('Delete this asset entry?')) return;
+    try {
+      await assetApi.delete(id);
+      success('Asset deleted');
+      setAssets((prev) => prev.filter((a) => a.id !== id));
+    } catch (err: any) {
+      error('Failed to delete asset: ' + err.message);
+    }
+  };
+
+  const filteredAssets = assets.filter((a) => {
+    const matchesSearch =
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.serialNumber && a.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (a.godownName && a.godownName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory = categoryFilter === 'ALL' || a.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-apple-text dark:text-apple-darkText">
-            Equipment & Asset Register
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+            Assets & Infrastructure Register
           </h1>
-          <p className="text-sm text-apple-secondary dark:text-apple-darkSecondary mt-1">
-            Track forklifts, diesel generators, CCTV, weighbridges, and fire safety systems per godown.
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            CCTV cameras, fire extinguishers, high-bay lights, generators, and equipment warranties
           </p>
         </div>
 
         <Button
-          variant="primary"
           onClick={() => {
-            resetForm();
+            setFormData({
+              name: '',
+              godownId: godowns[0] ? String(godowns[0].id) : '',
+              category: 'CCTV',
+              serialNumber: '',
+              purchaseDate: new Date().toISOString().slice(0, 10),
+              purchaseCost: '',
+              warrantyExpiry: '',
+              status: 'OPERATIONAL',
+              notes: '',
+            });
             setIsModalOpen(true);
           }}
           icon={<Plus className="w-4 h-4" />}
+          className="rounded-xl shadow-apple-sm"
         >
-          Register New Asset
+          Add Equipment
         </Button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <SegmentedControl
-          value={selectedCondition}
-          onChange={(val) => {
-            setSelectedCondition(val);
-            setPage(0);
-          }}
-          options={[
-            { value: 'ALL', label: 'All Equipment' },
-            { value: 'EXCELLENT', label: 'Excellent' },
-            { value: 'GOOD', label: 'Good' },
-            { value: 'FAIR', label: 'Fair' },
-            { value: 'POOR', label: 'Poor / Damaged' },
-          ]}
-        />
-
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedGodownId}
-            onChange={(e) => {
-              setSelectedGodownId(e.target.value);
-              setPage(0);
-            }}
-            className="px-3.5 py-1.5 rounded-full border border-apple-border dark:border-apple-darkBorder bg-white/80 dark:bg-apple-darkSurface text-xs text-apple-text dark:text-apple-darkText focus:outline-none focus:ring-2 focus:ring-apple-accent/20"
-          >
-            <option value="ALL">All Warehouses</option>
-            {(godowns || []).map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name} ({g.code})
-              </option>
-            ))}
-          </select>
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <Input
+            placeholder="Search by equipment name, serial number, or warehouse..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
         </div>
+
+        <Select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="w-full sm:w-44"
+        >
+          <option value="ALL">All Categories</option>
+          <option value="CCTV">CCTV Systems</option>
+          <option value="FIRE_SAFETY">Fire Safety</option>
+          <option value="GENERATOR">Generator / UPS</option>
+          <option value="FORKLIFT">Forklifts / Ramps</option>
+          <option value="LIGHTING">High-bay Lighting</option>
+          <option value="HVAC">Ventilation & HVAC</option>
+          <option value="OTHER">Other Equipment</option>
+        </Select>
       </div>
 
-      {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={assetsData?.content || []}
-        isLoading={isLoading}
-        searchPlaceholder="Search equipment by name or serial number..."
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        page={page}
-        totalPages={assetsData?.totalPages || 1}
-        totalElements={assetsData?.totalElements}
-        onPageChange={setPage}
-        emptyTitle="No equipment registered"
-        emptyDescription="There are no assets recorded matching the selected filter."
-      />
+      {/* Assets Grid */}
+      {loading ? (
+        <div className="py-16 text-center text-xs text-gray-400">
+          Loading equipment assets...
+        </div>
+      ) : filteredAssets.length === 0 ? (
+        <Card className="p-10 text-center text-xs text-gray-400">
+          No equipment records found. Log your safety infrastructure.
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAssets.map((asset) => (
+            <Card key={asset.id} className="p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">{asset.name}</h3>
+                    <p className="text-xs text-apple-accent font-medium mt-0.5">{asset.category}</p>
+                  </div>
+                  <Badge
+                    variant={asset.status === 'OPERATIONAL' ? 'success' : asset.status === 'NEEDS_REPAIR' ? 'warning' : 'danger'}
+                    size="sm"
+                  >
+                    {asset.status}
+                  </Badge>
+                </div>
 
-      {/* Add / Edit Sheet */}
-      <Sheet
+                <div className="mt-4 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
+                  <p className="flex items-center gap-2">
+                    <Building className="w-3.5 h-3.5 text-gray-400" />
+                    <span>{asset.godownName || `Godown #${asset.godownId}`}</span>
+                  </p>
+                  {asset.serialNumber && (
+                    <p className="text-gray-400 font-mono text-[11px]">
+                      S/N: {asset.serialNumber}
+                    </p>
+                  )}
+                  {asset.warrantyExpiry && (
+                    <p className="flex items-center gap-1.5 text-gray-500">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Warranty Expiry: {asset.warrantyExpiry}</span>
+                    </p>
+                  )}
+                  {asset.notes && (
+                    <p className="mt-2 text-gray-400 italic text-[11px]">
+                      {asset.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Cost</span>
+                  <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                    {asset.purchaseCost ? formatCurrency(asset.purchaseCost) : 'N/A'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => handleDeleteAsset(asset.id)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                  title="Delete asset"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Add Asset Modal */}
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingAsset ? 'Edit Equipment Unit' : 'Register New Asset'}
-        description="Record machinery, generators, weighbridges, and warranties."
+        title="Add Equipment / Asset"
+        description="Register a safety device, machine, or warehouse fixture."
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField
-            label="Warehouse Facility"
-            as="select"
-            required
-            value={formData.godownId}
-            onChange={(e) => setFormData({ ...formData, godownId: Number(e.target.value) })}
-          >
-            <option value="">Select Facility...</option>
-            {(godowns || []).map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name} ({g.code})
-              </option>
-            ))}
+        <form onSubmit={handleCreateAsset} className="space-y-4">
+          <FormField label="Asset / Equipment Name" required>
+            <Input
+              placeholder="e.g. Hikvision 8CH 4K IP CCTV Kit"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
           </FormField>
 
-          <FormField
-            label="Equipment / Asset Name"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g. Kirloskar 125 kVA Silent Generator"
-          />
-
           <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Category"
-              required
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              placeholder="e.g. Power Backup / Material Handling"
-            />
-            <FormField
-              label="Serial Number / Tag"
-              value={formData.serialNumber}
-              onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-              placeholder="e.g. KIR-GEN-9421"
-            />
-          </div>
+            <FormField label="Assigned Godown" required>
+              <Select
+                value={formData.godownId}
+                onChange={(e) => setFormData({ ...formData, godownId: e.target.value })}
+                required
+              >
+                <option value="">-- Choose Godown --</option>
+                {godowns.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-          <div className="grid grid-cols-3 gap-3">
-            <FormField
-              label="Quantity"
-              type="number"
-              required
-              value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-            />
-            <FormField
-              label="Unit Cost (INR)"
-              type="number"
-              required
-              value={formData.cost}
-              onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })}
-            />
-            <FormField
-              label="Condition"
-              as="select"
-              required
-              value={formData.condition}
-              onChange={(e) => setFormData({ ...formData, condition: e.target.value as AssetCondition })}
-              options={[
-                { value: 'EXCELLENT', label: 'Excellent' },
-                { value: 'GOOD', label: 'Good' },
-                { value: 'FAIR', label: 'Fair' },
-                { value: 'POOR', label: 'Poor' },
-                { value: 'DAMAGED', label: 'Damaged' },
-              ]}
-            />
+            <FormField label="Category">
+              <Select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+              >
+                <option value="CCTV">CCTV Systems</option>
+                <option value="FIRE_SAFETY">Fire Safety</option>
+                <option value="GENERATOR">Generator / UPS</option>
+                <option value="FORKLIFT">Forklift / Ramp</option>
+                <option value="LIGHTING">High-bay Lighting</option>
+                <option value="HVAC">HVAC / Ventilation</option>
+                <option value="OTHER">Other</option>
+              </Select>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Purchase Date"
-              type="date"
-              value={formData.purchaseDate}
-              onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-            />
-            <FormField
-              label="Warranty Expiry Date"
-              type="date"
-              value={formData.warrantyExpiryDate}
-              onChange={(e) => setFormData({ ...formData, warrantyExpiryDate: e.target.value })}
-            />
+            <FormField label="Serial Number">
+              <Input
+                placeholder="e.g. SN-89218491"
+                value={formData.serialNumber}
+                onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+              />
+            </FormField>
+
+            <FormField label="Cost (₹)">
+              <Input
+                type="number"
+                placeholder="e.g. 45000"
+                value={formData.purchaseCost}
+                onChange={(e) => setFormData({ ...formData, purchaseCost: e.target.value })}
+              />
+            </FormField>
           </div>
 
-          <FormField
-            label="Maintenance Notes / AMC Details"
-            as="textarea"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Annual maintenance contract vendor, service schedule, calibration notes..."
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Purchase Date">
+              <Input
+                type="date"
+                value={formData.purchaseDate}
+                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+              />
+            </FormField>
 
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+            <FormField label="Warranty Expiry">
+              <Input
+                type="date"
+                value={formData.warrantyExpiry}
+                onChange={(e) => setFormData({ ...formData, warrantyExpiry: e.target.value })}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Operational Status">
+            <Select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+            >
+              <option value="OPERATIONAL">OPERATIONAL</option>
+              <option value="NEEDS_REPAIR">NEEDS REPAIR</option>
+              <option value="DECOMMISSIONED">DECOMMISSIONED</option>
+            </Select>
+          </FormField>
+
+          <FormField label="Maintenance Notes">
+            <Textarea
+              placeholder="AMC provider, servicing schedule, filter changes..."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            />
+          </FormField>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" isLoading={saveMutation.isPending}>
-              {editingAsset ? 'Save Changes' : 'Register Asset'}
+            <Button type="submit" loading={submitting}>
+              Save Equipment
             </Button>
           </div>
         </form>
-      </Sheet>
+      </Modal>
     </div>
   );
 };
-

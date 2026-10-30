@@ -1,59 +1,53 @@
-import React from 'react';
-import { cn } from '../../lib/utils';
+import React, { ButtonHTMLAttributes } from 'react';
 import { Loader2 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
-  isLoading?: boolean;
+  loading?: boolean;
   icon?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   children,
-  className,
   variant = 'primary',
   size = 'md',
-  isLoading = false,
+  loading = false,
   icon,
+  className,
   disabled,
   ...props
 }) => {
-  const baseStyles =
-    'inline-flex items-center justify-center font-medium rounded-full transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-apple-accent/50';
+  const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-200 select-none active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none rounded-xl';
 
   const variants = {
-    primary:
-      'bg-apple-accent hover:bg-apple-accent-hover text-white shadow-sm hover:shadow',
-    secondary:
-      'bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/[0.09] dark:hover:bg-white/[0.12] text-apple-text dark:text-apple-darkText border border-apple-border dark:border-apple-darkBorder',
-    outline:
-      'border border-apple-border dark:border-apple-darkBorder hover:bg-black/[0.03] dark:hover:bg-white/[0.05] text-apple-text dark:text-apple-darkText',
-    ghost:
-      'hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-apple-secondary dark:text-apple-darkSecondary hover:text-apple-text dark:hover:text-apple-darkText',
-    danger:
-      'bg-apple-danger hover:bg-red-600 text-white shadow-sm',
+    primary: 'bg-apple-accent hover:bg-apple-accentHover text-white shadow-apple-sm hover:shadow-apple-md',
+    secondary: 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-[#1D1D1F] dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] dark:text-[#F5F5F7]',
+    outline: 'border border-black/15 hover:border-black/30 dark:border-white/20 dark:hover:border-white/40 bg-transparent text-[#1D1D1F] dark:text-[#F5F5F7]',
+    ghost: 'bg-transparent hover:bg-black/5 dark:hover:bg-white/10 text-[#1D1D1F] dark:text-[#F5F5F7]',
+    danger: 'bg-apple-danger hover:bg-red-600 text-white shadow-apple-sm',
   };
 
   const sizes = {
-    sm: 'text-xs px-3.5 py-1.5 gap-1.5 h-8',
-    md: 'text-sm px-4 py-2 gap-2 h-10',
-    lg: 'text-base px-6 py-2.5 gap-2.5 h-12',
+    sm: 'text-xs px-3 py-1.5 gap-1.5',
+    md: 'text-sm px-4 py-2.5 gap-2',
+    lg: 'text-base px-6 py-3.5 gap-2.5 rounded-2xl',
   };
 
   return (
     <button
-      className={cn(baseStyles, variants[variant], sizes[size], className)}
-      disabled={disabled || isLoading}
+      className={twMerge(clsx(baseStyles, variants[variant], sizes[size], className))}
+      disabled={disabled || loading}
       {...props}
     >
-      {isLoading ? (
+      {loading ? (
         <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-      ) : icon ? (
-        <span className="shrink-0">{icon}</span>
-      ) : null}
+      ) : (
+        icon && <span className="shrink-0">{icon}</span>
+      )}
       <span>{children}</span>
     </button>
   );
 };
-

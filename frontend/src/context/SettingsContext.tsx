@@ -1,72 +1,67 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient } from '../lib/api';
-import { AppSettings, ApiResponse } from '../types';
+import { AppSettings } from '../types';
+import { settingsApi } from '../services/api';
 
 interface SettingsContextType {
   settings: AppSettings;
-  currencySymbol: string;
-  companyName: string;
-  logoUrl: string;
-  refreshSettings: () => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  formatCurrency: (amount: number | undefined | null) => string;
 }
 
 const defaultSettings: AppSettings = {
-  id: 1,
-  companyName: 'RGS Godown Portfolio',
-  logoUrl: '',
-  currencySymbol: '₹',
-  contactEmail: 'operations@rgsenterprises.com',
-  contactPhone: '+91 98490 54321',
-  updatedAt: new Date().toISOString(),
+  companyName: 'RGS ENTERPRISES',
+  companyTagline: 'Industrial Godown & Warehouse Assets Management',
+  contactEmail: 'rgsenterprise2026@gmail.com',
+  currency: '₹',
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-
-  const refreshSettings = async () => {
+  const [settings, setSettings] = useState<AppSettings>(() => {
     try {
-      const res = await apiClient.get<ApiResponse<AppSettings>>('/settings');
-      if (res.data.success && res.data.data) {
-        setSettings(res.data.data);
-      }
+      const saved = localStorage.getItem('appSettings');
+      return saved ? JSON.parse(saved) : defaultSettings;
     } catch {
-      // Use defaults if unauthenticated or offline
+      return defaultSettings;
     }
-  };
+  });
 
   useEffect(() => {
-    refreshSettings();
+    const fetchSettings = async () => {
+      try {
+        const data: any = await settingsApi.get();
+        if (data) {
+          setSettings((prev) => ({ ...prev, ...data }));
+          localStorage.setItem('appSettings', JSON.stringify(data));
+        }
+      } catch {
+        // Keep defaults if not loaded
+      }
+    };
+    fetchSettings();
   }, []);
 
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
-    const payload = {
-      companyName: newSettings.companyName || settings.companyName,
-      logoUrl: newSettings.logoUrl !== undefined ? newSettings.logoUrl : settings.logoUrl,
-      currencySymbol: newSettings.currencySymbol || settings.currencySymbol,
-      contactEmail: newSettings.contactEmail || settings.contactEmail,
-      contactPhone: newSettings.contactPhone || settings.contactPhone,
-    };
-
-    const res = await apiClient.put<ApiResponse<AppSettings>>('/settings', payload);
-    if (res.data.success && res.data.data) {
-      setSettings(res.data.data);
+    try {
+      const updated = (await settingsApi.update(newSettings)) as any;
+      setSettings(updated);
+      localStorage.setItem('appSettings', JSON.stringify(updated));
+    } catch (err) {
+      setSettings((prev) => ({ ...prev, ...newSettings }));
+      throw err;
     }
   };
 
+  const formatCurrency = (amount: number | undefined | null): string => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return `${settings.currency}0`;
+    }
+    return `${settings.currency}${amount.toLocaleString('en-IN')}`;
+  };
+
   return (
-    <SettingsContext.Provider
-      value={{
-        settings,
-        currencySymbol: settings.currencySymbol || '₹',
-        companyName: settings.companyName || 'RGS Godown Portfolio',
-        logoUrl: settings.logoUrl || '',
-        refreshSettings,
-        updateSettings,
-      }}
-    >
+    <SettingsContext.Provider value={{ settings, updateSettings, formatCurrency }}>
       {children}
     </SettingsContext.Provider>
   );

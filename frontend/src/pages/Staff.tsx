@@ -1,545 +1,452 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
+  Search,
   Plus,
-  Receipt,
   Phone,
   Mail,
-  Calendar,
-  CheckCircle2,
+  DollarSign,
+  CreditCard,
   Trash2,
-  Edit,
+  Building,
 } from 'lucide-react';
-import { apiClient } from '../lib/api';
-import {
-  Employee,
-  SalaryPayment,
-  EmployeeStatus,
-  SalaryStatus,
-  Godown,
-  ApiResponse,
-  PagedResponse,
-} from '../types';
-import { formatINR, formatDate, formatMonth } from '../lib/utils';
 import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { DataTable, Column } from '../components/ui/DataTable';
-import { Sheet } from '../components/ui/Sheet';
-import { FormField } from '../components/ui/FormField';
-import { SegmentedControl } from '../components/ui/SegmentedControl';
-import { useToast } from '../components/ui/Toast';
+import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { FormField, Input, Select } from '../components/ui/Input';
+import { useSettings } from '../context/SettingsContext';
+import { useToast } from '../context/ToastContext';
+import { employeeApi, godownApi, salaryApi } from '../services/api';
+import { Staff, Godown } from '../types';
 
-export const Staff: React.FC = () => {
-  const queryClient = useQueryClient();
-  const { success: toastSuccess, error: toastError } = useToast();
+export const StaffDirectory: React.FC = () => {
+  const { formatCurrency } = useSettings();
+  const { success, error } = useToast();
 
-  const [mainView, setMainView] = useState<'employees' | 'payroll'>('employees');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [page, setPage] = useState(0);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Modals
-  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
-  const [isPaySalaryOpen, setIsPaySalaryOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-
-  // Staff Form State
-  const [staffFormData, setStaffFormData] = useState({
-    godownId: '' as number | '',
+  // Add Staff Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
     fullName: '',
-    role: 'Warehouse Manager',
-    phone: '',
+    role: 'Security Guard',
+    phoneNumber: '',
     email: '',
-    monthlySalary: 35000,
-    joiningDate: new Date().toISOString().split('T')[0],
-    status: 'ACTIVE' as EmployeeStatus,
+    monthlySalary: '',
+    godownId: '',
+    joiningDate: new Date().toISOString().slice(0, 10),
+    status: 'ACTIVE',
   });
 
-  // Salary Payment Form State
-  const [salaryFormData, setSalaryFormData] = useState({
-    employeeId: '' as number | '',
-    paymentMonth: '2026-10',
-    amount: 35000,
-    paymentDate: new Date().toISOString().split('T')[0],
-    status: 'PAID' as SalaryStatus,
-    paymentMode: 'BANK_TRANSFER',
-    transactionRef: '',
-    notes: 'Salary disbursement',
+  // Disburse Salary Modal
+  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
+  const [salaryData, setSalaryData] = useState({
+    amount: '',
+    paymentMonth: new Date().toISOString().slice(0, 7),
+    paymentDate: new Date().toISOString().slice(0, 10),
+    paymentMethod: 'BANK_TRANSFER',
   });
 
-  // Fetch Godowns
-  const { data: godowns } = useQuery({
-    queryKey: ['activeGodownsDropdown'],
-    queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<Godown[]>>('/godowns/all');
-      return res.data.data;
-    },
-  });
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch Employees
-  const { data: employeesData, isLoading: employeesLoading } = useQuery({
-    queryKey: ['employees', selectedStatus, page],
-    queryFn: async () => {
-      const params: Record<string, string | number> = { page, size: 15 };
-      if (selectedStatus !== 'ALL') params.status = selectedStatus;
-      const res = await apiClient.get<ApiResponse<PagedResponse<Employee>>>('/employees', { params });
-      return res.data.data;
-    },
-    enabled: mainView === 'employees',
-  });
+  const fetchStaff = async () => {
+    setLoading(true);
+    try {
+      const [sRes, gRes] = await Promise.all([
+        employeeApi.getAll({ size: 100 }),
+        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
+      ]);
 
-  // Fetch Salary Payments
-  const { data: salariesData, isLoading: salariesLoading } = useQuery({
-    queryKey: ['salaryPayments', page],
-    queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<PagedResponse<SalaryPayment>>>('/salary-payments', {
-        params: { page, size: 15 },
-      });
-      return res.data.data;
-    },
-    enabled: mainView === 'payroll',
-  });
+      const employees = Array.isArray(sRes) ? sRes : (sRes as any)?.content || [];
+      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
 
-  // Add Employee Mutation
-  const addStaffMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      return apiClient.post('/employees', payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess('Staff member onboarded successfully');
-      setIsAddStaffOpen(false);
-      setStaffFormData({
-        godownId: '',
-        fullName: '',
-        role: 'Warehouse Manager',
-        phone: '',
-        email: '',
-        monthlySalary: 35000,
-        joiningDate: new Date().toISOString().split('T')[0],
-        status: 'ACTIVE',
-      });
-    },
-    onError: (err: any) => {
-      toastError(err.response?.data?.message || 'Failed to add employee');
-    },
-  });
-
-  // Pay Salary Mutation
-  const paySalaryMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      return apiClient.post('/salary-payments', payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess('Salary disbursement recorded successfully');
-      setIsPaySalaryOpen(false);
-    },
-    onError: (err: any) => {
-      toastError(err.response?.data?.message || 'Failed to record salary');
-    },
-  });
-
-  // Delete Employee Mutation
-  const deleteStaffMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return apiClient.delete(`/employees/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toastSuccess('Employee deleted');
-    },
-  });
-
-  const handleOpenSalaryPayment = (emp: Employee) => {
-    setSelectedEmployee(emp);
-    setSalaryFormData({
-      employeeId: emp.id,
-      paymentMonth: '2026-10',
-      amount: emp.monthlySalary,
-      paymentDate: new Date().toISOString().split('T')[0],
-      status: 'PAID',
-      paymentMode: 'BANK_TRANSFER',
-      transactionRef: 'NEFT-SALARY-' + Math.floor(1000 + Math.random() * 9000),
-      notes: `${emp.fullName} monthly salary`,
-    });
-    setIsPaySalaryOpen(true);
+      setStaffList(employees);
+      setGodowns(gList);
+    } catch (err: any) {
+      error('Failed to load personnel: ' + (err.message || 'Error'));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddStaffSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchStaff();
+  }, []);
+
+  const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    addStaffMutation.mutate({
-      ...staffFormData,
-      godownId: staffFormData.godownId ? Number(staffFormData.godownId) : null,
-    });
+    if (!formData.fullName || !formData.phoneNumber || !formData.monthlySalary) {
+      error('Please fill required fields');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await employeeApi.create({
+        fullName: formData.fullName,
+        role: formData.role,
+        phoneNumber: formData.phoneNumber,
+        email: formData.email || null,
+        monthlySalary: Number(formData.monthlySalary),
+        godownId: formData.godownId ? Number(formData.godownId) : null,
+        joiningDate: formData.joiningDate,
+        status: formData.status,
+      });
+
+      success('Staff member registered');
+      setIsModalOpen(false);
+      fetchStaff();
+    } catch (err: any) {
+      error('Failed to register staff: ' + (err.message || 'Error'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handlePaySalarySubmit = (e: React.FormEvent) => {
+  const handleDisburseSalary = async (e: React.FormEvent) => {
     e.preventDefault();
-    paySalaryMutation.mutate({
-      ...salaryFormData,
-      employeeId: Number(salaryFormData.employeeId),
-    });
+    if (!selectedStaff) return;
+
+    setSubmitting(true);
+    try {
+      await salaryApi.create({
+        employeeId: selectedStaff.id,
+        amount: Number(salaryData.amount),
+        month: salaryData.paymentMonth,
+        paymentDate: salaryData.paymentDate,
+        paymentMethod: salaryData.paymentMethod,
+        status: 'PAID',
+      });
+
+      success(`Salary disbursed for ${selectedStaff.fullName}`);
+      setIsSalaryModalOpen(false);
+    } catch (err: any) {
+      error('Failed to record salary: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Columns for Employees
-  const employeeColumns: Column<Employee>[] = [
-    {
-      key: 'name',
-      header: 'Staff Member',
-      render: (item) => (
-        <div>
-          <span className="font-semibold text-apple-text dark:text-apple-darkText block">
-            {item.fullName}
-          </span>
-          <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary">
-            {item.role}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'godown',
-      header: 'Stationed Facility',
-      render: (item) => (
-        <span className="font-medium text-apple-text dark:text-apple-darkText">
-          {item.godownName}
-        </span>
-      ),
-    },
-    {
-      key: 'contact',
-      header: 'Contact Info',
-      render: (item) => (
-        <div className="text-xs text-apple-secondary dark:text-apple-darkSecondary">
-          <span className="block">{item.phone || '—'}</span>
-          <span className="block">{item.email || '—'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'joiningDate',
-      header: 'Joined Date',
-      render: (item) => (
-        <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary">
-          {formatDate(item.joiningDate)}
-        </span>
-      ),
-    },
-    {
-      key: 'monthlySalary',
-      header: 'Monthly Salary',
-      render: (item) => <span className="font-bold">{formatINR(item.monthlySalary)}/mo</span>,
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (item) => (
-        <Badge variant={item.status === 'ACTIVE' ? 'success' : 'neutral'}>{item.status}</Badge>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      className: 'text-right',
-      render: (item) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => handleOpenSalaryPayment(item)}
-            className="h-7 text-xs"
-          >
-            Disburse
-          </Button>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Remove staff record?')) deleteStaffMutation.mutate(item.id);
-            }}
-            className="p-1 rounded-md text-apple-secondary hover:text-apple-danger"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const handleDeleteStaff = async (id: number) => {
+    if (!window.confirm('Delete this staff record?')) return;
+    try {
+      await employeeApi.delete(id);
+      success('Staff record removed');
+      setStaffList((prev) => prev.filter((s) => s.id !== id));
+    } catch (err: any) {
+      error('Failed to delete staff: ' + err.message);
+    }
+  };
 
-  // Columns for Salary Payments
-  const salaryColumns: Column<SalaryPayment>[] = [
-    {
-      key: 'employee',
-      header: 'Employee & Role',
-      render: (item) => (
-        <div>
-          <span className="font-semibold text-apple-text dark:text-apple-darkText block">
-            {item.employeeName}
-          </span>
-          <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary">
-            {item.employeeRole} • {item.godownName}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'month',
-      header: 'Month Cycle',
-      render: (item) => (
-        <span className="font-medium text-apple-text dark:text-apple-darkText">
-          {formatMonth(item.paymentMonth)}
-        </span>
-      ),
-    },
-    {
-      key: 'amount',
-      header: 'Amount (INR)',
-      render: (item) => (
-        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-          {formatINR(item.amount)}
-        </span>
-      ),
-    },
-    {
-      key: 'date',
-      header: 'Payment Date',
-      render: (item) => (
-        <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary">
-          {formatDate(item.paymentDate)}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (item) => (
-        <Badge variant={item.status === 'PAID' ? 'success' : 'warning'}>{item.status}</Badge>
-      ),
-    },
-    {
-      key: 'ref',
-      header: 'Payment Mode / Ref',
-      render: (item) => (
-        <span className="text-xs text-apple-secondary dark:text-apple-darkSecondary">
-          {item.paymentMode} {item.transactionRef && `(${item.transactionRef})`}
-        </span>
-      ),
-    },
-  ];
+  const totalPayroll = staffList.reduce((acc, s) => acc + (s.monthlySalary || 0), 0);
+
+  const filteredStaff = staffList.filter((s) => {
+    return (
+      s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.phoneNumber.includes(searchQuery)
+    );
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-apple-text dark:text-apple-darkText">
-            Workforce & Payroll
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+            Personnel & Security Directory
           </h1>
-          <p className="text-sm text-apple-secondary dark:text-apple-darkSecondary mt-1">
-            Manage facility managers, supervisors, security staff, and monthly wage disbursements.
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Supervisors, 24/7 security guards, maintenance crew, and payroll dispatches
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="primary"
-            onClick={() => setIsAddStaffOpen(true)}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            Onboard Staff
-          </Button>
-        </div>
+        <Button
+          onClick={() => {
+            setFormData({
+              fullName: '',
+              role: 'Security Guard',
+              phoneNumber: '',
+              email: '',
+              monthlySalary: '',
+              godownId: '',
+              joiningDate: new Date().toISOString().slice(0, 10),
+              status: 'ACTIVE',
+            });
+            setIsModalOpen(true);
+          }}
+          icon={<Plus className="w-4 h-4" />}
+          className="rounded-xl shadow-apple-sm"
+        >
+          Add Staff Member
+        </Button>
       </div>
 
-      {/* View Switcher: Staff Directory vs Payroll Ledger */}
-      <SegmentedControl
-        value={mainView}
-        onChange={(val) => {
-          setMainView(val);
-          setPage(0);
-        }}
-        options={[
-          { value: 'employees', label: 'Staff Roster', icon: <Users className="w-3.5 h-3.5" /> },
-          { value: 'payroll', label: 'Salary Ledger', icon: <Receipt className="w-3.5 h-3.5" /> },
-        ]}
-      />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="p-4 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Active Staff</span>
+            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-0.5">{staffList.length} Personnel</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-apple-accent/10 text-apple-accent">
+            <Users className="w-5 h-5" />
+          </div>
+        </Card>
 
-      {/* Main Table */}
-      {mainView === 'employees' ? (
-        <DataTable
-          columns={employeeColumns}
-          data={employeesData?.content || []}
-          isLoading={employeesLoading}
-          page={page}
-          totalPages={employeesData?.totalPages || 1}
-          totalElements={employeesData?.totalElements}
-          onPageChange={setPage}
-          emptyTitle="No staff registered"
-          emptyDescription="There are no staff members currently on the roster."
+        <Card className="p-4 flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Monthly Payroll Obligation</span>
+            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(totalPayroll)}</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-apple-success/10 text-apple-success">
+            <DollarSign className="w-5 h-5" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative w-full">
+        <Input
+          placeholder="Search by staff name, designation, or phone number..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
         />
+        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
+      </div>
+
+      {/* Staff Grid */}
+      {loading ? (
+        <div className="py-16 text-center text-xs text-gray-400">
+          Loading staff directory...
+        </div>
+      ) : filteredStaff.length === 0 ? (
+        <Card className="p-10 text-center text-xs text-gray-400">
+          No personnel recorded. Add your security team and warehouse staff.
+        </Card>
       ) : (
-        <DataTable
-          columns={salaryColumns}
-          data={salariesData?.content || []}
-          isLoading={salariesLoading}
-          page={page}
-          totalPages={salariesData?.totalPages || 1}
-          totalElements={salariesData?.totalElements}
-          onPageChange={setPage}
-          emptyTitle="No salary disbursements"
-          emptyDescription="No monthly salary payments recorded yet."
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredStaff.map((staff) => (
+            <Card key={staff.id} className="p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">{staff.fullName}</h3>
+                    <p className="text-xs text-apple-accent font-medium mt-0.5">{staff.role}</p>
+                  </div>
+                  <Badge variant={staff.status === 'ACTIVE' ? 'success' : 'neutral'} size="sm">
+                    {staff.status}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+                  <p className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-gray-400" />
+                    <span>{staff.phoneNumber}</span>
+                  </p>
+                  {staff.email && (
+                    <p className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{staff.email}</span>
+                    </p>
+                  )}
+                  <p className="flex items-center gap-2">
+                    <Building className="w-3.5 h-3.5 text-gray-400" />
+                    <span>{staff.godownName || (staff.godownId ? `Godown #${staff.godownId}` : 'All Godowns')}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Salary</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    {formatCurrency(staff.monthlySalary)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedStaff(staff);
+                      setSalaryData({
+                        amount: String(staff.monthlySalary || ''),
+                        paymentMonth: new Date().toISOString().slice(0, 7),
+                        paymentDate: new Date().toISOString().slice(0, 10),
+                        paymentMethod: 'BANK_TRANSFER',
+                      });
+                      setIsSalaryModalOpen(true);
+                    }}
+                    icon={<CreditCard className="w-3.5 h-3.5" />}
+                  >
+                    Pay
+                  </Button>
+                  <button
+                    onClick={() => handleDeleteStaff(staff.id)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Onboard Staff Sheet */}
-      <Sheet
-        isOpen={isAddStaffOpen}
-        onClose={() => setIsAddStaffOpen(false)}
-        title="Onboard Staff Member"
-        description="Allocate personnel to an Andhra Pradesh or Telangana warehouse."
+      {/* Add Staff Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Add Personnel Member"
+        description="Register a security guard, technician, or warehouse manager."
       >
-        <form onSubmit={handleAddStaffSubmit} className="space-y-4">
-          <FormField
-            label="Full Name"
-            required
-            value={staffFormData.fullName}
-            onChange={(e) => setStaffFormData({ ...staffFormData, fullName: e.target.value })}
-            placeholder="e.g. S. Ramachandra Rao"
-          />
+        <form onSubmit={handleCreateStaff} className="space-y-4">
+          <FormField label="Full Name" required>
+            <Input
+              placeholder="e.g. Ramesh Kumar"
+              value={formData.fullName}
+              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              required
+            />
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Designation / Role"
-              required
-              value={staffFormData.role}
-              onChange={(e) => setStaffFormData({ ...staffFormData, role: e.target.value })}
-              placeholder="e.g. Warehouse Manager / Security In-charge"
-            />
-            <FormField
-              label="Stationed Facility"
-              as="select"
-              value={staffFormData.godownId}
-              onChange={(e) => setStaffFormData({ ...staffFormData, godownId: Number(e.target.value) })}
-            >
-              <option value="">Unassigned</option>
-              {(godowns || []).map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({g.code})
-                </option>
-              ))}
+            <FormField label="Role / Designation" required>
+              <Select
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              >
+                <option value="Security Guard">Security Guard</option>
+                <option value="Head Guard">Head Guard</option>
+                <option value="Warehouse Supervisor">Warehouse Supervisor</option>
+                <option value="Electrician">Electrician</option>
+                <option value="Maintenance Crew">Maintenance Crew</option>
+              </Select>
+            </FormField>
+
+            <FormField label="Monthly Salary (₹)" required>
+              <Input
+                type="number"
+                placeholder="e.g. 18000"
+                value={formData.monthlySalary}
+                onChange={(e) => setFormData({ ...formData, monthlySalary: e.target.value })}
+                required
+              />
             </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Phone Number"
-              value={staffFormData.phone}
-              onChange={(e) => setStaffFormData({ ...staffFormData, phone: e.target.value })}
-              placeholder="+91 98480 12345"
-            />
-            <FormField
-              label="Email Address"
-              type="email"
-              value={staffFormData.email}
-              onChange={(e) => setStaffFormData({ ...staffFormData, email: e.target.value })}
-              placeholder="staff@rgsenterprises.com"
-            />
+            <FormField label="Phone Number" required>
+              <Input
+                placeholder="e.g. +91 98765 12345"
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                required
+              />
+            </FormField>
+
+            <FormField label="Email">
+              <Input
+                type="email"
+                placeholder="Optional email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Monthly Salary (INR)"
-              type="number"
-              required
-              value={staffFormData.monthlySalary}
-              onChange={(e) => setStaffFormData({ ...staffFormData, monthlySalary: Number(e.target.value) })}
-            />
-            <FormField
-              label="Joining Date"
-              type="date"
-              required
-              value={staffFormData.joiningDate}
-              onChange={(e) => setStaffFormData({ ...staffFormData, joiningDate: e.target.value })}
-            />
-          </div>
+          <FormField label="Assigned Godown">
+            <Select
+              value={formData.godownId}
+              onChange={(e) => setFormData({ ...formData, godownId: e.target.value })}
+            >
+              <option value="">General (All Warehouses)</option>
+              {godowns.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} - {g.location}
+                </option>
+              ))}
+            </Select>
+          </FormField>
 
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setIsAddStaffOpen(false)}>
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" isLoading={addStaffMutation.isPending}>
-              Add Employee
+            <Button type="submit" loading={submitting}>
+              Add Personnel
             </Button>
           </div>
         </form>
-      </Sheet>
+      </Modal>
 
-      {/* Disburse Salary Sheet */}
-      <Sheet
-        isOpen={isPaySalaryOpen}
-        onClose={() => setIsPaySalaryOpen(false)}
+      {/* Disburse Salary Modal */}
+      <Modal
+        isOpen={isSalaryModalOpen}
+        onClose={() => setIsSalaryModalOpen(false)}
         title="Disburse Monthly Salary"
-        description={`${selectedEmployee?.fullName} (${selectedEmployee?.role})`}
+        description={`Logging payout for ${selectedStaff?.fullName}`}
       >
-        <form onSubmit={handlePaySalarySubmit} className="space-y-4">
+        <form onSubmit={handleDisburseSalary} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Payment Month (YYYY-MM)"
-              required
-              value={salaryFormData.paymentMonth}
-              onChange={(e) => setSalaryFormData({ ...salaryFormData, paymentMonth: e.target.value })}
-              placeholder="2026-10"
-            />
-            <FormField
-              label="Payment Date"
-              type="date"
-              required
-              value={salaryFormData.paymentDate}
-              onChange={(e) => setSalaryFormData({ ...salaryFormData, paymentDate: e.target.value })}
-            />
+            <FormField label="Salary Month" required>
+              <Input
+                type="month"
+                value={salaryData.paymentMonth}
+                onChange={(e) => setSalaryData({ ...salaryData, paymentMonth: e.target.value })}
+                required
+              />
+            </FormField>
+
+            <FormField label="Disbursement Date" required>
+              <Input
+                type="date"
+                value={salaryData.paymentDate}
+                onChange={(e) => setSalaryData({ ...salaryData, paymentDate: e.target.value })}
+                required
+              />
+            </FormField>
           </div>
 
-          <FormField
-            label="Disbursed Amount (INR)"
-            type="number"
-            required
-            value={salaryFormData.amount}
-            onChange={(e) => setSalaryFormData({ ...salaryFormData, amount: Number(e.target.value) })}
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              label="Payment Mode"
-              as="select"
+          <FormField label="Amount (₹)" required>
+            <Input
+              type="number"
+              value={salaryData.amount}
+              onChange={(e) => setSalaryData({ ...salaryData, amount: e.target.value })}
               required
-              value={salaryFormData.paymentMode}
-              onChange={(e) => setSalaryFormData({ ...salaryFormData, paymentMode: e.target.value })}
-              options={[
-                { value: 'BANK_TRANSFER', label: 'Bank Transfer (NEFT/RTGS)' },
-                { value: 'UPI', label: 'UPI' },
-                { value: 'CHEQUE', label: 'Cheque' },
-                { value: 'CASH', label: 'Cash' },
-              ]}
             />
-            <FormField
-              label="Transaction Ref / Voucher No"
-              value={salaryFormData.transactionRef}
-              onChange={(e) => setSalaryFormData({ ...salaryFormData, transactionRef: e.target.value })}
-              placeholder="e.g. NEFT-HDFC-99120"
-            />
-          </div>
+          </FormField>
 
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setIsPaySalaryOpen(false)}>
+          <FormField label="Payment Method">
+            <Select
+              value={salaryData.paymentMethod}
+              onChange={(e) => setSalaryData({ ...salaryData, paymentMethod: e.target.value })}
+            >
+              <option value="BANK_TRANSFER">Direct Bank Transfer</option>
+              <option value="UPI">UPI</option>
+              <option value="CASH">Cash</option>
+            </Select>
+          </FormField>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button type="button" variant="outline" onClick={() => setIsSalaryModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" isLoading={paySalaryMutation.isPending}>
+            <Button type="submit" loading={submitting}>
               Confirm Disbursement
             </Button>
           </div>
         </form>
-      </Sheet>
+      </Modal>
     </div>
   );
 };
-

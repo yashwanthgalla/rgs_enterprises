@@ -1,215 +1,157 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Warehouse, ArrowRight, KeyRound, User, Mail, Lock } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
-import { apiClient } from '../lib/api';
+import { Lock, Mail, Building2, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { FormField } from '../components/ui/FormField';
-import { Sheet } from '../components/ui/Sheet';
-import { useToast } from '../components/ui/Toast';
-import { ApiResponse, AuthResponse } from '../types';
+import { Input, FormField } from '../components/ui/Input';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useSettings } from '../context/SettingsContext';
 
 export const Login: React.FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const { error: toastError, success: toastSuccess } = useToast();
+  const { settings } = useSettings();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // First-time Password Change Modal State
-  const [isFirstLoginModalOpen, setIsFirstLoginModalOpen] = useState(false);
-  const [setupUsername, setSetupUsername] = useState('');
-  const [setupEmail, setSetupEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSavingSetup, setIsSavingSetup] = useState(false);
-
-  const { login, updateUser } = useAuth();
-  const { companyName } = useSettings();
-  const { error: toastError, success: toastSuccess } = useToast();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) return;
+    setErrorMessage('');
 
-    setIsLoading(true);
-    try {
-      const authData = await login(username, password);
-      // Check if user must change password
-      if (authData.mustChangePassword || authData.user?.mustChangePassword) {
-        setSetupUsername(authData.user.username);
-        setSetupEmail(authData.user.email || '');
-        setNewPassword('');
-        setConfirmPassword('');
-        setIsFirstLoginModalOpen(true);
-        toastSuccess('Initial login verified. Please set your new password.');
-      } else {
-        toastSuccess('Welcome back! Signed in successfully.');
-        navigate('/');
-      }
-    } catch (err: unknown) {
-      toastError(err instanceof Error ? err.message : 'Invalid credentials. Please verify your username and password.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleFirstTimeSetupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword || newPassword.length < 6) {
-      toastError('New password must be at least 6 characters.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toastError('Passwords do not match. Please re-enter.');
+    if (!username.trim() || !password) {
+      setErrorMessage('Please enter both username/email and password.');
       return;
     }
 
-    setIsSavingSetup(true);
+    setLoading(true);
     try {
-      const res = await apiClient.put<ApiResponse<AuthResponse>>('/auth/profile', {
-        username: setupUsername.trim(),
-        email: setupEmail.trim(),
-        newPassword,
+      const authData = await login({
+        username: username.trim(),
+        password,
       });
 
-      if (res.data.success && res.data.data) {
-        updateUser(res.data.data.user, res.data.data.token);
-        toastSuccess(`Credentials configured! Welcome, ${res.data.data.user.username}.`);
-        setIsFirstLoginModalOpen(false);
-        navigate('/');
-      }
+      toastSuccess(`Welcome back, ${authData.fullName || authData.username}!`);
+      navigate('/', { replace: true });
     } catch (err: any) {
-      toastError(err.response?.data?.message || 'Failed to update credentials.');
+      console.error('Login error:', err);
+      let msg = 'Authentication failed. Please verify your credentials.';
+      if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      } else if (err.message && err.message.includes('Network Error')) {
+        msg = 'Unable to connect to the backend server. Please verify your internet connection.';
+      }
+      setErrorMessage(msg);
+      toastError(msg);
     } finally {
-      setIsSavingSetup(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] dark:bg-[#000000] flex flex-col justify-center items-center p-4 selection:bg-apple-accent selection:text-white">
-      <div className="w-full max-w-md">
-        {/* Apple styled frosted card */}
-        <div className="bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-2xl rounded-apple-xl border border-black/[0.08] dark:border-white/[0.12] p-8 shadow-apple-modal">
-          {/* Logo & Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-apple-accent text-white shadow-md mb-4">
-              <Warehouse className="w-7 h-7" />
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-apple-text dark:text-apple-darkText">
-              {companyName}
+    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 sm:p-6 bg-[#F5F5F7] dark:bg-[#000000] selection:bg-apple-accent selection:text-white">
+      {/* Background radial glow */}
+      <div className="fixed inset-0 pointer-events-none flex items-center justify-center">
+        <div className="w-[500px] h-[500px] bg-apple-accent/10 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-md">
+        {/* Brand Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-apple-accent text-white shadow-apple-md mb-4 animate-scaleUp">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+            {settings.companyName || 'RGS ENTERPRISES'}
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium tracking-wide">
+            GodownIQ • Enterprise Warehouse Operations
+          </p>
+        </div>
+
+        {/* Card */}
+        <div className="p-8 rounded-3xl bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-apple-modal animate-scaleUp">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Sign In
             </h2>
-            <p className="text-xs text-apple-secondary dark:text-apple-darkSecondary mt-1">
-              Administrator Access & Portfolio Management Portal
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Enter your authorized administrator credentials
             </p>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <FormField
-              label="Username or Email"
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. Sai Babu P or rgsenterprise2026@gmail.com"
-              autoComplete="username"
-            />
+          {errorMessage && (
+            <div className="mb-5 p-3.5 rounded-2xl bg-apple-danger/10 border border-apple-danger/20 text-xs font-medium text-apple-danger flex items-start gap-2">
+              <span className="font-bold">•</span>
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
-            <FormField
-              label="Password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              autoComplete="current-password"
-            />
+          <form onSubmit={handleLogin} className="space-y-4">
+            <FormField label="Username or Email" required>
+              <div className="relative">
+                <Input
+                  type="text"
+                  autoComplete="username"
+                  placeholder="Enter username or email"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+                <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none" />
+              </div>
+            </FormField>
+
+            <FormField label="Password" required>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </FormField>
 
             <div className="pt-2">
               <Button
                 type="submit"
-                variant="primary"
-                size="lg"
-                isLoading={isLoading}
-                className="w-full"
+                loading={loading}
+                className="w-full h-11 text-sm font-semibold rounded-2xl"
                 icon={<ArrowRight className="w-4 h-4" />}
               >
                 Sign In to Dashboard
               </Button>
             </div>
           </form>
+
+          <div className="mt-6 pt-5 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center gap-2 text-xs text-gray-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-apple-success" />
+            <span>End-to-End Encrypted Session</span>
+          </div>
         </div>
 
-        {/* Security badge */}
-        <p className="text-center text-xs text-apple-secondary dark:text-apple-darkSecondary mt-6">
-          Secured with JSON Web Token (JWT) & Supabase PostgreSQL
+        {/* Footer info */}
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
+          © {new Date().getFullYear()} RGS Enterprises. All rights reserved.
         </p>
       </div>
-
-      {/* First-Time Password & Profile Setup Centered Modal */}
-      <Sheet
-        isOpen={isFirstLoginModalOpen}
-        onClose={() => {}} // Non-closable without setting password
-        title="First-Time Administrator Setup"
-        description="For security, please set your personal password. You may also adjust your username and email address."
-      >
-        <form onSubmit={handleFirstTimeSetupSubmit} className="space-y-4">
-          <div className="p-3 bg-apple-accent/10 rounded-xl text-xs text-apple-accent flex items-center gap-2">
-            <KeyRound className="w-4 h-4 shrink-0" />
-            <span>Welcome! This account is currently using default credentials. Please set your secure password to proceed.</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField
-              label="Username"
-              required
-              value={setupUsername}
-              onChange={(e) => setSetupUsername(e.target.value)}
-              placeholder="Your preferred username"
-            />
-            <FormField
-              label="Email Address"
-              type="email"
-              required
-              value={setupEmail}
-              onChange={(e) => setSetupEmail(e.target.value)}
-              placeholder="admin@example.com"
-            />
-          </div>
-
-          <FormField
-            label="New Personal Password"
-            type="password"
-            required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="At least 6 characters"
-          />
-
-          <FormField
-            label="Confirm New Password"
-            type="password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Re-enter your new password"
-          />
-
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              isLoading={isSavingSetup}
-              className="w-full"
-              icon={<ArrowRight className="w-4 h-4" />}
-            >
-              Save Credentials & Enter Dashboard
-            </Button>
-          </div>
-        </form>
-      </Sheet>
     </div>
   );
 };

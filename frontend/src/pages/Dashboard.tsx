@@ -67,11 +67,11 @@ export const Dashboard: React.FC = () => {
       {/* Top Banner / Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-apple-sm border border-black/10 dark:border-white/10 shrink-0 bg-white">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-apple-sm border border-black/10 dark:border-white/10 shrink-0 bg-white/80 dark:bg-white/10 backdrop-blur-md p-1.5">
             <img
-              src="/rgs-enterprises-logo.jpeg"
+              src="/rgs-logo-removebg-preview.png"
               alt="RGS Enterprises Logo"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               onError={(e) => {
                 e.currentTarget.src = '/rgs-enterprises-logo.png';
               }}

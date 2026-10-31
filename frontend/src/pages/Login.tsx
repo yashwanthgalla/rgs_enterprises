@@ -54,20 +54,23 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 sm:p-6 bg-[#F5F5F7] dark:bg-[#000000] selection:bg-apple-accent selection:text-white">
+    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 sm:p-6 bg-[#F5F5F7] dark:bg-[#000000] selection:bg-apple-accent selection:text-white relative overflow-hidden">
+      {/* Background Brand Watermark */}
+      <div className="site-bg-watermark" aria-hidden="true" />
+
       {/* Background radial glow */}
       <div className="fixed inset-0 pointer-events-none flex items-center justify-center">
         <div className="w-[500px] h-[500px] bg-apple-accent/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-md">
+      <div className="relative z-10 w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl overflow-hidden shadow-apple-md mb-4 animate-scaleUp border border-black/10 dark:border-white/10 bg-white">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl overflow-hidden shadow-apple-md mb-4 animate-scaleUp border border-black/10 dark:border-white/10 bg-white/80 backdrop-blur-md p-2">
             <img
-              src="/rgs-enterprises-logo.jpeg"
+              src="/rgs-logo-removebg-preview.png"
               alt="RGS Enterprises Logo"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               onError={(e) => {
                 e.currentTarget.src = '/rgs-enterprises-logo.png';
               }}

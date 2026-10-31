@@ -25,12 +25,15 @@ export const AppShell: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-apple-bg dark:bg-apple-darkBg flex flex-col">
+    <div className="min-h-screen bg-apple-bg dark:bg-apple-darkBg flex flex-col relative overflow-x-hidden">
+      {/* Background Brand Watermark */}
+      <div className="site-bg-watermark" aria-hidden="true" />
+
       {/* Sidebar for Desktop & Mobile drawer */}
       <Sidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
       {/* Main Content Area */}
-      <div className="lg:pl-64 flex flex-col flex-1">
+      <div className="lg:pl-64 flex flex-col flex-1 relative z-10">
         <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           <Outlet />

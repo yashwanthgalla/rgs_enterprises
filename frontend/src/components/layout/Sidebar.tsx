@@ -57,11 +57,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       >
         {/* Brand Header */}
         <div className="p-5 pb-4 flex items-center gap-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-apple-sm border border-black/10 dark:border-white/10 shrink-0 bg-white">
+          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-apple-sm border border-black/10 dark:border-white/10 shrink-0 bg-white/80 dark:bg-white/10 backdrop-blur-md p-1">
             <img
-              src="/rgs-enterprises-logo.jpeg"
+              src="/rgs-logo-removebg-preview.png"
               alt="RGS Enterprises Logo"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               onError={(e) => {
                 e.currentTarget.src = '/rgs-enterprises-logo.png';
               }}

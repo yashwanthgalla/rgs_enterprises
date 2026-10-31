@@ -66,13 +66,25 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-8 animate-fadeIn">
       {/* Top Banner / Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            Welcome, {user?.fullName || user?.username || 'Administrator'}
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Real-time operations, occupancy tracking, and rental cashflow
-          </p>
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-apple-sm border border-black/10 dark:border-white/10 shrink-0 bg-white">
+            <img
+              src="/rgs-enterprises-logo.jpeg"
+              alt="RGS Enterprises Logo"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/rgs-enterprises-logo.png';
+              }}
+            />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+              Welcome, {user?.fullName || user?.username || 'Administrator'}
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Real-time operations, occupancy tracking, and rental cashflow
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

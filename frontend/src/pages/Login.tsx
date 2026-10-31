@@ -63,8 +63,15 @@ export const Login: React.FC = () => {
       <div className="relative w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-apple-accent text-white shadow-apple-md mb-4 animate-scaleUp">
-            <Building2 className="w-8 h-8" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl overflow-hidden shadow-apple-md mb-4 animate-scaleUp border border-black/10 dark:border-white/10 bg-white">
+            <img
+              src="/rgs-enterprises-logo.jpeg"
+              alt="RGS Enterprises Logo"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/rgs-enterprises-logo.png';
+              }}
+            />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
             {settings.companyName || 'RGS ENTERPRISES'}

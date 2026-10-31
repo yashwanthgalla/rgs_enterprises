@@ -141,7 +141,7 @@ export const normalizeSettings = (s: any): AppSettings => {
     contactPhone: s.contactPhone || '',
     address: s.address || s.companyAddress || '',
     currency: s.currencySymbol || s.currency || s.defaultCurrency || '₹',
-    logoUrl: s.logoUrl || '/rgs-enterprises-logo.png',
+    logoUrl: s.logoUrl || '/rgs-enterprises-logo.jpeg',
   };
 };
 

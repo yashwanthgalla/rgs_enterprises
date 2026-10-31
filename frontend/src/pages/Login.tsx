@@ -66,14 +66,11 @@ export const Login: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl overflow-hidden shadow-apple-md mb-4 animate-scaleUp border border-black/10 dark:border-white/10 bg-white/80 backdrop-blur-md p-2">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl overflow-hidden shadow-apple-md mb-4 animate-scaleUp border border-black/10 dark:border-white/10 bg-white">
             <img
-              src="/rgs-logo-removebg-preview.png"
+              src="/2.jpeg"
               alt="RGS Enterprises Logo"
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                e.currentTarget.src = '/rgs-enterprises-logo.png';
-              }}
+              className="w-full h-full object-cover"
             />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">

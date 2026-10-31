@@ -69,11 +69,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </div>
           <div className="overflow-hidden">
             <h1 className="text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100 truncate">
-              {settings.companyName || 'RGS ENTERPRISES'}
+              RGS ENTERPRISES
             </h1>
-            <p className="text-[11px] font-medium text-apple-accent tracking-wide uppercase">
-              GodownIQ Portfolio
-            </p>
           </div>
         </div>
 

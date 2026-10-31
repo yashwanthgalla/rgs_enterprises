@@ -84,7 +84,7 @@ export const FirstLoginModal: React.FC = () => {
         <div className="p-3 rounded-2xl bg-apple-accent/10 border border-apple-accent/20 flex items-start gap-3">
           <ShieldCheck className="w-5 h-5 text-apple-accent shrink-0 mt-0.5" />
           <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-            Welcome, <strong>{user?.fullName || user?.username}</strong>. Please change your default password to protect your administrator privileges.
+            Welcome, <strong>{user?.fullName || user?.username || 'Administrator'}</strong>. Please change your default password to protect your administrator privileges.
           </div>
         </div>
 

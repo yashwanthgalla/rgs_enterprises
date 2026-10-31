@@ -30,12 +30,13 @@ export const Login: React.FC = () => {
 
     setLoading(true);
     try {
-      const authData = await login({
+      const loggedUser = await login({
         username: username.trim(),
         password,
       });
 
-      toastSuccess(`Welcome back, ${authData.fullName || authData.username}!`);
+      const displayName = loggedUser.fullName || loggedUser.username || 'Administrator';
+      toastSuccess(`Welcome back, ${displayName}!`);
       navigate('/', { replace: true });
     } catch (err: any) {
       console.error('Login error:', err);

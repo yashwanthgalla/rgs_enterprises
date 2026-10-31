@@ -8,7 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   mustChangePassword: boolean;
-  login: (credentials: { username: string; password: string }) => Promise<AuthResponse>;
+  login: (credentials: { username: string; password: string }) => Promise<User>;
   logout: () => void;
   updateUser: (updatedUser: Partial<User>) => void;
   setMustChangePassword: (must: boolean) => void;
@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
-  const login = async (credentials: { username: string; password: string }): Promise<AuthResponse> => {
+  const login = async (credentials: { username: string; password: string }): Promise<User> => {
     const res = await authApi.login(credentials);
     const authData = res as any;
     const newToken = authData.token;
@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: userPayload.id || 1,
       username: userPayload.username,
       email: userPayload.email,
-      fullName: userPayload.fullName || userPayload.username,
+      fullName: userPayload.fullName || userPayload.username || 'Administrator',
       role: (userPayload.role as any) || 'ADMIN',
       mustChangePassword: !!(authData.mustChangePassword ?? userPayload.mustChangePassword),
     };
@@ -85,9 +85,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('user', JSON.stringify(userObj));
     setToken(newToken);
     setUser(userObj);
-    setMustChangePassword(!!authData.mustChangePassword);
+    setMustChangePassword(!!userObj.mustChangePassword);
 
-    return authData;
+    return userObj;
   };
 
   const logout = useCallback(() => {

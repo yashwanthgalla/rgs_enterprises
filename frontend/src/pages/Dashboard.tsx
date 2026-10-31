@@ -18,12 +18,14 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { dashboardApi, godownApi } from '../services/api';
 import { Godown } from '../types';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { formatCurrency } = useSettings();
+  const { user } = useAuth();
 
   const [stats, setStats] = useState<any>(null);
   const [reminders, setReminders] = useState<any[]>([]);
@@ -66,7 +68,7 @@ export const Dashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            Portfolio Dashboard
+            Welcome, {user?.fullName || user?.username || 'Administrator'}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Real-time operations, occupancy tracking, and rental cashflow

@@ -49,9 +49,9 @@ export const Reports: React.FC = () => {
     window.open(reportApi.exportCsvUrl(selectedYear), '_blank');
   };
 
-  const totalIncome = summary?.totalRentalIncome || 0;
-  const totalExpense = summary?.totalOperatingExpenses || 0;
-  const netProfit = summary?.netOperatingIncome || totalIncome - totalExpense;
+  const totalIncome = summary?.totalRentalIncome ?? summary?.totalRentCollected ?? summary?.totalRentBilled ?? 0;
+  const totalExpense = summary?.totalOperatingExpenses ?? (Number(summary?.totalCompanyExpenses || 0) + Number(summary?.totalSalariesPaid || 0));
+  const netProfit = summary?.netOperatingIncome ?? summary?.netOperatingProfit ?? (totalIncome - totalExpense);
   const marginPct = totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
 
   return (
@@ -149,9 +149,9 @@ export const Reports: React.FC = () => {
                 </tr>
               ) : (
                 pnlList.map((row, idx) => {
-                  const income = row.rentalIncome || 0;
-                  const exp = row.operatingExpenses || 0;
-                  const net = row.netIncome ?? income - exp;
+                  const income = row.rentalIncome ?? row.rentIncome ?? 0;
+                  const exp = row.operatingExpenses ?? 0;
+                  const net = row.netIncome ?? row.netProfit ?? (income - exp);
                   const mPct = income > 0 ? Math.round((net / income) * 100) : 0;
 
                   return (

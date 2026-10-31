@@ -211,8 +211,8 @@ export const Godowns: React.FC = () => {
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
-            <option value="MAINTENANCE">Maintenance</option>
-            <option value="INACTIVE">Inactive</option>
+            <option value="UNDER_MAINTENANCE">Under Maintenance</option>
+            <option value="VACANT">Vacant</option>
           </Select>
         </div>
       </div>
@@ -438,8 +438,8 @@ export const Godowns: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               >
                 <option value="ACTIVE">ACTIVE</option>
-                <option value="MAINTENANCE">MAINTENANCE</option>
-                <option value="INACTIVE">INACTIVE</option>
+                <option value="UNDER_MAINTENANCE">UNDER_MAINTENANCE</option>
+                <option value="VACANT">VACANT</option>
               </Select>
             </FormField>
           </div>

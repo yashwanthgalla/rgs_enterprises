@@ -35,7 +35,7 @@ public class AppSettingsService {
 
         settings.setCompanyName(request.companyName());
         settings.setLogoUrl(request.logoUrl());
-        settings.setCurrencySymbol(request.currencySymbol());
+        settings.setCurrencySymbol(request.getEffectiveCurrencySymbol());
         settings.setContactEmail(request.contactEmail());
         settings.setContactPhone(request.contactPhone());
 

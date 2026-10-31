@@ -36,15 +36,27 @@ api.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 );
 
-// Interceptor to handle unauthenticated 401s
+// Interceptor to handle unauthenticated 401s and extract server error messages
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  (error: AxiosError<any>) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
+      }
+    }
+
+    const data = error.response?.data;
+    if (data) {
+      if (data.errors && typeof data.errors === 'object') {
+        const errorDetails = Object.values(data.errors).join(', ');
+        if (errorDetails) {
+          error.message = errorDetails;
+        }
+      } else if (data.message) {
+        error.message = data.message;
       }
     }
     return Promise.reject(error);
@@ -128,7 +140,7 @@ export const normalizeSettings = (s: any): AppSettings => {
     contactEmail: s.contactEmail || s.alertEmail || 'rgsenterprise2026@gmail.com',
     contactPhone: s.contactPhone || '',
     address: s.address || s.companyAddress || '',
-    currency: s.currency || s.defaultCurrency || '₹',
+    currency: s.currencySymbol || s.currency || s.defaultCurrency || '₹',
     logoUrl: s.logoUrl || '/rgs-enterprises-logo.png',
   };
 };
@@ -358,13 +370,13 @@ export const assetApi = {
     api.get(`/assets/${id}`).then(unwrap).then(normalizeAsset),
   create: (data: any) => {
     const payload = {
-      godownId: Number(data.godownId),
+      godownId: data.godownId ? Number(data.godownId) : null,
       name: data.name,
       category: data.category || 'CCTV',
       serialNumber: data.serialNumber || null,
       quantity: 1,
       cost: Number(data.cost ?? data.purchaseCost ?? 0),
-      condition: data.condition || 'GOOD',
+      condition: data.condition || data.status || 'GOOD',
       purchaseDate: data.purchaseDate || new Date().toISOString().slice(0, 10),
       warrantyExpiryDate: data.warrantyExpiryDate || data.warrantyExpiry || null,
       notes: data.notes || null,
@@ -403,8 +415,10 @@ export const settingsApi = {
     const payload = {
       companyName: data.companyName,
       companyTagline: data.companyTagline,
-      defaultCurrency: data.defaultCurrency || data.currency || '₹',
-      alertEmail: data.alertEmail || data.contactEmail,
+      currencySymbol: data.currencySymbol || data.defaultCurrency || data.currency || '₹',
+      defaultCurrency: data.currencySymbol || data.defaultCurrency || data.currency || '₹',
+      contactEmail: data.contactEmail || data.alertEmail,
+      alertEmail: data.contactEmail || data.alertEmail,
       contactPhone: data.contactPhone,
       companyAddress: data.companyAddress || data.address,
       logoUrl: data.logoUrl,

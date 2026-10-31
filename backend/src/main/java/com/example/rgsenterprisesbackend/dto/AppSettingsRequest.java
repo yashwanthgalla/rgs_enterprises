@@ -1,8 +1,7 @@
 package com.example.rgsenterprisesbackend.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
-
-import java.time.OffsetDateTime;
 
 public record AppSettingsRequest(
         @NotBlank(message = "Company name is required")
@@ -10,10 +9,15 @@ public record AppSettingsRequest(
 
         String logoUrl,
 
-        @NotBlank(message = "Currency symbol is required")
+        @JsonAlias({"currency", "defaultCurrency"})
         String currencySymbol,
 
+        @JsonAlias("alertEmail")
         String contactEmail,
-        String contactPhone
-) {}
 
+        String contactPhone
+) {
+    public String getEffectiveCurrencySymbol() {
+        return (currencySymbol != null && !currencySymbol.isBlank()) ? currencySymbol : "₹";
+    }
+}

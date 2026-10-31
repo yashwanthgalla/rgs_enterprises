@@ -51,21 +51,34 @@ public class RentEntryService {
 
     @Transactional
     public RentEntryResponse createRentEntry(RentEntryRequest request) {
-        Godown godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId())
-                .orElseThrow(() -> new ResourceNotFoundException("Godown not found with ID: " + request.godownId()));
-
-        if (rentEntryRepository.findByGodownIdAndRentMonth(request.godownId(), request.rentMonth()).isPresent()) {
-            throw new BadRequestException("A rent entry already exists for godown '" + godown.getName() + "' for month " + request.rentMonth());
+        Godown godown = null;
+        if (request.godownId() != null && request.godownId() > 0) {
+            godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId()).orElse(null);
+        }
+        if (godown == null) {
+            godown = godownRepository.findByIsDeletedFalse().stream().findFirst()
+                    .orElseThrow(() -> new BadRequestException("Please register at least one Godown before generating rent invoices."));
         }
 
-        BigDecimal paid = request.paidAmount() != null ? request.paidAmount() : BigDecimal.ZERO;
-        RentStatus status = request.status() != null ? request.status() : determineStatus(request.dueDate(), request.dueAmount(), paid);
+        String month = request.rentMonth();
+        if (month != null && month.length() > 7) {
+            month = month.substring(0, 7);
+        }
+
+        if (rentEntryRepository.findByGodownIdAndRentMonth(godown.getId(), month).isPresent()) {
+            throw new BadRequestException("A rent entry already exists for godown '" + godown.getName() + "' for month " + month);
+        }
+
+        BigDecimal due = request.getEffectiveDueAmount();
+        BigDecimal paid = request.getEffectivePaidAmount();
+        LocalDate dueD = request.getEffectiveDueDate();
+        RentStatus status = request.status() != null ? request.status() : determineStatus(dueD, due, paid);
 
         RentEntry entry = RentEntry.builder()
                 .godown(godown)
-                .rentMonth(request.rentMonth())
-                .dueDate(request.dueDate())
-                .dueAmount(request.dueAmount())
+                .rentMonth(month)
+                .dueDate(dueD)
+                .dueAmount(due)
                 .paidAmount(paid)
                 .paymentDate(request.paymentDate())
                 .status(status)

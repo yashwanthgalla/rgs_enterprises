@@ -86,19 +86,20 @@ public class GodownService {
 
     @Transactional
     public GodownResponse createGodown(GodownRequest request) {
-        if (godownRepository.existsByCodeAndIsDeletedFalse(request.code())) {
-            throw new BadRequestException("A godown with code '" + request.code() + "' already exists");
+        String finalCode = request.getEffectiveCode();
+        if (godownRepository.existsByCodeAndIsDeletedFalse(finalCode)) {
+            finalCode = finalCode + "-" + (int)(Math.random() * 900 + 100);
         }
 
         Godown godown = Godown.builder()
                 .name(request.name())
-                .code(request.code().toUpperCase())
-                .city(request.city())
-                .state(request.state())
-                .address(request.address())
-                .pincode(request.pincode())
-                .sizeSqft(request.sizeSqft())
-                .status(request.status())
+                .code(finalCode)
+                .city(request.getEffectiveCity())
+                .state(request.getEffectiveState())
+                .address(request.getEffectiveAddress())
+                .pincode(request.pincode() != null ? request.pincode() : "500051")
+                .sizeSqft(request.getEffectiveSizeSqft())
+                .status(request.getEffectiveStatus())
                 .currentTenant(request.currentTenant())
                 .tenantPhone(request.tenantPhone())
                 .tenantEmail(request.tenantEmail())
@@ -161,18 +162,19 @@ public class GodownService {
         Godown godown = godownRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Godown not found with ID: " + id));
 
-        if (godownRepository.existsByCodeAndIdNotAndIsDeletedFalse(request.code(), id)) {
-            throw new BadRequestException("Another godown with code '" + request.code() + "' already exists");
+        String updatedCode = request.code() != null && !request.code().isBlank() ? request.code().toUpperCase() : godown.getCode();
+        if (godownRepository.existsByCodeAndIdNotAndIsDeletedFalse(updatedCode, id)) {
+            throw new BadRequestException("Another godown with code '" + updatedCode + "' already exists");
         }
 
         godown.setName(request.name());
-        godown.setCode(request.code().toUpperCase());
-        godown.setCity(request.city());
-        godown.setState(request.state());
-        godown.setAddress(request.address());
-        godown.setPincode(request.pincode());
-        godown.setSizeSqft(request.sizeSqft());
-        godown.setStatus(request.status());
+        godown.setCode(updatedCode);
+        if (request.city() != null) godown.setCity(request.city());
+        if (request.state() != null) godown.setState(request.state());
+        if (request.address() != null) godown.setAddress(request.address());
+        if (request.pincode() != null) godown.setPincode(request.pincode());
+        if (request.sizeSqft() != null) godown.setSizeSqft(request.sizeSqft());
+        if (request.status() != null) godown.setStatus(request.status());
         godown.setCurrentTenant(request.currentTenant());
         godown.setTenantPhone(request.tenantPhone());
         godown.setTenantEmail(request.tenantEmail());

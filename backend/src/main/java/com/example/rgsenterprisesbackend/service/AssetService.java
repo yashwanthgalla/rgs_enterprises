@@ -49,17 +49,23 @@ public class AssetService {
 
     @Transactional
     public AssetResponse createAsset(AssetRequest request) {
-        Godown godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId())
-                .orElseThrow(() -> new ResourceNotFoundException("Godown not found with ID: " + request.godownId()));
+        Godown godown = null;
+        if (request.godownId() != null && request.godownId() > 0) {
+            godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId()).orElse(null);
+        }
+        if (godown == null) {
+            godown = godownRepository.findByIsDeletedFalse().stream().findFirst()
+                    .orElseThrow(() -> new com.example.rgsenterprisesbackend.exception.BadRequestException("Please register at least one Godown before adding assets."));
+        }
 
         Asset asset = Asset.builder()
                 .godown(godown)
                 .name(request.name())
-                .category(request.category())
+                .category(request.getEffectiveCategory())
                 .serialNumber(request.serialNumber())
-                .quantity(request.quantity())
-                .cost(request.cost())
-                .condition(request.condition())
+                .quantity(request.getEffectiveQuantity())
+                .cost(request.getEffectiveCost())
+                .condition(request.getEffectiveCondition())
                 .purchaseDate(request.purchaseDate())
                 .warrantyExpiryDate(request.warrantyExpiryDate())
                 .notes(request.notes())

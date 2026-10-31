@@ -169,7 +169,17 @@ export const RentLedger: React.FC = () => {
         </div>
 
         <Button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            const first = godowns[0];
+            setCreateData({
+              godownId: first ? String(first.id) : '',
+              tenantName: first?.currentTenant || '',
+              month: new Date().toISOString().slice(0, 7),
+              dueDate: new Date().toISOString().slice(0, 10),
+              amountDue: first ? String(first.monthlyRent || '') : '',
+            });
+            setIsCreateModalOpen(true);
+          }}
           icon={<Plus className="w-4 h-4" />}
           className="rounded-xl shadow-apple-sm"
         >

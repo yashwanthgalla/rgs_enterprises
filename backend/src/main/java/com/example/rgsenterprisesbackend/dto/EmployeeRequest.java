@@ -2,7 +2,6 @@ package com.example.rgsenterprisesbackend.dto;
 
 import com.example.rgsenterprisesbackend.model.EmployeeStatus;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
@@ -20,14 +19,21 @@ public record EmployeeRequest(
         String phone,
         String email,
 
-        @NotNull(message = "Monthly salary is required")
         @PositiveOrZero(message = "Monthly salary must be non-negative")
         BigDecimal monthlySalary,
 
-        @NotNull(message = "Joining date is required")
         LocalDate joiningDate,
-
-        @NotNull(message = "Status is required")
         EmployeeStatus status
-) {}
+) {
+    public BigDecimal getEffectiveSalary() {
+        return (monthlySalary != null) ? monthlySalary : BigDecimal.ZERO;
+    }
 
+    public LocalDate getEffectiveJoiningDate() {
+        return (joiningDate != null) ? joiningDate : LocalDate.now();
+    }
+
+    public EmployeeStatus getEffectiveStatus() {
+        return (status != null) ? status : EmployeeStatus.ACTIVE;
+    }
+}

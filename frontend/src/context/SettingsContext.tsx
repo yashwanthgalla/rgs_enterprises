@@ -21,7 +21,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('appSettings');
-      return saved ? JSON.parse(saved) : defaultSettings;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...defaultSettings,
+          ...parsed,
+          currency: parsed.currency || parsed.currencySymbol || parsed.defaultCurrency || '₹',
+        };
+      }
+      return defaultSettings;
     } catch {
       return defaultSettings;
     }
@@ -34,7 +42,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (data) {
           const normalized = {
             ...data,
-            currency: data.currency || data.defaultCurrency || '₹',
+            currency: data.currency || data.currencySymbol || data.defaultCurrency || '₹',
             contactEmail: data.contactEmail || data.alertEmail || 'rgsenterprise2026@gmail.com',
           };
           setSettings((prev) => ({ ...prev, ...normalized }));
@@ -50,8 +58,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     try {
       const updated = (await settingsApi.update(newSettings)) as any;
-      setSettings(updated);
-      localStorage.setItem('appSettings', JSON.stringify(updated));
+      const normalized = {
+        ...updated,
+        currency: updated.currency || updated.currencySymbol || updated.defaultCurrency || '₹',
+      };
+      setSettings(normalized);
+      localStorage.setItem('appSettings', JSON.stringify(normalized));
     } catch (err) {
       setSettings((prev) => ({ ...prev, ...newSettings }));
       throw err;
@@ -59,7 +71,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const formatCurrency = (amount: number | undefined | null): string => {
-    const symbol = settings?.currency || (settings as any)?.defaultCurrency || '₹';
+    const symbol = settings?.currency || (settings as any)?.currencySymbol || (settings as any)?.defaultCurrency || '₹';
     if (amount === undefined || amount === null || isNaN(amount)) {
       return `${symbol}0`;
     }

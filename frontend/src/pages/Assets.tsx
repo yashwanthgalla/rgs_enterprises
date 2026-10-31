@@ -70,8 +70,14 @@ export const Assets: React.FC = () => {
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.godownId) {
-      error('Please provide asset name and facility');
+    if (!formData.name) {
+      error('Please enter an equipment name');
+      return;
+    }
+
+    const targetGodownId = formData.godownId ? Number(formData.godownId) : (godowns[0] ? godowns[0].id : null);
+    if (!targetGodownId) {
+      error('Please add at least one godown facility before registering equipment.');
       return;
     }
 
@@ -79,11 +85,11 @@ export const Assets: React.FC = () => {
     try {
       await assetApi.create({
         name: formData.name,
-        godownId: Number(formData.godownId),
+        godownId: targetGodownId,
         category: formData.category,
         serialNumber: formData.serialNumber || undefined,
         purchaseDate: formData.purchaseDate || undefined,
-        purchaseCost: formData.purchaseCost ? Number(formData.purchaseCost) : undefined,
+        purchaseCost: formData.purchaseCost ? Number(formData.purchaseCost) : 0,
         warrantyExpiry: formData.warrantyExpiry || undefined,
         status: formData.status,
         notes: formData.notes || undefined,

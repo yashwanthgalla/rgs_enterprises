@@ -49,9 +49,8 @@ public class EmployeeService {
     @Transactional
     public EmployeeResponse createEmployee(EmployeeRequest request) {
         Godown godown = null;
-        if (request.godownId() != null) {
-            godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Godown not found with ID: " + request.godownId()));
+        if (request.godownId() != null && request.godownId() > 0) {
+            godown = godownRepository.findByIdAndIsDeletedFalse(request.godownId()).orElse(null);
         }
 
         Employee emp = Employee.builder()
@@ -60,9 +59,9 @@ public class EmployeeService {
                 .role(request.role())
                 .phone(request.phone())
                 .email(request.email())
-                .monthlySalary(request.monthlySalary())
-                .joiningDate(request.joiningDate())
-                .status(request.status())
+                .monthlySalary(request.getEffectiveSalary())
+                .joiningDate(request.getEffectiveJoiningDate())
+                .status(request.getEffectiveStatus())
                 .isDeleted(false)
                 .build();
 

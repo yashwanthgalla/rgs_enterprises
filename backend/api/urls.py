@@ -60,3 +60,4 @@ urlpatterns = [
     # Settings
     path('settings', views.settings_view, name='settings'),
 ]
+

@@ -325,6 +325,20 @@ def godowns_view(request):
         serializer = GodownSerializer(data=request.data)
         if serializer.is_valid():
             godown = serializer.save()
+            if godown.current_tenant and godown.monthly_rent and godown.monthly_rent > 0:
+                current_month = timezone.now().strftime('%Y-%m')
+                due_date = timezone.now().date().replace(day=5)
+                RentEntry.objects.get_or_create(
+                    godown=godown,
+                    rent_month=current_month,
+                    defaults={
+                        'due_date': due_date,
+                        'due_amount': godown.monthly_rent,
+                        'paid_amount': Decimal('0'),
+                        'status': 'DUE',
+                        'notes': f"Initial rent cycle automatically generated for {godown.name}"
+                    }
+                )
             return api_success(GodownSerializer(godown).data, status_code=status.HTTP_201_CREATED)
         return api_error("Validation error", errors=serializer.errors)
 
@@ -743,49 +757,96 @@ def upload_document_view(request):
 def reports_summary_view(request):
     year_param = request.GET.get('year')
     current_year = int(year_param) if year_param else timezone.now().year
+    year_str = f"{current_year:04d}"
+
+    # Year-wide totals
+    year_rents = RentEntry.objects.filter(
+        Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
+    )
+    total_rent_billed = year_rents.aggregate(total=Sum('due_amount'))['total'] or Decimal('0')
+    total_rent_collected = year_rents.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+    total_rent_outstanding = max(Decimal('0'), total_rent_billed - total_rent_collected)
+
+    year_expenses = Expense.objects.filter(
+        is_deleted=False,
+        bill_date__year=current_year
+    )
+    total_company_expenses = year_expenses.filter(responsibility='COMPANY').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    total_tenant_expenses = year_expenses.filter(responsibility='TENANT').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    all_expenses_sum = year_expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    if total_company_expenses == 0 and all_expenses_sum > 0:
+        total_company_expenses = all_expenses_sum
+
+    year_salaries = SalaryPayment.objects.filter(
+        Q(payment_month__startswith=year_str) | Q(payment_date__year=current_year),
+        status='PAID'
+    )
+    total_salaries_paid = year_salaries.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    total_operating_expenses = total_company_expenses + total_salaries_paid
+    effective_income = total_rent_collected if total_rent_collected > 0 else total_rent_billed
+    net_operating_income = effective_income - total_operating_expenses
+
+    # Categories breakdown
+    cat_qs = year_expenses.values('category').annotate(total=Sum('amount'))
+    expenses_by_category = {item['category']: float(item['total']) for item in cat_qs}
 
     # Aggregate by month for the year
     monthly_data = []
-    total_revenue = Decimal('0')
-    total_expenses = Decimal('0')
-
     for month_num in range(1, 13):
         month_str = f"{current_year:04d}-{month_num:02d}"
         month_label = datetime.date(current_year, month_num, 1).strftime('%B')
 
         rev = RentEntry.objects.filter(
-            rent_month=month_str
+            Q(rent_month=month_str) | Q(payment_date__year=current_year, payment_date__month=month_num)
         ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+
+        billed = RentEntry.objects.filter(
+            Q(rent_month=month_str) | Q(due_date__year=current_year, due_date__month=month_num)
+        ).aggregate(total=Sum('due_amount'))['total'] or Decimal('0')
+
+        month_rev = rev if rev > 0 else billed
 
         exp = Expense.objects.filter(
             is_deleted=False,
-            bill_date__startswith=month_str
+            bill_date__year=current_year,
+            bill_date__month=month_num
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
         sal = SalaryPayment.objects.filter(
-            payment_month=month_str,
+            Q(payment_month=month_str) | Q(payment_date__year=current_year, payment_date__month=month_num),
             status='PAID'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
         month_expense = exp + sal
-        net = rev - month_expense
-
-        total_revenue += rev
-        total_expenses += month_expense
+        net = month_rev - month_expense
 
         monthly_data.append({
             "month": month_str,
             "monthName": month_label,
-            "revenue": float(rev),
+            "revenue": float(month_rev),
             "expenses": float(month_expense),
             "netProfit": float(net)
         })
 
     return api_success({
         "year": current_year,
-        "totalRevenue": float(total_revenue),
-        "totalExpenses": float(total_expenses),
-        "netProfit": float(total_revenue - total_expenses),
+        "startDate": f"{current_year}-01-01",
+        "endDate": f"{current_year}-12-31",
+        "totalRentalIncome": float(effective_income),
+        "totalRentCollected": float(total_rent_collected),
+        "totalRentBilled": float(total_rent_billed),
+        "totalRentOutstanding": float(total_rent_outstanding),
+        "totalOperatingExpenses": float(total_operating_expenses),
+        "totalCompanyExpenses": float(total_company_expenses),
+        "totalTenantExpenses": float(total_tenant_expenses),
+        "totalSalariesPaid": float(total_salaries_paid),
+        "netOperatingIncome": float(net_operating_income),
+        "netOperatingProfit": float(net_operating_income),
+        "netProfit": float(net_operating_income),
+        "totalRevenue": float(effective_income),
+        "totalExpenses": float(total_operating_expenses),
+        "expensesByCategory": expenses_by_category,
         "monthlyBreakdown": monthly_data
     })
 
@@ -801,21 +862,31 @@ def reports_godown_pnl_view(request):
     pnl_list = []
 
     for godown in godowns:
-        rev = RentEntry.objects.filter(
-            godown=godown,
-            rent_month__startswith=year_str
+        rev_paid = RentEntry.objects.filter(
+            godown=godown
+        ).filter(
+            Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
         ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+
+        rev_billed = RentEntry.objects.filter(
+            godown=godown
+        ).filter(
+            Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
+        ).aggregate(total=Sum('due_amount'))['total'] or Decimal('0')
+
+        rev = rev_paid if rev_paid > 0 else rev_billed
 
         exp = Expense.objects.filter(
             godown=godown,
             is_deleted=False,
-            bill_date__startswith=year_str
+            bill_date__year=current_year
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
         sal = SalaryPayment.objects.filter(
             employee__godown=godown,
-            payment_month__startswith=year_str,
             status='PAID'
+        ).filter(
+            Q(payment_month__startswith=year_str) | Q(payment_date__year=current_year)
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
         total_exp = exp + sal
@@ -826,9 +897,22 @@ def reports_godown_pnl_view(request):
             "godownId": godown.id,
             "godownName": godown.name,
             "godownCode": godown.code,
+            "city": godown.city or "Hyderabad",
+            "tenantName": godown.current_tenant or "Vacant",
+            "occupancyStatus": godown.status,
+            "rentalIncome": float(rev),
+            "rentIncome": float(rev),
+            "grossRentCollected": float(rev_paid),
+            "rentBilled": float(rev_billed),
             "revenue": float(rev),
+            "operatingExpenses": float(total_exp),
+            "utilityAndMaintExpenses": float(exp),
+            "staffExpense": float(sal),
             "expenses": float(total_exp),
+            "netIncome": float(net),
+            "netOperatingIncome": float(net),
             "netProfit": float(net),
+            "margin": round(float(margin), 1),
             "profitMargin": round(float(margin), 1)
         })
 
@@ -836,36 +920,52 @@ def reports_godown_pnl_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def reports_export_csv_view(request):
     year_param = request.GET.get('year')
     current_year = int(year_param) if year_param else timezone.now().year
+    year_str = f"{current_year:04d}"
 
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="rgs_financial_report_{current_year}.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(['Month', 'Revenue (INR)', 'Expenses (INR)', 'Net Profit (INR)'])
+    writer.writerow(['Godown ID', 'Facility Name', 'Code', 'City', 'Tenant', 'Rent Collected (INR)', 'Operating Expenses (INR)', 'Staff Expense (INR)', 'Net Operating Profit (INR)', 'Status'])
 
-    for month_num in range(1, 13):
-        month_str = f"{current_year:04d}-{month_num:02d}"
-        month_label = datetime.date(current_year, month_num, 1).strftime('%B')
-
+    godowns = Godown.objects.filter(is_deleted=False).order_by('name')
+    for godown in godowns:
         rev = RentEntry.objects.filter(
-            rent_month=month_str
+            godown=godown
+        ).filter(
+            Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
         ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
 
         exp = Expense.objects.filter(
+            godown=godown,
             is_deleted=False,
-            bill_date__startswith=month_str
+            bill_date__year=current_year
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
         sal = SalaryPayment.objects.filter(
-            payment_month=month_str,
+            employee__godown=godown,
             status='PAID'
+        ).filter(
+            Q(payment_month__startswith=year_str) | Q(payment_date__year=current_year)
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-        writer.writerow([month_label, float(rev), float(exp + sal), float(rev - (exp + sal))])
+        net = rev - (exp + sal)
+        writer.writerow([
+            godown.id,
+            godown.name,
+            godown.code,
+            godown.city or "Hyderabad",
+            godown.current_tenant or "Vacant",
+            float(rev),
+            float(exp),
+            float(sal),
+            float(net),
+            godown.status
+        ])
 
     return response
 

@@ -175,10 +175,10 @@ export const Godowns: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            HUBS & Warehouses
+            HUBS
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Manage physical hubs, warehouse spaces, lease contracts, and capacity
+            Manage physical hubs, lease contracts, and square footage capacity
           </p>
         </div>
 
@@ -221,7 +221,7 @@ export const Godowns: React.FC = () => {
       {loading ? (
         <div className="py-20 text-center text-xs text-gray-400">
           <div className="w-6 h-6 border-2 border-apple-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          Loading warehouse facilities...
+          Loading hub facilities...
         </div>
       ) : filteredGodowns.length === 0 ? (
         <Card className="p-12 text-center text-xs text-gray-400">

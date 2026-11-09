@@ -108,15 +108,15 @@ export const Godowns: React.FC = () => {
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this godown? This will delete associated records.')) {
+    if (!window.confirm('Are you sure you want to delete this hub? This will delete associated records.')) {
       return;
     }
     try {
       await godownApi.delete(id);
-      success('Godown deleted successfully');
+      success('Hub deleted successfully');
       setGodowns((prev) => prev.filter((g) => g.id !== id));
     } catch (err: any) {
-      error('Failed to delete godown: ' + (err.message || 'Unknown error'));
+      error('Failed to delete hub: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -145,10 +145,10 @@ export const Godowns: React.FC = () => {
 
       if (editingGodown) {
         await godownApi.update(editingGodown.id, payload);
-        success('Godown updated successfully');
+        success('Hub updated successfully');
       } else {
         await godownApi.create(payload);
-        success('Godown created successfully');
+        success('Hub created successfully');
       }
 
       setIsModalOpen(false);
@@ -175,10 +175,10 @@ export const Godowns: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            Godowns & Warehouses
+            HUBS & Warehouses
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Manage physical warehouses, lease contracts, and square footage capacity
+            Manage physical hubs, warehouse spaces, lease contracts, and capacity
           </p>
         </div>
 
@@ -187,7 +187,7 @@ export const Godowns: React.FC = () => {
           icon={<Plus className="w-4 h-4" />}
           className="rounded-xl shadow-apple-sm"
         >
-          Add New Godown
+          Add New Hub
         </Button>
       </div>
 
@@ -195,7 +195,7 @@ export const Godowns: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Input
-            placeholder="Search by godown name, location, or tenant..."
+            placeholder="Search by hub name, location, or tenant..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -227,12 +227,12 @@ export const Godowns: React.FC = () => {
         <Card className="p-12 text-center text-xs text-gray-400">
           <Warehouse className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
           <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
-            No godowns found
+            No hubs found
           </p>
           <p className="mt-1">
             {searchQuery
               ? 'Try modifying your search filter.'
-              : 'Add your first warehouse property to get started.'}
+              : 'Add your first hub property to get started.'}
           </p>
         </Card>
       ) : (
@@ -243,7 +243,7 @@ export const Godowns: React.FC = () => {
               <Card
                 key={g.id}
                 hoverable
-                onClick={() => navigate(`/godowns/${g.id}`)}
+                onClick={() => navigate(`/hubs/${g.id}`)}
                 className="p-5 flex flex-col justify-between cursor-pointer group"
               >
                 <div>
@@ -275,14 +275,14 @@ export const Godowns: React.FC = () => {
                       <button
                         onClick={(e) => openEditModal(g, e)}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-black/5 dark:hover:text-gray-200 dark:hover:bg-white/10 transition-colors"
-                        title="Edit Godown"
+                        title="Edit Hub"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={(e) => handleDelete(g.id, e)}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                        title="Delete Godown"
+                        title="Delete Hub"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -351,13 +351,13 @@ export const Godowns: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingGodown ? 'Edit Godown Property' : 'Add New Godown Property'}
-        description="Fill in facility measurements, tenancy, and monthly billing rates."
+        title={editingGodown ? 'Edit Hub Property' : 'Add New Hub Property'}
+        description="Fill in hub measurements, tenancy, and monthly billing rates."
         maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Godown Name" required>
+            <FormField label="Hub Name" required>
               <Input
                 placeholder="e.g. Unit A - Auto Logistics"
                 value={formData.name}
@@ -368,7 +368,7 @@ export const Godowns: React.FC = () => {
 
             <FormField label="Facility Code">
               <Input
-                placeholder="e.g. GDW-01"
+                placeholder="e.g. HUB-01"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               />
@@ -464,7 +464,7 @@ export const Godowns: React.FC = () => {
               type="submit"
               loading={submitting}
             >
-              {editingGodown ? 'Update Godown' : 'Create Godown'}
+              {editingGodown ? 'Update Hub' : 'Create Hub'}
             </Button>
           </div>
         </form>

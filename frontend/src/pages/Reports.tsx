@@ -63,7 +63,7 @@ export const Reports: React.FC = () => {
             Financial & Tax Reports
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Annual P&L statement, net operating cash flow, and Godown profitability
+            Annual P&L statement, net operating cash flow, and Hub profitability
           </p>
         </div>
 
@@ -117,17 +117,17 @@ export const Reports: React.FC = () => {
         </Card>
       </div>
 
-      {/* Godown-by-Godown P&L Table */}
+      {/* Hub-by-Hub P&L Table */}
       <Card className="p-6">
         <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4">
-          Facility Profit & Loss Analysis ({selectedYear})
+          Hub Profit & Loss Analysis ({selectedYear})
         </h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
-                <th className="py-3 px-3">Godown Facility</th>
+                <th className="py-3 px-3">Hub Facility</th>
                 <th className="py-3 px-3">Gross Rent Collected</th>
                 <th className="py-3 px-3">Utility & Maint. Expenses</th>
                 <th className="py-3 px-3">Net Operating Income</th>

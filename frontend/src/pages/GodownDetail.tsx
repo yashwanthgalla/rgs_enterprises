@@ -176,10 +176,10 @@ export const GodownDetail: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/godowns')}
+            onClick={() => navigate('/hubs')}
             icon={<ArrowLeft className="w-4 h-4" />}
           >
-            All Godowns
+            All Hubs
           </Button>
           <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
           <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">

@@ -77,7 +77,7 @@ export const Assets: React.FC = () => {
 
     const targetGodownId = formData.godownId ? Number(formData.godownId) : (godowns[0] ? godowns[0].id : null);
     if (!targetGodownId) {
-      error('Please add at least one godown facility before registering equipment.');
+      error('Please add at least one hub facility before registering equipment.');
       return;
     }
 
@@ -218,7 +218,7 @@ export const Assets: React.FC = () => {
                 <div className="mt-4 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
                   <p className="flex items-center gap-2">
                     <Building className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{asset.godownName || `Godown #${asset.godownId}`}</span>
+                    <span>{asset.godownName || `Hub #${asset.godownId}`}</span>
                   </p>
                   {asset.serialNumber && (
                     <p className="text-gray-400 font-mono text-[11px]">
@@ -278,13 +278,13 @@ export const Assets: React.FC = () => {
           </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Assigned Godown" required>
+            <FormField label="Assigned Hub" required>
               <Select
                 value={formData.godownId}
                 onChange={(e) => setFormData({ ...formData, godownId: e.target.value })}
                 required
               >
-                <option value="">-- Choose Godown --</option>
+                <option value="">-- Choose Hub --</option>
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}

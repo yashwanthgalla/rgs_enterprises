@@ -77,7 +77,7 @@ export const Expenses: React.FC = () => {
 
     const targetGodownId = formData.godownId ? Number(formData.godownId) : (godowns[0] ? godowns[0].id : null);
     if (!targetGodownId) {
-      error('Please register a Godown property before adding operating bills.');
+      error('Please register a Hub property before adding operating bills.');
       return;
     }
 
@@ -209,7 +209,7 @@ export const Expenses: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Input
-            placeholder="Search by bill title or godown..."
+            placeholder="Search by bill title or hub..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -250,7 +250,7 @@ export const Expenses: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
-                <th className="py-3 px-3">Title / Godown</th>
+                <th className="py-3 px-3">Title / Hub</th>
                 <th className="py-3 px-3">Category</th>
                 <th className="py-3 px-3">Date</th>
                 <th className="py-3 px-3">Amount</th>
@@ -277,7 +277,7 @@ export const Expenses: React.FC = () => {
                   <tr key={exp.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
                     <td className="py-3.5 px-3">
                       <p className="font-bold text-gray-900 dark:text-gray-100">{exp.title}</p>
-                      <p className="text-[11px] text-gray-400">{exp.godownName || (exp.godownId ? `Godown #${exp.godownId}` : 'General Portfolio')}</p>
+                      <p className="text-[11px] text-gray-400">{exp.godownName || (exp.godownId ? `Hub #${exp.godownId}` : 'General Portfolio')}</p>
                     </td>
                     <td className="py-3.5 px-3 font-semibold text-gray-700 dark:text-gray-300">
                       {exp.category}
@@ -342,12 +342,12 @@ export const Expenses: React.FC = () => {
             />
           </FormField>
 
-          <FormField label="Godown Facility" hint={godowns.length === 0 ? "Add your first godown in Godowns tab" : undefined}>
+          <FormField label="Hub Facility" hint={godowns.length === 0 ? "Add your first hub in HUBS tab" : undefined}>
             <Select
               value={formData.godownId}
               onChange={(e) => setFormData({ ...formData, godownId: e.target.value })}
             >
-              <option value="">General (All Facilities)</option>
+              <option value="">General (All Hubs)</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name} - {g.location}

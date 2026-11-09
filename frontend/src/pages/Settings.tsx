@@ -35,7 +35,7 @@ export const Settings: React.FC = () => {
   // Company Settings State
   const [companyData, setCompanyData] = useState({
     companyName: settings.companyName || 'RGS ENTERPRISES',
-    companyTagline: settings.companyTagline || 'Industrial Godown & Warehouse Assets Management',
+    companyTagline: settings.companyTagline || 'Industrial Hub & Warehouse Assets Management',
     contactEmail: settings.contactEmail || 'rgsenterprise2026@gmail.com',
     contactPhone: settings.contactPhone || '',
     currency: settings.currency || '₹',

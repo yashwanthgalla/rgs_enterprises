@@ -14,7 +14,7 @@ export const AppShell: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-apple-bg dark:bg-apple-darkBg">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-apple-accent border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-gray-400">Loading GodownIQ...</span>
+          <span className="text-xs font-semibold text-gray-400">Loading RGS Enterprises...</span>
         </div>
       </div>
     );

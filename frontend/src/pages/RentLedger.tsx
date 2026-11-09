@@ -112,7 +112,7 @@ export const RentLedger: React.FC = () => {
   const handleCreateRent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createData.godownId || !createData.amountDue) {
-      error('Please specify godown and amount due');
+      error('Please specify hub and amount due');
       return;
     }
 
@@ -224,7 +224,7 @@ export const RentLedger: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Input
-            placeholder="Search by tenant name, month, or godown..."
+            placeholder="Search by tenant name, month, or hub..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -251,7 +251,7 @@ export const RentLedger: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
-                <th className="py-3 px-3">Godown / Tenant</th>
+                <th className="py-3 px-3">Hub / Tenant</th>
                 <th className="py-3 px-3">Month</th>
                 <th className="py-3 px-3">Due Date</th>
                 <th className="py-3 px-3">Amount Due</th>
@@ -281,7 +281,7 @@ export const RentLedger: React.FC = () => {
                     <tr key={r.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
                       <td className="py-3.5 px-3">
                         <p className="font-bold text-gray-900 dark:text-gray-100">{r.tenantName}</p>
-                        <p className="text-[11px] text-gray-400">{r.godownName || `Godown #${r.godownId}`}</p>
+                        <p className="text-[11px] text-gray-400">{r.godownName || `Hub #${r.godownId}`}</p>
                       </td>
                       <td className="py-3.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
                         {r.month}
@@ -392,7 +392,7 @@ export const RentLedger: React.FC = () => {
         description="Add a new rent invoice to the ledger."
       >
         <form onSubmit={handleCreateRent} className="space-y-4">
-          <FormField label="Select Godown Facility" required>
+          <FormField label="Select Hub Facility" required>
             <Select
               value={createData.godownId}
               onChange={(e) => {
@@ -407,7 +407,7 @@ export const RentLedger: React.FC = () => {
               }}
               required
             >
-              <option value="">-- Choose Godown --</option>
+              <option value="">-- Choose Hub --</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name} ({g.location}) - {g.currentTenant || 'Vacant'}

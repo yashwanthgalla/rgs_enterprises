@@ -77,7 +77,7 @@ export const Login: React.FC = () => {
             {settings.companyName || 'RGS ENTERPRISES'}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium tracking-wide">
-            GodownIQ • Enterprise Warehouse Operations
+            RGS ENTERPRISES • Enterprise Hub Operations
           </p>
         </div>
 

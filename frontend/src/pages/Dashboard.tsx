@@ -96,10 +96,10 @@ export const Dashboard: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => navigate('/godowns')}
+            onClick={() => navigate('/hubs')}
             icon={<Plus className="w-3.5 h-3.5" />}
           >
-            New Godown
+            New Hub
           </Button>
         </div>
       </div>
@@ -107,12 +107,12 @@ export const Dashboard: React.FC = () => {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Godowns"
+          title="Total Hubs"
           value={stats?.totalGodowns ?? godowns.length ?? 0}
           subtitle={`${stats?.totalCapacitySqFt?.toLocaleString('en-IN') || 0} sq.ft total`}
           icon={Warehouse}
           color="blue"
-          onClick={() => navigate('/godowns')}
+          onClick={() => navigate('/hubs')}
         />
 
         <StatCard
@@ -125,7 +125,7 @@ export const Dashboard: React.FC = () => {
             value: `${stats?.occupancyRate ? Math.round(stats.occupancyRate) : 0}% Active`,
             isPositive: (stats?.occupancyRate || 0) >= 70,
           }}
-          onClick={() => navigate('/godowns')}
+          onClick={() => navigate('/hubs')}
         />
 
         <StatCard
@@ -168,7 +168,7 @@ export const Dashboard: React.FC = () => {
               {reminders.length === 0 ? (
                 <div className="py-8 text-center text-xs text-gray-400">
                   <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-apple-success opacity-80" />
-                  All godowns, rent schedules, and bills are up to date!
+                  All hubs, rent schedules, and bills are up to date!
                 </div>
               ) : (
                 reminders.map((r, idx) => (
@@ -209,7 +209,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between pb-4 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div>
                 <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  Warehouse Portfolio Snapshot
+                  Hubs Portfolio Snapshot
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Latest facility records and tenancy
@@ -218,7 +218,7 @@ export const Dashboard: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/godowns')}
+                onClick={() => navigate('/hubs')}
                 icon={<ArrowRight className="w-3.5 h-3.5" />}
               >
                 View All
@@ -229,7 +229,7 @@ export const Dashboard: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
-                    <th className="py-3 px-2">Godown</th>
+                    <th className="py-3 px-2">Hub</th>
                     <th className="py-3 px-2">Location</th>
                     <th className="py-3 px-2">Capacity</th>
                     <th className="py-3 px-2">Tenant</th>
@@ -241,14 +241,14 @@ export const Dashboard: React.FC = () => {
                   {godowns.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-gray-400">
-                        No godowns registered yet. Click &quot;New Godown&quot; to add your first facility.
+                        No hubs registered yet. Click &quot;New Hub&quot; to add your first facility.
                       </td>
                     </tr>
                   ) : (
                     godowns.slice(0, 5).map((g) => (
                       <tr
                         key={g.id}
-                        onClick={() => navigate(`/godowns/${g.id}`)}
+                        onClick={() => navigate(`/hubs/${g.id}`)}
                         className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] cursor-pointer transition-colors"
                       >
                         <td className="py-3 px-2 font-semibold text-gray-900 dark:text-gray-100">

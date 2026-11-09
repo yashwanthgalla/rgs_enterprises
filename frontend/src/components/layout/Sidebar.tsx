@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { label: 'Godowns', path: '/godowns', icon: Warehouse },
+    { label: 'HUBS', path: '/hubs', icon: Warehouse },
     { label: 'Rent Ledger', path: '/rent-ledger', icon: ReceiptText },
     { label: 'Expenses & Bills', path: '/expenses', icon: Receipt },
     { label: 'Staff Directory', path: '/staff', icon: Users },

@@ -62,7 +62,7 @@ export const FirstLoginModal: React.FC = () => {
       });
 
       setMustChangePassword(false);
-      success('Password and profile updated successfully! Welcome to GodownIQ.');
+      success('Password and profile updated successfully! Welcome to RGS Enterprises.');
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Failed to update password. Please check your current password.';
       setFormError(msg);

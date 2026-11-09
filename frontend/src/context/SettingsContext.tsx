@@ -10,7 +10,7 @@ interface SettingsContextType {
 
 const defaultSettings: AppSettings = {
   companyName: 'RGS ENTERPRISES',
-  companyTagline: 'Industrial Godown & Warehouse Assets Management',
+  companyTagline: 'Industrial Hub & Warehouse Assets Management',
   contactEmail: 'rgsenterprise2026@gmail.com',
   currency: '₹',
   logoUrl: '/2.jpeg',

@@ -258,7 +258,7 @@ export const StaffDirectory: React.FC = () => {
                   )}
                   <p className="flex items-center gap-2">
                     <Building className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{staff.godownName || (staff.godownId ? `Godown #${staff.godownId}` : 'All Godowns')}</span>
+                    <span>{staff.godownName || (staff.godownId ? `Hub #${staff.godownId}` : 'All Hubs')}</span>
                   </p>
                 </div>
               </div>
@@ -364,12 +364,12 @@ export const StaffDirectory: React.FC = () => {
             </FormField>
           </div>
 
-          <FormField label="Assigned Godown">
+          <FormField label="Assigned Hub">
             <Select
               value={formData.godownId}
               onChange={(e) => setFormData({ ...formData, godownId: e.target.value })}
             >
-              <option value="">General (All Warehouses)</option>
+              <option value="">General (All Hubs)</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name} - {g.location}

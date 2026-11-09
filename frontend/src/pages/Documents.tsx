@@ -143,7 +143,7 @@ export const Documents: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Input
-            placeholder="Search by title, filename, or godown..."
+            placeholder="Search by title, filename, or hub..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -174,7 +174,7 @@ export const Documents: React.FC = () => {
               <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
                 <th className="py-3 px-3">Document Title</th>
                 <th className="py-3 px-3">Type</th>
-                <th className="py-3 px-3">Associated Godown</th>
+                <th className="py-3 px-3">Associated Hub</th>
                 <th className="py-3 px-3">Uploaded Date</th>
                 <th className="py-3 px-3 text-right">Actions</th>
               </tr>
@@ -212,7 +212,7 @@ export const Documents: React.FC = () => {
                       </Badge>
                     </td>
                     <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300">
-                      {doc.godownName || (doc.godownId ? `Godown #${doc.godownId}` : 'Portfolio General')}
+                      {doc.godownName || (doc.godownId ? `Hub #${doc.godownId}` : 'Portfolio General')}
                     </td>
                     <td className="py-3.5 px-3 text-gray-400">
                       {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'}
@@ -275,12 +275,12 @@ export const Documents: React.FC = () => {
               </Select>
             </FormField>
 
-            <FormField label="Godown Facility">
+            <FormField label="Hub Facility">
               <Select
                 value={uploadData.godownId}
                 onChange={(e) => setUploadData({ ...uploadData, godownId: e.target.value })}
               >
-                <option value="">General Portfolio</option>
+                <option value="">General (All Hubs)</option>
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}

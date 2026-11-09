@@ -136,7 +136,7 @@ export const normalizeSettings = (s: any): AppSettings => {
   if (!s) return s;
   return {
     companyName: s.companyName || 'RGS ENTERPRISES',
-    companyTagline: s.companyTagline || 'Industrial Godown & Warehouse Assets Management',
+    companyTagline: s.companyTagline || 'Industrial Hub & Warehouse Assets Management',
     contactEmail: s.contactEmail || s.alertEmail || 'rgsenterprise2026@gmail.com',
     contactPhone: s.contactPhone || '',
     address: s.address || s.companyAddress || '',

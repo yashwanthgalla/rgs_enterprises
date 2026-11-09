@@ -33,6 +33,8 @@ export const App: React.FC = () => {
                 {/* Protected Layout Routes */}
                 <Route path="/" element={<AppShell />}>
                   <Route index element={<Dashboard />} />
+                  <Route path="hubs" element={<Godowns />} />
+                  <Route path="hubs/:id" element={<GodownDetail />} />
                   <Route path="godowns" element={<Godowns />} />
                   <Route path="godowns/:id" element={<GodownDetail />} />
                   <Route path="rent-ledger" element={<RentLedger />} />

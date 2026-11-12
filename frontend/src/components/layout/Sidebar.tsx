@@ -14,6 +14,8 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronRight,
+  Zap,
+  Wifi,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -43,7 +45,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [financeOpen, setFinanceOpen] = useState(true);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
+    '/finance': true,
+    '/expenses': true,
+  });
 
   const navItems: NavItem[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -57,7 +62,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         { label: 'Rent', path: '/finance/rent', icon: Receipt },
       ],
     },
-    { label: 'Expenses & Bills', path: '/expenses', icon: Receipt },
+    {
+      label: 'Expenses & Bills',
+      path: '/expenses',
+      icon: Receipt,
+      children: [
+        { label: 'Bills & Expenses', path: '/expenses/bills', icon: Receipt },
+        { label: 'Electricity Information', path: '/expenses/electricity', icon: Zap },
+        { label: 'WiFi Information', path: '/expenses/wifi', icon: Wifi },
+      ],
+    },
     { label: 'Staff Directory', path: '/staff', icon: Users },
     { label: 'Assets & Equipment', path: '/assets', icon: Wrench },
     { label: 'Document Vault', path: '/documents', icon: FolderLock },
@@ -65,13 +79,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
 
-  const isFinanceActive = location.pathname.startsWith('/finance');
-
-  const handleFinanceToggle = () => {
-    const willOpen = !financeOpen;
-    setFinanceOpen(willOpen);
-    if (willOpen && !location.pathname.startsWith('/finance')) {
-      navigate('/finance/revenue');
+  const handleToggle = (path: string, defaultChildPath: string) => {
+    const isCurrentlyOpen = !!openMenus[path];
+    setOpenMenus((prev) => ({ ...prev, [path]: !isCurrentlyOpen }));
+    if (!isCurrentlyOpen && !location.pathname.startsWith(path)) {
+      navigate(defaultChildPath);
     }
   };
 
@@ -113,16 +125,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {navItems.map((item) => {
             const Icon = item.icon;
 
-            // Render NavItem with Sub-items (Finance)
+            // Render NavItem with Sub-items (Finance & Expenses)
             if (item.children) {
+              const isGroupActive = location.pathname.startsWith(item.path);
+              const isGroupOpen = !!openMenus[item.path];
+              const defaultChildPath = item.children[0]?.path || item.path;
+
               return (
                 <div key={item.path} className="space-y-1">
                   <button
                     type="button"
-                    onClick={handleFinanceToggle}
+                    onClick={() => handleToggle(item.path, defaultChildPath)}
                     className={clsx(
                       'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150 select-none cursor-pointer',
-                      isFinanceActive
+                      isGroupActive
                         ? 'bg-apple-accent/10 dark:bg-apple-accent/15 text-apple-accent font-bold'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                     )}
@@ -132,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                       <span>{item.label}</span>
                     </div>
                     <div className="p-1 rounded-lg text-gray-400">
-                      {financeOpen ? (
+                      {isGroupOpen ? (
                         <ChevronDown className="w-3.5 h-3.5" />
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5" />
@@ -141,12 +157,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   </button>
 
                   {/* Submenu Items */}
-                  {financeOpen && (
+                  {isGroupOpen && (
                     <div className="ml-4 pl-3 border-l-2 border-black/[0.08] dark:border-white/[0.08] space-y-1 my-1">
-                      {item.children.map((sub) => {
+                      {item.children.map((sub, idx) => {
                         const SubIcon = sub.icon;
                         const isSubActive =
                           location.pathname === sub.path ||
+                          (location.pathname === item.path && idx === 0) ||
                           (sub.path === '/finance/revenue' &&
                             location.pathname === '/finance' &&
                             (!location.search || location.search.includes('revenue'))) ||

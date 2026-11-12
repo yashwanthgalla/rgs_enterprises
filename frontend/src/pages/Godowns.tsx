@@ -49,15 +49,6 @@ const HUB_MODEL_OPTIONS = [
   { value: 'ISH', label: 'ISH' },
 ];
 
-const emptyBroadband = (): BroadbandConnection => ({
-  networkProvider: '',
-  accountNumber: '',
-  registeredMobileNumber: '',
-  userId: '',
-  currentPlanEndDate: '',
-  serviceContactNumber: '',
-});
-
 const calculateMonths = (startDate: string, endDate: string): number => {
   if (!startDate || !endDate) return 0;
   const start = new Date(startDate);
@@ -113,34 +104,27 @@ export const Godowns: React.FC = () => {
     operationsPocName: '', // Required
     operationsPocMobile: '', // 10 digits
 
-    // 4. Broadband Details
-    broadbandDetails: [] as BroadbandConnection[],
-
-    // 5. CCTV Details
+    // 4. CCTV Details
     cctvUsername: '',
     cctvPassword: '',
     cctvAccessUrl: '',
 
-    // 6. Labour Licence
+    // 5. Labour Licence
     hasLabourLicence: false,
     labourLicenceStartDate: '',
     labourLicenceExpiryDate: '',
 
-    // 7. Trade Licence
+    // 6. Trade Licence
     hasTradeLicence: false,
     tradeLicenceStartDate: '',
     tradeLicenceExpiryDate: '',
 
-    // 8. Financial Information (non-negative, 2 decimals)
+    // 7. Financial Information (non-negative, 2 decimals)
     totalSetupCost: '',
     securityAdvance: '', // Refundable Advance Amount
     monthlyRent: '',
 
-    // 9. Electricity Information
-    electricityProvider: '',
-    electricityServiceNumber: '',
-
-    // 10. Lease Contact and Owner Information
+    // 8. Lease Contact and Owner Information
     leaseContactName: '',
     leaseContactMobile: '',
     ownerAddress: '',
@@ -185,7 +169,6 @@ export const Godowns: React.FC = () => {
       leaseDurationMonths: 0,
       operationsPocName: '',
       operationsPocMobile: '',
-      broadbandDetails: [],
       cctvUsername: '',
       cctvPassword: '',
       cctvAccessUrl: '',
@@ -198,8 +181,6 @@ export const Godowns: React.FC = () => {
       totalSetupCost: '',
       securityAdvance: '',
       monthlyRent: '',
-      electricityProvider: '',
-      electricityServiceNumber: '',
       leaseContactName: '',
       leaseContactMobile: '',
       ownerAddress: '',
@@ -229,7 +210,6 @@ export const Godowns: React.FC = () => {
       leaseDurationMonths: duration,
       operationsPocName: g.operationsPocName || g.opsPocName || '',
       operationsPocMobile: g.operationsPocMobile || g.opsPocMobile || '',
-      broadbandDetails: Array.isArray(g.broadbandDetails) ? g.broadbandDetails : [],
       cctvUsername: g.cctvUsername || '',
       cctvPassword: g.cctvPassword || '',
       cctvAccessUrl: g.cctvAccessUrl || '',
@@ -242,8 +222,6 @@ export const Godowns: React.FC = () => {
       totalSetupCost: g.totalSetupCost ? String(g.totalSetupCost) : '',
       securityAdvance: g.securityAdvance ? String(g.securityAdvance) : (g.refundableAdvance ? String(g.refundableAdvance) : ''),
       monthlyRent: g.monthlyRent ? String(g.monthlyRent) : '',
-      electricityProvider: g.electricityProvider || '',
-      electricityServiceNumber: g.electricityServiceNumber || '',
       leaseContactName: g.leaseContactName || '',
       leaseContactMobile: g.leaseContactMobile || '',
       ownerAddress: g.ownerAddress || '',
@@ -283,29 +261,6 @@ export const Godowns: React.FC = () => {
       leaseEndDate: val,
       leaseDurationMonths: duration,
     }));
-  };
-
-  // Dynamic Broadband Handlers
-  const addBroadbandConnection = () => {
-    setFormData((prev) => ({
-      ...prev,
-      broadbandDetails: [...prev.broadbandDetails, emptyBroadband()],
-    }));
-  };
-
-  const removeBroadbandConnection = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      broadbandDetails: prev.broadbandDetails.filter((_, idx) => idx !== index),
-    }));
-  };
-
-  const updateBroadbandConnection = (index: number, field: keyof BroadbandConnection, value: string) => {
-    setFormData((prev) => {
-      const updated = [...prev.broadbandDetails];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, broadbandDetails: updated };
-    });
   };
 
   // Labour Licence Handler (hide and clear values when No is selected)
@@ -423,38 +378,36 @@ export const Godowns: React.FC = () => {
         operationsPocName: formData.operationsPocName.trim() || null,
         operationsPocMobile: formData.operationsPocMobile.trim() || null,
 
-        // 4. Broadband Details
-        broadbandDetails: formData.broadbandDetails,
-
-        // 5. CCTV Details
+        // 4. CCTV Details
         cctvUsername: formData.cctvUsername.trim() || null,
         cctvPassword: formData.cctvPassword.trim() || null,
         cctvAccessUrl: formData.cctvAccessUrl.trim() || null,
 
-        // 6. Labour Licence
+        // 5. Labour Licence
         hasLabourLicence: formData.hasLabourLicence,
         labourLicenceStartDate: formData.hasLabourLicence ? (formData.labourLicenceStartDate || null) : null,
         labourLicenceExpiryDate: formData.hasLabourLicence ? (formData.labourLicenceExpiryDate || null) : null,
 
-        // 7. Trade Licence
+        // 6. Trade Licence
         hasTradeLicence: formData.hasTradeLicence,
         tradeLicenceStartDate: formData.hasTradeLicence ? (formData.tradeLicenceStartDate || null) : null,
         tradeLicenceExpiryDate: formData.hasTradeLicence ? (formData.tradeLicenceExpiryDate || null) : null,
 
-        // 8. Financial Information (non-negative, 2 decimals)
+        // 7. Financial Information (non-negative, 2 decimals)
         totalSetupCost: Number(parseFloat(formData.totalSetupCost || '0').toFixed(2)),
         securityAdvance: Number(parseFloat(formData.securityAdvance || '0').toFixed(2)),
         refundableAdvance: Number(parseFloat(formData.securityAdvance || '0').toFixed(2)),
         monthlyRent: Number(parseFloat(formData.monthlyRent || '0').toFixed(2)),
 
-        // 9. Electricity Information
-        electricityProvider: formData.electricityProvider.trim() || null,
-        electricityServiceNumber: formData.electricityServiceNumber.trim() || null,
-
-        // 10. Lease Contact & Owner Information
+        // 8. Lease Contact & Owner Information
         leaseContactName: formData.leaseContactName.trim() || null,
         leaseContactMobile: formData.leaseContactMobile.trim() || null,
         ownerAddress: formData.ownerAddress.trim() || null,
+
+        // Broadband and electricity configured in Expenses & Bills
+        broadbandDetails: [],
+        electricityProvider: null,
+        electricityServiceNumber: null,
 
         notes: formData.notes.trim() || null,
       };
@@ -912,121 +865,15 @@ export const Godowns: React.FC = () => {
             </div>
           </div>
 
-          {/* SECTION 4: BROADBAND DETAILS */}
-          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                  4
-                </div>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                  <Wifi className="w-4 h-4 text-apple-accent" />
-                  <span>4. Broadband Details</span>
-                </h4>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                icon={<Plus className="w-3.5 h-3.5" />}
-                onClick={addBroadbandConnection}
-              >
-                Add Broadband
-              </Button>
-            </div>
-
-            {formData.broadbandDetails.length === 0 ? (
-              <div className="p-4 text-center rounded-xl border border-dashed border-black/10 dark:border-white/10 text-xs text-gray-400">
-                No broadband blocks configured. Click &quot;Add Broadband&quot; to configure connections.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {formData.broadbandDetails.map((conn, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-xl bg-white dark:bg-apple-cardDark border border-black/[0.08] dark:border-white/[0.1] space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                        <Wifi className="w-3.5 h-3.5 text-apple-accent" />
-                        <span>Broadband Connection #{idx + 1}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeBroadbandConnection(idx)}
-                        className="text-xs text-apple-danger hover:underline flex items-center gap-1 font-semibold"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Remove</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <FormField label="Network Provider">
-                        <Input
-                          placeholder="e.g. Airtel, ACT, Jio"
-                          value={conn.networkProvider}
-                          onChange={(e) => updateBroadbandConnection(idx, 'networkProvider', e.target.value)}
-                        />
-                      </FormField>
-
-                      <FormField label="Account Number">
-                        <Input
-                          placeholder="e.g. ACC-10928374"
-                          value={conn.accountNumber}
-                          onChange={(e) => updateBroadbandConnection(idx, 'accountNumber', e.target.value)}
-                        />
-                      </FormField>
-
-                      <FormField label="Registered Mobile Number">
-                        <Input
-                          placeholder="e.g. 9876543210"
-                          maxLength={10}
-                          value={conn.registeredMobileNumber}
-                          onChange={(e) => updateBroadbandConnection(idx, 'registeredMobileNumber', e.target.value)}
-                        />
-                      </FormField>
-
-                      <FormField label="User ID">
-                        <Input
-                          placeholder="e.g. ACT_HYD_9821"
-                          value={conn.userId}
-                          onChange={(e) => updateBroadbandConnection(idx, 'userId', e.target.value)}
-                        />
-                      </FormField>
-
-                      <FormField label="Current Plan End Date">
-                        <Input
-                          type="date"
-                          value={conn.currentPlanEndDate}
-                          onChange={(e) => updateBroadbandConnection(idx, 'currentPlanEndDate', e.target.value)}
-                        />
-                      </FormField>
-
-                      <FormField label="Service Contact Number">
-                        <Input
-                          placeholder="e.g. 18001030198"
-                          value={conn.serviceContactNumber}
-                          onChange={(e) => updateBroadbandConnection(idx, 'serviceContactNumber', e.target.value)}
-                        />
-                      </FormField>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* SECTION 5: CCTV DETAILS */}
+          {/* SECTION 4: CCTV DETAILS */}
           <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                5
+                4
               </div>
               <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                 <Video className="w-4 h-4 text-apple-accent" />
-                <span>5. CCTV Details</span>
+                <span>4. CCTV Details</span>
               </h4>
             </div>
 
@@ -1072,16 +919,16 @@ export const Godowns: React.FC = () => {
             </div>
           </div>
 
-          {/* SECTION 6: LABOUR LICENCE */}
+          {/* SECTION 5: LABOUR LICENCE */}
           <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                  6
+                  5
                 </div>
                 <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-apple-accent" />
-                  <span>6. Labour Licence</span>
+                  <span>5. Labour Licence</span>
                 </h4>
               </div>
 
@@ -1140,16 +987,16 @@ export const Godowns: React.FC = () => {
             )}
           </div>
 
-          {/* SECTION 7: TRADE LICENCE */}
+          {/* SECTION 6: TRADE LICENCE */}
           <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                  7
+                  6
                 </div>
                 <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                   <FileCheck className="w-4 h-4 text-apple-accent" />
-                  <span>7. Trade Licence</span>
+                  <span>6. Trade Licence</span>
                 </h4>
               </div>
 
@@ -1208,15 +1055,15 @@ export const Godowns: React.FC = () => {
             )}
           </div>
 
-          {/* SECTION 8: FINANCIAL INFORMATION */}
+          {/* SECTION 7: FINANCIAL INFORMATION */}
           <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                8
+                7
               </div>
               <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                 <IndianRupee className="w-4 h-4 text-apple-accent" />
-                <span>8. Financial Information (Numeric, Non-negative, 2 Decimals)</span>
+                <span>7. Financial Information (Numeric, Non-negative, 2 Decimals)</span>
               </h4>
             </div>
 
@@ -1256,46 +1103,15 @@ export const Godowns: React.FC = () => {
             </div>
           </div>
 
-          {/* SECTION 9: ELECTRICITY INFORMATION */}
+          {/* SECTION 8: LEASE CONTACT AND OWNER INFORMATION */}
           <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
               <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                9
-              </div>
-              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                <Zap className="w-4 h-4 text-apple-accent" />
-                <span>9. Electricity Information</span>
-              </h4>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField label="Service Provider">
-                <Input
-                  placeholder="e.g. TSSPDCL, BESCOM, MSEDCL"
-                  value={formData.electricityProvider}
-                  onChange={(e) => setFormData({ ...formData, electricityProvider: e.target.value })}
-                />
-              </FormField>
-
-              <FormField label="Electricity Service Number">
-                <Input
-                  placeholder="e.g. 1029384756"
-                  value={formData.electricityServiceNumber}
-                  onChange={(e) => setFormData({ ...formData, electricityServiceNumber: e.target.value })}
-                />
-              </FormField>
-            </div>
-          </div>
-
-          {/* SECTION 10: LEASE CONTACT AND OWNER INFORMATION */}
-          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
-                10
+                8
               </div>
               <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                 <Building className="w-4 h-4 text-apple-accent" />
-                <span>10. Lease Contact and Owner Information</span>
+                <span>8. Lease Contact and Owner Information</span>
               </h4>
             </div>
 

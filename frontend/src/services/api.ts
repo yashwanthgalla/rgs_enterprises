@@ -286,6 +286,9 @@ export const godownApi = {
     };
     return api.put(`/godowns/${id}`, payload).then(unwrap).then(normalizeGodown);
   },
+  patch: (id: number | string, data: any) => {
+    return api.put(`/godowns/${id}`, data).then(unwrap).then(normalizeGodown);
+  },
   delete: (id: number | string) => api.delete(`/godowns/${id}`).then(unwrap),
 };
 

@@ -147,7 +147,7 @@ export const Dashboard: React.FC = () => {
           subtitle={`Bills: ${formatCurrency(stats?.totalExpensesThisMonth || 0)}`}
           icon={AlertTriangle}
           color="amber"
-          onClick={() => navigate('/rent-ledger')}
+          onClick={() => navigate('/finance/rent')}
         />
       </div>
 
@@ -199,10 +199,10 @@ export const Dashboard: React.FC = () => {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => navigate('/rent-ledger')}
+              onClick={() => navigate('/finance/rent')}
               icon={<ArrowRight className="w-3.5 h-3.5" />}
             >
-              Review Rent Roll
+              Review Rent
             </Button>
           </div>
         </Card>
@@ -298,8 +298,8 @@ export const Dashboard: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/rent-ledger')}
-              icon={<ReceiptText className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/finance/rent')}
+              icon={<Receipt className="w-3.5 h-3.5" />}
             >
               Record Rent
             </Button>

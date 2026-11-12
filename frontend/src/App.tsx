@@ -11,7 +11,6 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Godowns } from './pages/Godowns';
 import { GodownDetail } from './pages/GodownDetail';
-import { RentLedger } from './pages/RentLedger';
 import { Expenses } from './pages/Expenses';
 import { Finance } from './pages/Finance';
 import { StaffDirectory } from './pages/Staff';
@@ -41,7 +40,7 @@ export const App: React.FC = () => {
                   <Route path="finance" element={<Finance />} />
                   <Route path="finance/revenue" element={<Finance />} />
                   <Route path="finance/rent" element={<Finance />} />
-                  <Route path="rent-ledger" element={<RentLedger />} />
+                  <Route path="rent-ledger" element={<Navigate to="/finance/rent" replace />} />
                   <Route path="expenses" element={<Expenses />} />
                   <Route path="staff" element={<StaffDirectory />} />
                   <Route path="assets" element={<Assets />} />

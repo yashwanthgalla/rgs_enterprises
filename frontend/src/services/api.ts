@@ -1,11 +1,15 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { Godown, RentEntry, Expense, Staff, Asset, AppSettings } from '../types';
 
-// Get base URL from environment or fallback to live Vercel backend
+// Get base URL from environment or fallback to live local/production backend
 const getBaseUrl = (): string => {
   let envUrl = import.meta.env.VITE_API_URL;
   if (!envUrl || envUrl.trim() === '') {
-    envUrl = 'https://rgs-enterprises-backend.vercel.app/api/v1';
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      envUrl = 'http://localhost:8000/api/v1';
+    } else {
+      envUrl = 'https://rgs-enterprises-backend.vercel.app/api/v1';
+    }
   }
   envUrl = envUrl.replace(/\/+$/, '');
   if (!envUrl.endsWith('/api/v1')) {

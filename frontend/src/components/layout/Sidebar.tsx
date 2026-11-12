@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Warehouse,
@@ -42,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const { settings } = useSettings();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [financeOpen, setFinanceOpen] = useState(true);
 
@@ -53,8 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       path: '/finance',
       icon: Landmark,
       children: [
-        { label: 'Total Revenue (Yearly)', path: '/finance/revenue', icon: TrendingUp },
-        { label: 'Rent (Monthly)', path: '/finance/rent', icon: Receipt },
+        { label: 'Total Revenue', path: '/finance/revenue', icon: TrendingUp },
+        { label: 'Rent', path: '/finance/rent', icon: Receipt },
       ],
     },
     { label: 'Rent Ledger', path: '/rent-ledger', icon: ReceiptText },
@@ -67,6 +68,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   ];
 
   const isFinanceActive = location.pathname.startsWith('/finance');
+
+  const handleFinanceToggle = () => {
+    const willOpen = !financeOpen;
+    setFinanceOpen(willOpen);
+    if (willOpen && !location.pathname.startsWith('/finance')) {
+      navigate('/finance/revenue');
+    }
+  };
 
   return (
     <>
@@ -110,38 +119,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             if (item.children) {
               return (
                 <div key={item.path} className="space-y-1">
-                  <div
+                  <button
+                    type="button"
+                    onClick={handleFinanceToggle}
                     className={clsx(
-                      'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150',
+                      'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150 select-none cursor-pointer',
                       isFinanceActive
                         ? 'bg-apple-accent/10 dark:bg-apple-accent/15 text-apple-accent font-bold'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                     )}
                   >
-                    <NavLink
-                      to="/finance/revenue"
-                      onClick={onClose}
-                      className="flex items-center gap-3 flex-1"
-                    >
+                    <div className="flex items-center gap-3">
                       <Icon className="w-4 h-4 shrink-0" />
                       <span>{item.label}</span>
-                    </NavLink>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFinanceOpen((prev) => !prev);
-                      }}
-                      className="p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                      title={financeOpen ? 'Collapse Finance Submenu' : 'Expand Finance Submenu'}
-                    >
+                    </div>
+                    <div className="p-1 rounded-lg text-gray-400">
                       {financeOpen ? (
                         <ChevronDown className="w-3.5 h-3.5" />
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5" />
                       )}
-                    </button>
-                  </div>
+                    </div>
+                  </button>
 
                   {/* Submenu Items */}
                   {financeOpen && (

@@ -53,23 +53,16 @@ export const Finance: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'REVENUE' | 'RENT'>(getInitialTab);
 
-  // Keep activeTab in sync with route changes
+  // Keep activeTab in sync with route changes; redirect /finance to /finance/revenue
   useEffect(() => {
-    if (location.pathname.includes('/rent') || searchParams.get('tab') === 'rent') {
+    if (location.pathname === '/finance') {
+      navigate('/finance/revenue', { replace: true });
+    } else if (location.pathname.includes('/rent') || searchParams.get('tab') === 'rent') {
       setActiveTab('RENT');
     } else if (location.pathname.includes('/revenue') || searchParams.get('tab') === 'revenue') {
       setActiveTab('REVENUE');
     }
-  }, [location.pathname, searchParams]);
-
-  const switchTab = (tab: 'REVENUE' | 'RENT') => {
-    setActiveTab(tab);
-    if (tab === 'RENT') {
-      navigate('/finance/rent');
-    } else {
-      navigate('/finance/revenue');
-    }
-  };
+  }, [location.pathname, searchParams, navigate]);
 
   const [hubs, setHubs] = useState<Godown[]>([]);
   const [selectedHubId, setSelectedHubId] = useState<string>('ALL');
@@ -371,10 +364,12 @@ export const Finance: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Landmark className="w-6 h-6 text-apple-accent" />
-            <span>Finance Module</span>
+            <span>{activeTab === 'REVENUE' ? 'Total Revenue' : 'Rent'}</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Manage yearly Total Revenue statements and monthly Rent ledgers with auto-calculated TDS and GST
+            {activeTab === 'REVENUE'
+              ? 'Manage annual Total Revenue statements and financial projections by Hub'
+              : 'Manage monthly Rent ledgers with auto-calculated TDS (10%) and GST (18%)'}
           </p>
         </div>
 
@@ -401,38 +396,9 @@ export const Finance: React.FC = () => {
             icon={<Plus className="w-4 h-4" />}
             className="rounded-xl shadow-apple-sm"
           >
-            {activeTab === 'REVENUE' ? 'Add Total Revenue' : 'Add Monthly Rent'}
+            {activeTab === 'REVENUE' ? 'Add Total Revenue' : 'Add Rent'}
           </Button>
         </div>
-      </div>
-
-      {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-black/[0.06] dark:border-white/[0.08] pb-1">
-        <button
-          type="button"
-          onClick={() => switchTab('REVENUE')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-            activeTab === 'REVENUE'
-              ? 'bg-apple-accent text-white shadow-apple-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          <span>Tab 1: Total Revenue (Yearly)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => switchTab('RENT')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-            activeTab === 'RENT'
-              ? 'bg-apple-accent text-white shadow-apple-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          <span>Tab 2: Rent (Monthly)</span>
-        </button>
       </div>
 
       {/* TAB 1: TOTAL REVENUE VIEW */}

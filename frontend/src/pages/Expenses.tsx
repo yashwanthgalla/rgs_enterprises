@@ -56,8 +56,11 @@ export const Expenses: React.FC = () => {
   const [savingElectricity, setSavingElectricity] = useState(false);
 
   // Bills for selected Hub (for information only)
+  const [billCategory, setBillCategory] = useState<'ELECTRICITY' | 'WIFI'>('ELECTRICITY');
   const [electricityBills, setElectricityBills] = useState<Expense[]>([]);
+  const [wifiBills, setWifiBills] = useState<Expense[]>([]);
   const [loadingBills, setLoadingBills] = useState(false);
+  const [loadingWifiBills, setLoadingWifiBills] = useState(false);
 
   // Add Bill Modal State
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
@@ -115,6 +118,24 @@ export const Expenses: React.FC = () => {
     }
   };
 
+  // Fetch wifi bills for this hub
+  const fetchHubWifiBills = async (hubId: string | number) => {
+    if (!hubId) return;
+    setLoadingWifiBills(true);
+    try {
+      const res = await expenseApi.getByGodown(hubId).catch(() => []);
+      const allExpenses: Expense[] = Array.isArray(res) ? res : (res as any)?.content || [];
+      const wifiOnly = allExpenses.filter(
+        (e) => e.category === 'WIFI' || e.category === 'INTERNET' || e.category === 'BROADBAND'
+      );
+      setWifiBills(wifiOnly);
+    } catch {
+      setWifiBills([]);
+    } finally {
+      setLoadingWifiBills(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedGodown) {
       const provider = selectedGodown.electricityProvider || '';
@@ -129,8 +150,9 @@ export const Expenses: React.FC = () => {
         setIsElectricityEditing(true);
       }
 
-      // Fetch electricity bills
+      // Fetch electricity and wifi bills for information
       fetchHubElectricityBills(selectedGodown.id);
+      fetchHubWifiBills(selectedGodown.id);
 
       // Setup WiFi
       const existingBbs = Array.isArray(selectedGodown.broadbandDetails)
@@ -182,8 +204,9 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  // Add Bill for this Card (information only)
+  // Add Bill for Electricity (information only)
   const handleOpenAddBillModal = () => {
+    setBillCategory('ELECTRICITY');
     const defaultTitle = `${selectedGodown?.electricityProvider || 'Power'} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
     setBillFormData({
       amount: '',
@@ -192,6 +215,24 @@ export const Expenses: React.FC = () => {
       title: defaultTitle,
       status: 'PAID',
       notes: selectedGodown?.electricityServiceNumber ? `USC: ${selectedGodown.electricityServiceNumber}` : '',
+    });
+    setIsAddBillModalOpen(true);
+  };
+
+  // Add Bill for WiFi / Broadband (information only)
+  const handleOpenAddWifiBillModal = (specificLine?: BroadbandConnection) => {
+    setBillCategory('WIFI');
+    const targetLine = specificLine || broadbandList[0];
+    const provider = targetLine?.networkProvider || 'Broadband / WiFi';
+    const defaultTitle = `${provider} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
+    const lineNotes = targetLine?.accountNumber ? `Account No: ${targetLine.accountNumber}` : '';
+    setBillFormData({
+      amount: '',
+      billDate: new Date().toISOString().slice(0, 10),
+      dueDate: '',
+      title: defaultTitle,
+      status: 'PAID',
+      notes: lineNotes,
     });
     setIsAddBillModalOpen(true);
   };
@@ -207,8 +248,8 @@ export const Expenses: React.FC = () => {
     try {
       await expenseApi.create({
         godownId: Number(selectedHubId),
-        category: 'ELECTRICITY',
-        title: billFormData.title || 'Electricity Bill',
+        category: billCategory,
+        title: billFormData.title || (billCategory === 'WIFI' ? 'WiFi Bill' : 'Electricity Bill'),
         amount: Number(billFormData.amount),
         billDate: billFormData.billDate,
         dueDate: billFormData.dueDate || null,
@@ -216,9 +257,13 @@ export const Expenses: React.FC = () => {
         notes: billFormData.notes || null,
       });
 
-      success('Bill saved for information.');
+      success(`${billCategory === 'WIFI' ? 'WiFi' : 'Electricity'} bill saved for information.`);
       setIsAddBillModalOpen(false);
-      fetchHubElectricityBills(selectedHubId);
+      if (billCategory === 'WIFI') {
+        fetchHubWifiBills(selectedHubId);
+      } else {
+        fetchHubElectricityBills(selectedHubId);
+      }
     } catch (err: any) {
       error('Failed to save bill: ' + (err.message || 'Error'));
     } finally {
@@ -232,6 +277,17 @@ export const Expenses: React.FC = () => {
       await expenseApi.delete(billId);
       setElectricityBills((prev) => prev.filter((b) => b.id !== billId));
       success('Bill record removed.');
+    } catch (err: any) {
+      error('Failed to delete: ' + err.message);
+    }
+  };
+
+  const handleDeleteWifiBill = async (billId: number) => {
+    if (!window.confirm('Delete this WiFi bill record?')) return;
+    try {
+      await expenseApi.delete(billId);
+      setWifiBills((prev) => prev.filter((b) => b.id !== billId));
+      success('WiFi bill record removed.');
     } catch (err: any) {
       error('Failed to delete: ' + err.message);
     }
@@ -715,11 +771,22 @@ export const Expenses: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
+                    variant="primary"
+                    onClick={() => handleOpenAddWifiBillModal()}
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    className="rounded-xl shadow-apple-sm text-xs font-semibold px-3 py-1.5"
+                  >
+                    + Add Bill
+                  </Button>
+
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => setIsWifiEditing(true)}
                     icon={<Pencil className="w-3.5 h-3.5" />}
+                    className="text-xs font-semibold"
                   >
-                    Edit WiFi Details
+                    Edit Details
                   </Button>
                 </div>
               </div>
@@ -735,7 +802,18 @@ export const Expenses: React.FC = () => {
                         <Radio className="w-3.5 h-3.5 text-cyan-500" />
                         {bb.networkProvider || `Connection #${idx + 1}`}
                       </span>
-                      <Badge variant="accent" size="sm">Line #{idx + 1}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAddWifiBillModal(bb)}
+                          className="text-[11px] font-semibold text-apple-accent hover:underline flex items-center gap-0.5"
+                          title="Add bill for this connection"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Bill</span>
+                        </button>
+                        <Badge variant="accent" size="sm">Line #{idx + 1}</Badge>
+                      </div>
                     </div>
 
                     <div className="space-y-1.5 pt-1 text-[11px]">
@@ -762,6 +840,81 @@ export const Expenses: React.FC = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Logged WiFi Bills for Information */}
+              <div className="mt-6 pt-5 border-t border-black/[0.06] dark:border-white/[0.08]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-cyan-500" />
+                    <h5 className="font-bold text-xs text-gray-900 dark:text-gray-100">
+                      Saved WiFi Bills ({wifiBills.length})
+                    </h5>
+                    <span className="text-[10px] text-gray-400">(Saved for information only)</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddWifiBillModal()}
+                    className="text-xs text-apple-accent hover:underline font-semibold flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Bill</span>
+                  </button>
+                </div>
+
+                {loadingWifiBills ? (
+                  <div className="py-6 text-center text-xs text-gray-400">Loading bill records...</div>
+                ) : wifiBills.length === 0 ? (
+                  <div className="py-6 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400">
+                    No WiFi bills recorded yet. Click &quot;+ Add Bill&quot; on the card to save a bill for information.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3">Title / Provider</th>
+                          <th className="py-2.5 px-3">Amount</th>
+                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
+                        {wifiBills.map((bill) => (
+                          <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                            <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
+                              {bill.expenseDate}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
+                              {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
+                            </td>
+                            <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
+                              {formatCurrency(bill.amount)}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
+                                {bill.status}
+                              </Badge>
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWifiBill(bill.id)}
+                                className="p-1 rounded-md text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                                title="Delete Bill Record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </Card>
           ) : (
@@ -945,13 +1098,17 @@ export const Expenses: React.FC = () => {
       <Modal
         isOpen={isAddBillModalOpen}
         onClose={() => setIsAddBillModalOpen(false)}
-        title="Add Bill (Information Only)"
+        title={`Add ${billCategory === 'WIFI' ? 'WiFi / Broadband' : 'Electricity'} Bill (Information Only)`}
         description={`Record a bill for ${selectedGodown?.erpName || selectedGodown?.name || 'this Hub'}. Stored solely for your information.`}
       >
         <form onSubmit={handleSaveBill} className="space-y-4">
           <FormField label="Bill Title / Description" required>
             <Input
-              placeholder="e.g. APSPDCL Power Bill - Nov 2026"
+              placeholder={
+                billCategory === 'WIFI'
+                  ? 'e.g. Airtel Fibernet Bill - Nov 2026'
+                  : 'e.g. APSPDCL Power Bill - Nov 2026'
+              }
               value={billFormData.title}
               onChange={(e) => setBillFormData({ ...billFormData, title: e.target.value })}
               required
@@ -962,7 +1119,7 @@ export const Expenses: React.FC = () => {
             <FormField label="Amount (₹)" required>
               <Input
                 type="number"
-                placeholder="e.g. 14500"
+                placeholder="e.g. 1500"
                 value={billFormData.amount}
                 onChange={(e) => setBillFormData({ ...billFormData, amount: e.target.value })}
                 required
@@ -999,9 +1156,13 @@ export const Expenses: React.FC = () => {
             </FormField>
           </div>
 
-          <FormField label="Notes / Consumer Details">
+          <FormField label="Notes / Reference Details">
             <Input
-              placeholder="e.g. Meter reading: 4520 units, paid online"
+              placeholder={
+                billCategory === 'WIFI'
+                  ? 'e.g. Account No: 10429482, paid online'
+                  : 'e.g. Meter reading: 4520 units, paid online'
+              }
               value={billFormData.notes}
               onChange={(e) => setBillFormData({ ...billFormData, notes: e.target.value })}
             />

@@ -162,7 +162,7 @@ export interface Expense {
   godownId?: number;
   godownName?: string;
   godownCode?: string;
-  category: 'ELECTRICITY' | 'WATER' | 'PROPERTY_TAX' | 'MAINTENANCE' | 'SALARY' | 'SECURITY' | 'INSURANCE' | 'OTHER';
+  category: 'ELECTRICITY' | 'WATER' | 'PROPERTY_TAX' | 'MAINTENANCE' | 'SALARY' | 'SECURITY' | 'INSURANCE' | 'WIFI' | 'INTERNET' | 'BROADBAND' | 'OTHER' | string;
   title: string;
   amount: number;
   expenseDate: string;

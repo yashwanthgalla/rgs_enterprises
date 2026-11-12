@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Warehouse,
@@ -12,6 +12,9 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  TrendingUp,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -22,14 +25,38 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+interface SubNavItem {
+  label: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+interface NavItem {
+  label: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children?: SubNavItem[];
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const { settings } = useSettings();
+  const location = useLocation();
 
-  const navItems = [
+  const [financeOpen, setFinanceOpen] = useState(true);
+
+  const navItems: NavItem[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'HUBS', path: '/hubs', icon: Warehouse },
-    { label: 'Finance', path: '/finance', icon: Landmark },
+    {
+      label: 'Finance',
+      path: '/finance',
+      icon: Landmark,
+      children: [
+        { label: 'Total Revenue (Yearly)', path: '/finance/revenue', icon: TrendingUp },
+        { label: 'Rent (Monthly)', path: '/finance/rent', icon: Receipt },
+      ],
+    },
     { label: 'Rent Ledger', path: '/rent-ledger', icon: ReceiptText },
     { label: 'Expenses & Bills', path: '/expenses', icon: Receipt },
     { label: 'Staff Directory', path: '/staff', icon: Users },
@@ -38,6 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Financial Reports', path: '/reports', icon: BarChart3 },
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
+
+  const isFinanceActive = location.pathname.startsWith('/finance');
 
   return (
     <>
@@ -76,6 +105,82 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
+
+            // Render NavItem with Sub-items (Finance)
+            if (item.children) {
+              return (
+                <div key={item.path} className="space-y-1">
+                  <div
+                    className={clsx(
+                      'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150',
+                      isFinanceActive
+                        ? 'bg-apple-accent/10 dark:bg-apple-accent/15 text-apple-accent font-bold'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                    )}
+                  >
+                    <NavLink
+                      to="/finance/revenue"
+                      onClick={onClose}
+                      className="flex items-center gap-3 flex-1"
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFinanceOpen((prev) => !prev);
+                      }}
+                      className="p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      title={financeOpen ? 'Collapse Finance Submenu' : 'Expand Finance Submenu'}
+                    >
+                      {financeOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Submenu Items */}
+                  {financeOpen && (
+                    <div className="ml-4 pl-3 border-l-2 border-black/[0.08] dark:border-white/[0.08] space-y-1 my-1">
+                      {item.children.map((sub) => {
+                        const SubIcon = sub.icon;
+                        const isSubActive =
+                          location.pathname === sub.path ||
+                          (sub.path === '/finance/revenue' &&
+                            location.pathname === '/finance' &&
+                            (!location.search || location.search.includes('revenue'))) ||
+                          (sub.path === '/finance/rent' &&
+                            location.pathname === '/finance' &&
+                            location.search.includes('rent'));
+
+                        return (
+                          <NavLink
+                            key={sub.path}
+                            to={sub.path}
+                            onClick={onClose}
+                            className={clsx(
+                              'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-150',
+                              isSubActive
+                                ? 'bg-apple-accent text-white shadow-apple-sm'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                            )}
+                          >
+                            <SubIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{sub.label}</span>
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Standard NavItem
             return (
               <NavLink
                 key={item.path}

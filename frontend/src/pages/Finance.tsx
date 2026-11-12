@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Landmark,
   Plus,
@@ -38,8 +39,38 @@ const FINANCIAL_YEARS = [
 export const Finance: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<'REVENUE' | 'RENT'>('REVENUE');
+  // Determine initial tab from route or query params
+  const getInitialTab = (): 'REVENUE' | 'RENT' => {
+    if (location.pathname.includes('/rent') || searchParams.get('tab') === 'rent') {
+      return 'RENT';
+    }
+    return 'REVENUE';
+  };
+
+  const [activeTab, setActiveTab] = useState<'REVENUE' | 'RENT'>(getInitialTab);
+
+  // Keep activeTab in sync with route changes
+  useEffect(() => {
+    if (location.pathname.includes('/rent') || searchParams.get('tab') === 'rent') {
+      setActiveTab('RENT');
+    } else if (location.pathname.includes('/revenue') || searchParams.get('tab') === 'revenue') {
+      setActiveTab('REVENUE');
+    }
+  }, [location.pathname, searchParams]);
+
+  const switchTab = (tab: 'REVENUE' | 'RENT') => {
+    setActiveTab(tab);
+    if (tab === 'RENT') {
+      navigate('/finance/rent');
+    } else {
+      navigate('/finance/revenue');
+    }
+  };
+
   const [hubs, setHubs] = useState<Godown[]>([]);
   const [selectedHubId, setSelectedHubId] = useState<string>('ALL');
   const [loading, setLoading] = useState(true);
@@ -379,7 +410,7 @@ export const Finance: React.FC = () => {
       <div className="flex items-center gap-2 border-b border-black/[0.06] dark:border-white/[0.08] pb-1">
         <button
           type="button"
-          onClick={() => setActiveTab('REVENUE')}
+          onClick={() => switchTab('REVENUE')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
             activeTab === 'REVENUE'
               ? 'bg-apple-accent text-white shadow-apple-sm'
@@ -392,7 +423,7 @@ export const Finance: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setActiveTab('RENT')}
+          onClick={() => switchTab('RENT')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
             activeTab === 'RENT'
               ? 'bg-apple-accent text-white shadow-apple-sm'

@@ -9,10 +9,21 @@ import {
   Square,
   Users,
   IndianRupee,
-  MoreVertical,
   ExternalLink,
   Edit,
   Trash2,
+  Wifi,
+  Video,
+  FileCheck,
+  Calendar,
+  Zap,
+  Phone,
+  ShieldCheck,
+  Building,
+  Clock,
+  Eye,
+  EyeOff,
+  AlertCircle,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -22,7 +33,46 @@ import { FormField, Input, Select, Textarea } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { godownApi } from '../services/api';
-import { Godown } from '../types';
+import { Godown, BroadbandConnection } from '../types';
+
+const HUB_STATUS_OPTIONS = [
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
+  { value: 'YET_TO_LIVE', label: 'Yet to Live' },
+  { value: 'CLOSED', label: 'Closed' },
+  { value: 'TERMINATED', label: 'Terminated' },
+];
+
+const HUB_MODEL_OPTIONS = [
+  { value: 'LDP', label: 'LDP' },
+  { value: 'OSH', label: 'OSH' },
+  { value: 'ISH', label: 'ISH' },
+];
+
+const emptyBroadband = (): BroadbandConnection => ({
+  networkProvider: '',
+  accountNumber: '',
+  registeredMobileNumber: '',
+  userId: '',
+  currentPlanEndDate: '',
+  serviceContactNumber: '',
+});
+
+const calculateMonths = (startDate: string, endDate: string): number => {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return 0;
+
+  const years = end.getFullYear() - start.getFullYear();
+  const months = end.getMonth() - start.getMonth();
+  const days = end.getDate() - start.getDate();
+  let total = years * 12 + months;
+  if (days >= 15) {
+    total += 1;
+  }
+  return Math.max(0, total);
+};
 
 export const Godowns: React.FC = () => {
   const navigate = useNavigate();
@@ -37,20 +87,67 @@ export const Godowns: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGodown, setEditingGodown] = useState<Godown | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Add / Edit Form State matching all 10 sections
   const [formData, setFormData] = useState({
-    name: '',
+    // 1. Hub Information
+    name: '', // ERP Name (required)
     code: '',
-    location: '',
-    capacitySqFt: '',
-    occupiedSqFt: '',
+    hubPocName: '', // Required
+    hubPocContact: '', // Phone (10 digits, required)
+    capacitySqFt: '', // Total Capacity (optional)
+    currentTenant: '', // Mandatory
+    status: 'ACTIVE', // Hub Status (required)
+    hubModel: 'LDP', // Hub Model (required)
+    googleLocation: '', // URL (required)
+    location: '', // Location Address (required)
+
+    // 2. Lease Information
+    leaseStartDate: '',
+    leaseEndDate: '',
+    leaseDurationMonths: 0,
+
+    // 3. Operations Information
+    operationsPocName: '', // Required
+    operationsPocMobile: '', // 10 digits
+
+    // 4. Broadband Details
+    broadbandDetails: [] as BroadbandConnection[],
+
+    // 5. CCTV Details
+    cctvUsername: '',
+    cctvPassword: '',
+    cctvAccessUrl: '',
+
+    // 6. Labour Licence
+    hasLabourLicence: false,
+    labourLicenceStartDate: '',
+    labourLicenceExpiryDate: '',
+
+    // 7. Trade Licence
+    hasTradeLicence: false,
+    tradeLicenceStartDate: '',
+    tradeLicenceExpiryDate: '',
+
+    // 8. Financial Information (non-negative, 2 decimals)
+    totalSetupCost: '',
+    securityAdvance: '', // Refundable Advance Amount
     monthlyRent: '',
-    currentTenant: '',
-    tenantPhone: '',
-    tenantEmail: '',
-    status: 'ACTIVE',
+
+    // 9. Electricity Information
+    electricityProvider: '',
+    electricityServiceNumber: '',
+
+    // 10. Lease Contact and Owner Information
+    leaseContactName: '',
+    leaseContactMobile: '',
+    ownerAddress: '',
+
+    // Additional remarks
     notes: '',
   });
-  const [submitting, setSubmitting] = useState(false);
 
   const fetchGodowns = async () => {
     setLoading(true);
@@ -59,7 +156,7 @@ export const Godowns: React.FC = () => {
       const data = Array.isArray(res) ? res : res?.content || [];
       setGodowns(data);
     } catch (err: any) {
-      error('Failed to load godowns: ' + (err.message || 'Unknown error'));
+      error('Failed to load hubs: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -71,17 +168,41 @@ export const Godowns: React.FC = () => {
 
   const openCreateModal = () => {
     setEditingGodown(null);
+    setShowPassword(false);
     setFormData({
       name: '',
       code: '',
-      location: '',
+      hubPocName: '',
+      hubPocContact: '',
       capacitySqFt: '',
-      occupiedSqFt: '',
-      monthlyRent: '',
       currentTenant: '',
-      tenantPhone: '',
-      tenantEmail: '',
       status: 'ACTIVE',
+      hubModel: 'LDP',
+      googleLocation: '',
+      location: '',
+      leaseStartDate: '',
+      leaseEndDate: '',
+      leaseDurationMonths: 0,
+      operationsPocName: '',
+      operationsPocMobile: '',
+      broadbandDetails: [],
+      cctvUsername: '',
+      cctvPassword: '',
+      cctvAccessUrl: '',
+      hasLabourLicence: false,
+      labourLicenceStartDate: '',
+      labourLicenceExpiryDate: '',
+      hasTradeLicence: false,
+      tradeLicenceStartDate: '',
+      tradeLicenceExpiryDate: '',
+      totalSetupCost: '',
+      securityAdvance: '',
+      monthlyRent: '',
+      electricityProvider: '',
+      electricityServiceNumber: '',
+      leaseContactName: '',
+      leaseContactMobile: '',
+      ownerAddress: '',
       notes: '',
     });
     setIsModalOpen(true);
@@ -90,17 +211,42 @@ export const Godowns: React.FC = () => {
   const openEditModal = (g: Godown, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingGodown(g);
+    setShowPassword(false);
+    const duration = g.leaseDurationMonths || calculateMonths(g.leaseStartDate || '', g.leaseEndDate || '');
     setFormData({
-      name: g.name || '',
+      name: g.erpName || g.name || '',
       code: g.code || '',
-      location: g.location || '',
-      capacitySqFt: String(g.capacitySqFt || ''),
-      occupiedSqFt: String(g.occupiedSqFt || ''),
-      monthlyRent: String(g.monthlyRent || ''),
+      hubPocName: g.hubPocName || '',
+      hubPocContact: g.hubPocContact || '',
+      capacitySqFt: g.capacitySqFt ? String(g.capacitySqFt) : (g.totalCapacity ? String(g.totalCapacity) : ''),
       currentTenant: g.currentTenant || '',
-      tenantPhone: g.tenantPhone || '',
-      tenantEmail: g.tenantEmail || '',
       status: g.status || 'ACTIVE',
+      hubModel: g.hubModel || 'LDP',
+      googleLocation: g.googleLocation || '',
+      location: g.address || g.locationAddress || g.location || '',
+      leaseStartDate: g.leaseStartDate || '',
+      leaseEndDate: g.leaseEndDate || '',
+      leaseDurationMonths: duration,
+      operationsPocName: g.operationsPocName || g.opsPocName || '',
+      operationsPocMobile: g.operationsPocMobile || g.opsPocMobile || '',
+      broadbandDetails: Array.isArray(g.broadbandDetails) ? g.broadbandDetails : [],
+      cctvUsername: g.cctvUsername || '',
+      cctvPassword: g.cctvPassword || '',
+      cctvAccessUrl: g.cctvAccessUrl || '',
+      hasLabourLicence: Boolean(g.hasLabourLicence),
+      labourLicenceStartDate: g.labourLicenceStartDate || '',
+      labourLicenceExpiryDate: g.labourLicenceExpiryDate || '',
+      hasTradeLicence: Boolean(g.hasTradeLicence),
+      tradeLicenceStartDate: g.tradeLicenceStartDate || '',
+      tradeLicenceExpiryDate: g.tradeLicenceExpiryDate || '',
+      totalSetupCost: g.totalSetupCost ? String(g.totalSetupCost) : '',
+      securityAdvance: g.securityAdvance ? String(g.securityAdvance) : (g.refundableAdvance ? String(g.refundableAdvance) : ''),
+      monthlyRent: g.monthlyRent ? String(g.monthlyRent) : '',
+      electricityProvider: g.electricityProvider || '',
+      electricityServiceNumber: g.electricityServiceNumber || '',
+      leaseContactName: g.leaseContactName || '',
+      leaseContactMobile: g.leaseContactMobile || '',
+      ownerAddress: g.ownerAddress || '',
       notes: g.notes || '',
     });
     setIsModalOpen(true);
@@ -120,27 +266,197 @@ export const Godowns: React.FC = () => {
     }
   };
 
+  // Date Change Handlers that calculate duration automatically
+  const handleStartDateChange = (val: string) => {
+    const duration = calculateMonths(val, formData.leaseEndDate);
+    setFormData((prev) => ({
+      ...prev,
+      leaseStartDate: val,
+      leaseDurationMonths: duration,
+    }));
+  };
+
+  const handleEndDateChange = (val: string) => {
+    const duration = calculateMonths(formData.leaseStartDate, val);
+    setFormData((prev) => ({
+      ...prev,
+      leaseEndDate: val,
+      leaseDurationMonths: duration,
+    }));
+  };
+
+  // Dynamic Broadband Handlers
+  const addBroadbandConnection = () => {
+    setFormData((prev) => ({
+      ...prev,
+      broadbandDetails: [...prev.broadbandDetails, emptyBroadband()],
+    }));
+  };
+
+  const removeBroadbandConnection = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      broadbandDetails: prev.broadbandDetails.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const updateBroadbandConnection = (index: number, field: keyof BroadbandConnection, value: string) => {
+    setFormData((prev) => {
+      const updated = [...prev.broadbandDetails];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, broadbandDetails: updated };
+    });
+  };
+
+  // Labour Licence Handler (hide and clear values when No is selected)
+  const handleLabourLicenceToggle = (available: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      hasLabourLicence: available,
+      labourLicenceStartDate: available ? prev.labourLicenceStartDate : '',
+      labourLicenceExpiryDate: available ? prev.labourLicenceExpiryDate : '',
+    }));
+  };
+
+  // Trade Licence Handler (hide and clear values when No is selected)
+  const handleTradeLicenceToggle = (available: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      hasTradeLicence: available,
+      tradeLicenceStartDate: available ? prev.tradeLicenceStartDate : '',
+      tradeLicenceExpiryDate: available ? prev.tradeLicenceExpiryDate : '',
+    }));
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    if (!phone) return true; // optional unless required
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    return cleaned.length === 10;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.location || !formData.capacitySqFt || !formData.monthlyRent) {
-      error('Please fill in all required fields.');
+
+    // 1. Mandatory Validations
+    if (!formData.name.trim()) {
+      error('ERP Name is required. Please enter Hub ERP Name.');
       return;
+    }
+    if (!formData.hubPocName.trim()) {
+      error('Hub POC Name is required.');
+      return;
+    }
+    if (!formData.hubPocContact.trim()) {
+      error('Hub POC Contact number is required.');
+      return;
+    }
+    if (!validatePhone(formData.hubPocContact)) {
+      error('Hub POC Contact must be a valid 10-digit phone number.');
+      return;
+    }
+    if (!formData.currentTenant.trim()) {
+      error('Current Tenant is mandatory.');
+      return;
+    }
+    if (!formData.googleLocation.trim()) {
+      error('Google Location (Google Maps link) is required.');
+      return;
+    }
+    if (!formData.location.trim()) {
+      error('Location Address is required.');
+      return;
+    }
+    if (formData.operationsPocMobile && !validatePhone(formData.operationsPocMobile)) {
+      error('Operations POC Mobile must be a valid 10-digit phone number.');
+      return;
+    }
+    if (formData.leaseContactMobile && !validatePhone(formData.leaseContactMobile)) {
+      error('Lease Contact Mobile must be a valid 10-digit phone number.');
+      return;
+    }
+
+    // 2. Date Validations
+    if (formData.leaseStartDate && formData.leaseEndDate) {
+      if (new Date(formData.leaseEndDate) <= new Date(formData.leaseStartDate)) {
+        error('Lease End Date must be after Lease Start Date.');
+        return;
+      }
+    }
+    if (formData.hasLabourLicence && formData.labourLicenceStartDate && formData.labourLicenceExpiryDate) {
+      if (new Date(formData.labourLicenceExpiryDate) <= new Date(formData.labourLicenceStartDate)) {
+        error('Labour Licence Expiry Date must be after Start Date.');
+        return;
+      }
+    }
+    if (formData.hasTradeLicence && formData.tradeLicenceStartDate && formData.tradeLicenceExpiryDate) {
+      if (new Date(formData.tradeLicenceExpiryDate) <= new Date(formData.tradeLicenceStartDate)) {
+        error('Trade Licence Expiry Date must be after Start Date.');
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
-      const payload = {
-        name: formData.name,
-        code: formData.code || undefined,
-        location: formData.location,
-        capacitySqFt: Number(formData.capacitySqFt),
-        occupiedSqFt: formData.occupiedSqFt ? Number(formData.occupiedSqFt) : 0,
-        monthlyRent: Number(formData.monthlyRent),
-        currentTenant: formData.currentTenant || null,
-        tenantPhone: formData.tenantPhone || null,
-        tenantEmail: formData.tenantEmail || null,
+      const payload: any = {
+        name: formData.name.trim(),
+        erpName: formData.name.trim(),
+        code: formData.code.trim() || undefined,
+        location: formData.location.trim(),
+        locationAddress: formData.location.trim(),
+        address: formData.location.trim(),
+        capacitySqFt: formData.capacitySqFt ? Number(parseFloat(formData.capacitySqFt).toFixed(2)) : null,
+        totalCapacity: formData.capacitySqFt ? Number(parseFloat(formData.capacitySqFt).toFixed(2)) : null,
+        currentTenant: formData.currentTenant.trim(),
         status: formData.status,
-        notes: formData.notes || null,
+        hubStatus: formData.status,
+        hubModel: formData.hubModel,
+        hubPocName: formData.hubPocName.trim(),
+        hubPocContact: formData.hubPocContact.trim(),
+        googleLocation: formData.googleLocation.trim(),
+
+        // 2. Lease Information
+        leaseStartDate: formData.leaseStartDate || null,
+        leaseEndDate: formData.leaseEndDate || null,
+        leaseDurationMonths: formData.leaseDurationMonths,
+
+        // 3. Operations Information
+        operationsPocName: formData.operationsPocName.trim() || null,
+        operationsPocMobile: formData.operationsPocMobile.trim() || null,
+
+        // 4. Broadband Details
+        broadbandDetails: formData.broadbandDetails,
+
+        // 5. CCTV Details
+        cctvUsername: formData.cctvUsername.trim() || null,
+        cctvPassword: formData.cctvPassword.trim() || null,
+        cctvAccessUrl: formData.cctvAccessUrl.trim() || null,
+
+        // 6. Labour Licence
+        hasLabourLicence: formData.hasLabourLicence,
+        labourLicenceStartDate: formData.hasLabourLicence ? (formData.labourLicenceStartDate || null) : null,
+        labourLicenceExpiryDate: formData.hasLabourLicence ? (formData.labourLicenceExpiryDate || null) : null,
+
+        // 7. Trade Licence
+        hasTradeLicence: formData.hasTradeLicence,
+        tradeLicenceStartDate: formData.hasTradeLicence ? (formData.tradeLicenceStartDate || null) : null,
+        tradeLicenceExpiryDate: formData.hasTradeLicence ? (formData.tradeLicenceExpiryDate || null) : null,
+
+        // 8. Financial Information (non-negative, 2 decimals)
+        totalSetupCost: Number(parseFloat(formData.totalSetupCost || '0').toFixed(2)),
+        securityAdvance: Number(parseFloat(formData.securityAdvance || '0').toFixed(2)),
+        refundableAdvance: Number(parseFloat(formData.securityAdvance || '0').toFixed(2)),
+        monthlyRent: Number(parseFloat(formData.monthlyRent || '0').toFixed(2)),
+
+        // 9. Electricity Information
+        electricityProvider: formData.electricityProvider.trim() || null,
+        electricityServiceNumber: formData.electricityServiceNumber.trim() || null,
+
+        // 10. Lease Contact & Owner Information
+        leaseContactName: formData.leaseContactName.trim() || null,
+        leaseContactMobile: formData.leaseContactMobile.trim() || null,
+        ownerAddress: formData.ownerAddress.trim() || null,
+
+        notes: formData.notes.trim() || null,
       };
 
       if (editingGodown) {
@@ -148,7 +464,7 @@ export const Godowns: React.FC = () => {
         success('Hub updated successfully');
       } else {
         await godownApi.create(payload);
-        success('Hub created successfully');
+        success('Hub added successfully');
       }
 
       setIsModalOpen(false);
@@ -160,25 +476,48 @@ export const Godowns: React.FC = () => {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return <Badge variant="success">Active</Badge>;
+      case 'UNDER_MAINTENANCE':
+        return <Badge variant="warning">Under Maintenance</Badge>;
+      case 'YET_TO_LIVE':
+        return <Badge variant="accent">Yet to Live</Badge>;
+      case 'CLOSED':
+        return <Badge variant="neutral">Closed</Badge>;
+      case 'TERMINATED':
+        return <Badge variant="danger">Terminated</Badge>;
+      default:
+        return <Badge variant="neutral">{status}</Badge>;
+    }
+  };
+
   const filteredGodowns = godowns.filter((g) => {
+    const term = searchQuery.toLowerCase();
     const matchesSearch =
-      g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (g.currentTenant && g.currentTenant.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
+      (g.name && g.name.toLowerCase().includes(term)) ||
+      (g.erpName && g.erpName.toLowerCase().includes(term)) ||
+      (g.location && g.location.toLowerCase().includes(term)) ||
+      (g.currentTenant && g.currentTenant.toLowerCase().includes(term)) ||
+      (g.hubPocName && g.hubPocName.toLowerCase().includes(term));
+    const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter || g.hubStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn pb-12">
       {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            HUBS
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <span>HUBS</span>
+            <span className="text-xs font-normal px-2.5 py-0.5 rounded-full bg-apple-accent/10 text-apple-accent">
+              {godowns.length} Facilities
+            </span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Manage physical hubs, lease contracts, and square footage capacity
+            Manage physical hubs, tenancy contracts, infrastructure, licenses, and operations
           </p>
         </div>
 
@@ -187,7 +526,7 @@ export const Godowns: React.FC = () => {
           icon={<Plus className="w-4 h-4" />}
           className="rounded-xl shadow-apple-sm"
         >
-          Add New Hub
+          Add Hub
         </Button>
       </div>
 
@@ -195,7 +534,7 @@ export const Godowns: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Input
-            placeholder="Search by hub name, location, or tenant..."
+            placeholder="Search by ERP name, location, tenant, or POC..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -207,17 +546,19 @@ export const Godowns: React.FC = () => {
           <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full sm:w-40"
+            className="w-full sm:w-48"
           >
             <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="UNDER_MAINTENANCE">Under Maintenance</option>
-            <option value="VACANT">Vacant</option>
+            {HUB_STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </Select>
         </div>
       </div>
 
-      {/* Grid of Godown Cards */}
+      {/* Grid of Hub Cards */}
       {loading ? (
         <div className="py-20 text-center text-xs text-gray-400">
           <div className="w-6 h-6 border-2 border-apple-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
@@ -234,11 +575,19 @@ export const Godowns: React.FC = () => {
               ? 'Try modifying your search filter.'
               : 'Add your first hub property to get started.'}
           </p>
+          <Button
+            onClick={openCreateModal}
+            icon={<Plus className="w-4 h-4" />}
+            size="sm"
+            className="mt-4"
+          >
+            Add Hub
+          </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredGodowns.map((g) => {
-            const occupancyPct = g.capacitySqFt > 0 ? Math.round(((g.occupiedSqFt || 0) / g.capacitySqFt) * 100) : 0;
+            const hasBroadband = Array.isArray(g.broadbandDetails) && g.broadbandDetails.length > 0;
             return (
               <Card
                 key={g.id}
@@ -249,29 +598,29 @@ export const Godowns: React.FC = () => {
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 group-hover:text-apple-accent transition-colors">
-                          {g.name}
+                          {g.erpName || g.name}
                         </h3>
+                        {g.hubModel && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40">
+                            {g.hubModel}
+                          </span>
+                        )}
                         {g.code && (
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-gray-500">
                             {g.code}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1.5 line-clamp-1">
                         <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        <span>{g.location}</span>
+                        <span>{g.address || g.locationAddress || g.location}</span>
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <Badge
-                        variant={g.status === 'ACTIVE' ? 'success' : g.status === 'MAINTENANCE' ? 'warning' : 'neutral'}
-                        size="sm"
-                      >
-                        {g.status}
-                      </Badge>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {getStatusBadge(g.status || g.hubStatus || 'ACTIVE')}
                       <button
                         onClick={(e) => openEditModal(g, e)}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-black/5 dark:hover:text-gray-200 dark:hover:bg-white/10 transition-colors"
@@ -289,38 +638,53 @@ export const Godowns: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Capacity Bar */}
-                  <div className="mt-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03]">
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
-                      <span className="flex items-center gap-1">
-                        <Square className="w-3.5 h-3.5" />
-                        <span>Capacity: {g.capacitySqFt.toLocaleString('en-IN')} sq.ft</span>
-                      </span>
-                      <span className="font-semibold text-gray-700 dark:text-gray-300">
-                        {occupancyPct}%
+                  {/* Key Metrics / Attributes */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-xs">
+                    <div>
+                      <span className="text-[10px] text-gray-400 block uppercase tracking-wider">Current Tenant</span>
+                      <span className="font-semibold text-gray-800 dark:text-gray-200 truncate block">
+                        {g.currentTenant || <span className="italic text-gray-400">Not Assigned</span>}
                       </span>
                     </div>
-                    <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-apple-accent rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(occupancyPct, 100)}%` }}
-                      />
+                    <div>
+                      <span className="text-[10px] text-gray-400 block uppercase tracking-wider">Total Capacity</span>
+                      <span className="font-semibold text-gray-800 dark:text-gray-200">
+                        {g.capacitySqFt || g.totalCapacity ? `${(g.capacitySqFt || g.totalCapacity)!.toLocaleString('en-IN')} sq.ft` : 'Optional / N/A'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Tenant Details */}
-                  <div className="mt-4 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Current Tenant:</span>
-                      <span className="font-semibold truncate max-w-[160px]">
-                        {g.currentTenant || <span className="text-gray-400 italic font-normal">Vacant</span>}
+                  {/* Highlights Bar: POC, Broadband, CCTV, Licence */}
+                  <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-gray-500 dark:text-gray-400">
+                    {g.hubPocName && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05]">
+                        <Users className="w-3 h-3 text-gray-400" />
+                        <span>POC: {g.hubPocName}</span>
                       </span>
-                    </div>
-                    {g.tenantPhone && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Phone:</span>
-                        <span>{g.tenantPhone}</span>
-                      </div>
+                    )}
+                    {hasBroadband && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                        <Wifi className="w-3 h-3" />
+                        <span>{g.broadbandDetails!.length} Broadband</span>
+                      </span>
+                    )}
+                    {g.cctvAccessUrl && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-400">
+                        <Video className="w-3 h-3" />
+                        <span>CCTV Configured</span>
+                      </span>
+                    )}
+                    {g.hasLabourLicence && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>Labour Lic.</span>
+                      </span>
+                    )}
+                    {g.hasTradeLicence && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+                        <FileCheck className="w-3 h-3" />
+                        <span>Trade Lic.</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -347,112 +711,637 @@ export const Godowns: React.FC = () => {
         </div>
       )}
 
-      {/* Add / Edit Godown Modal */}
+      {/* Comprehensive Add / Edit Hub Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingGodown ? 'Edit Hub Property' : 'Add New Hub Property'}
-        description="Fill in hub measurements, tenancy, and monthly billing rates."
-        maxWidth="lg"
+        title={editingGodown ? `Edit Hub: ${editingGodown.erpName || editingGodown.name}` : 'Add New Hub'}
+        description="Capture complete hub information, lease timeline, operations, connectivity, CCTV credentials, and licensing details."
+        maxWidth="3xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Hub Name" required>
+        <form onSubmit={handleSubmit} className="space-y-6 max-h-[75vh] overflow-y-auto px-1 pr-3">
+
+          {/* SECTION 1: HUB INFORMATION */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                1
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                1. Hub Information
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="ERP Name" required>
+                <Input
+                  placeholder="e.g. Hub-01 IDA Cherlapally"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </FormField>
+
+              <FormField label="Current Tenant" required>
+                <Input
+                  placeholder="e.g. Reliance Retail Logistics"
+                  value={formData.currentTenant}
+                  onChange={(e) => setFormData({ ...formData, currentTenant: e.target.value })}
+                  required
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="Hub POC Name" required>
+                <Input
+                  placeholder="e.g. Ramesh Sharma"
+                  value={formData.hubPocName}
+                  onChange={(e) => setFormData({ ...formData, hubPocName: e.target.value })}
+                  required
+                />
+              </FormField>
+
+              <FormField label="Hub POC Contact (10 Digits)" required>
+                <Input
+                  placeholder="e.g. 9876543210"
+                  maxLength={10}
+                  value={formData.hubPocContact}
+                  onChange={(e) => setFormData({ ...formData, hubPocContact: e.target.value })}
+                  required
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField label="Total Capacity (Number, Optional)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 25000"
+                  value={formData.capacitySqFt}
+                  onChange={(e) => setFormData({ ...formData, capacitySqFt: e.target.value })}
+                />
+              </FormField>
+
+              <FormField label="Hub Status" required>
+                <Select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  required
+                >
+                  {HUB_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Hub Model" required>
+                <Select
+                  value={formData.hubModel}
+                  onChange={(e) => setFormData({ ...formData, hubModel: e.target.value })}
+                  required
+                >
+                  {HUB_MODEL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+
+            <FormField label="Google Location (Google Maps Link)" required>
               <Input
-                placeholder="e.g. Unit A - Auto Logistics"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="https://maps.google.com/?q=..."
+                value={formData.googleLocation}
+                onChange={(e) => setFormData({ ...formData, googleLocation: e.target.value })}
                 required
               />
             </FormField>
 
-            <FormField label="Facility Code">
-              <Input
-                placeholder="e.g. HUB-01"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+            <FormField label="Location Address" required>
+              <Textarea
+                placeholder="Complete address including Plot / Survey No, Landmark, City, State..."
+                rows={2}
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                required
               />
             </FormField>
           </div>
 
-          <FormField label="Location / Address" required>
-            <Input
-              placeholder="e.g. Plot 42, IDA Cherlapally, Hyderabad"
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              required
-            />
-          </FormField>
+          {/* SECTION 2: LEASE INFORMATION */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                2
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                2. Lease Information
+              </h4>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <FormField label="Total Capacity (sq.ft)" required>
-              <Input
-                type="number"
-                placeholder="e.g. 15000"
-                value={formData.capacitySqFt}
-                onChange={(e) => setFormData({ ...formData, capacitySqFt: e.target.value })}
-                required
-              />
-            </FormField>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField label="Lease Start Date">
+                <Input
+                  type="date"
+                  value={formData.leaseStartDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                />
+              </FormField>
 
-            <FormField label="Occupied (sq.ft)">
-              <Input
-                type="number"
-                placeholder="e.g. 15000"
-                value={formData.occupiedSqFt}
-                onChange={(e) => setFormData({ ...formData, occupiedSqFt: e.target.value })}
-              />
-            </FormField>
+              <FormField label="Lease End Date (Must be after Start Date)">
+                <Input
+                  type="date"
+                  min={formData.leaseStartDate || undefined}
+                  value={formData.leaseEndDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                />
+              </FormField>
 
-            <FormField label="Monthly Rent (₹)" required>
-              <Input
-                type="number"
-                placeholder="e.g. 75000"
-                value={formData.monthlyRent}
-                onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
-                required
-              />
-            </FormField>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  Total Lease Duration (Months)
+                </label>
+                <div className="h-10 px-3.5 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-gray-200">
+                  <span className="flex items-center gap-1.5 text-apple-accent">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{formData.leaseDurationMonths} Months</span>
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-normal">
+                    Auto-calculated
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <FormField label="Current Tenant">
-              <Input
-                placeholder="e.g. Reliance Retail"
-                value={formData.currentTenant}
-                onChange={(e) => setFormData({ ...formData, currentTenant: e.target.value })}
-              />
-            </FormField>
+          {/* SECTION 3: OPERATIONS INFORMATION */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                3
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                3. Operations Information
+              </h4>
+            </div>
 
-            <FormField label="Tenant Phone">
-              <Input
-                placeholder="e.g. +91 98765 43210"
-                value={formData.tenantPhone}
-                onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-              />
-            </FormField>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="Operations POC Name" required>
+                <Input
+                  placeholder="e.g. Suresh Kumar"
+                  value={formData.operationsPocName}
+                  onChange={(e) => setFormData({ ...formData, operationsPocName: e.target.value })}
+                  required
+                />
+              </FormField>
 
-            <FormField label="Facility Status">
-              <Select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              <FormField label="Operations POC Mobile (10 Digits)">
+                <Input
+                  placeholder="e.g. 9988776655"
+                  maxLength={10}
+                  value={formData.operationsPocMobile}
+                  onChange={(e) => setFormData({ ...formData, operationsPocMobile: e.target.value })}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* SECTION 4: BROADBAND DETAILS */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                  4
+                </div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <Wifi className="w-4 h-4 text-apple-accent" />
+                  <span>4. Broadband Details</span>
+                </h4>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={<Plus className="w-3.5 h-3.5" />}
+                onClick={addBroadbandConnection}
               >
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="UNDER_MAINTENANCE">UNDER_MAINTENANCE</option>
-                <option value="VACANT">VACANT</option>
-              </Select>
+                Add Broadband
+              </Button>
+            </div>
+
+            {formData.broadbandDetails.length === 0 ? (
+              <div className="p-4 text-center rounded-xl border border-dashed border-black/10 dark:border-white/10 text-xs text-gray-400">
+                No broadband blocks configured. Click &quot;Add Broadband&quot; to configure connections.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {formData.broadbandDetails.map((conn, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl bg-white dark:bg-apple-cardDark border border-black/[0.08] dark:border-white/[0.1] space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                        <Wifi className="w-3.5 h-3.5 text-apple-accent" />
+                        <span>Broadband Connection #{idx + 1}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeBroadbandConnection(idx)}
+                        className="text-xs text-apple-danger hover:underline flex items-center gap-1 font-semibold"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <FormField label="Network Provider">
+                        <Input
+                          placeholder="e.g. Airtel, ACT, Jio"
+                          value={conn.networkProvider}
+                          onChange={(e) => updateBroadbandConnection(idx, 'networkProvider', e.target.value)}
+                        />
+                      </FormField>
+
+                      <FormField label="Account Number">
+                        <Input
+                          placeholder="e.g. ACC-10928374"
+                          value={conn.accountNumber}
+                          onChange={(e) => updateBroadbandConnection(idx, 'accountNumber', e.target.value)}
+                        />
+                      </FormField>
+
+                      <FormField label="Registered Mobile Number">
+                        <Input
+                          placeholder="e.g. 9876543210"
+                          maxLength={10}
+                          value={conn.registeredMobileNumber}
+                          onChange={(e) => updateBroadbandConnection(idx, 'registeredMobileNumber', e.target.value)}
+                        />
+                      </FormField>
+
+                      <FormField label="User ID">
+                        <Input
+                          placeholder="e.g. ACT_HYD_9821"
+                          value={conn.userId}
+                          onChange={(e) => updateBroadbandConnection(idx, 'userId', e.target.value)}
+                        />
+                      </FormField>
+
+                      <FormField label="Current Plan End Date">
+                        <Input
+                          type="date"
+                          value={conn.currentPlanEndDate}
+                          onChange={(e) => updateBroadbandConnection(idx, 'currentPlanEndDate', e.target.value)}
+                        />
+                      </FormField>
+
+                      <FormField label="Service Contact Number">
+                        <Input
+                          placeholder="e.g. 18001030198"
+                          value={conn.serviceContactNumber}
+                          onChange={(e) => updateBroadbandConnection(idx, 'serviceContactNumber', e.target.value)}
+                        />
+                      </FormField>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 5: CCTV DETAILS */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                5
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                <Video className="w-4 h-4 text-apple-accent" />
+                <span>5. CCTV Details</span>
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField label="CCTV Username">
+                <Input
+                  placeholder="e.g. admin"
+                  value={formData.cctvUsername}
+                  onChange={(e) => setFormData({ ...formData, cctvUsername: e.target.value })}
+                />
+              </FormField>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  CCTV Password (Encrypted)
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={formData.cctvPassword}
+                    onChange={(e) => setFormData({ ...formData, cctvPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <FormField label="CCTV Access URL / IP">
+                <Input
+                  placeholder="e.g. http://192.168.1.100:8000"
+                  value={formData.cctvAccessUrl}
+                  onChange={(e) => setFormData({ ...formData, cctvAccessUrl: e.target.value })}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* SECTION 6: LABOUR LICENCE */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                  6
+                </div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-apple-accent" />
+                  <span>6. Labour Licence</span>
+                </h4>
+              </div>
+
+              {/* Yes / No Radio Toggle */}
+              <div className="flex items-center gap-1 bg-black/[0.05] dark:bg-white/[0.08] p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => handleLabourLicenceToggle(true)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    formData.hasLabourLicence
+                      ? 'bg-apple-accent text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLabourLicenceToggle(false)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    !formData.hasLabourLicence
+                      ? 'bg-gray-700 text-white shadow-sm dark:bg-gray-600'
+                      : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+
+            {formData.hasLabourLicence ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 animate-fadeIn">
+                <FormField label="Licence Start Date" required>
+                  <Input
+                    type="date"
+                    value={formData.labourLicenceStartDate}
+                    onChange={(e) => setFormData({ ...formData, labourLicenceStartDate: e.target.value })}
+                    required
+                  />
+                </FormField>
+
+                <FormField label="Licence Expiry Date (Must be after Start Date)" required>
+                  <Input
+                    type="date"
+                    min={formData.labourLicenceStartDate || undefined}
+                    value={formData.labourLicenceExpiryDate}
+                    onChange={(e) => setFormData({ ...formData, labourLicenceExpiryDate: e.target.value })}
+                    required
+                  />
+                </FormField>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">
+                Labour Licence not available for this Hub.
+              </p>
+            )}
+          </div>
+
+          {/* SECTION 7: TRADE LICENCE */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                  7
+                </div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <FileCheck className="w-4 h-4 text-apple-accent" />
+                  <span>7. Trade Licence</span>
+                </h4>
+              </div>
+
+              {/* Yes / No Radio Toggle */}
+              <div className="flex items-center gap-1 bg-black/[0.05] dark:bg-white/[0.08] p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => handleTradeLicenceToggle(true)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    formData.hasTradeLicence
+                      ? 'bg-apple-accent text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTradeLicenceToggle(false)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    !formData.hasTradeLicence
+                      ? 'bg-gray-700 text-white shadow-sm dark:bg-gray-600'
+                      : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+
+            {formData.hasTradeLicence ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 animate-fadeIn">
+                <FormField label="Licence Start Date" required>
+                  <Input
+                    type="date"
+                    value={formData.tradeLicenceStartDate}
+                    onChange={(e) => setFormData({ ...formData, tradeLicenceStartDate: e.target.value })}
+                    required
+                  />
+                </FormField>
+
+                <FormField label="Licence Expiry Date (Must be after Start Date)" required>
+                  <Input
+                    type="date"
+                    min={formData.tradeLicenceStartDate || undefined}
+                    value={formData.tradeLicenceExpiryDate}
+                    onChange={(e) => setFormData({ ...formData, tradeLicenceExpiryDate: e.target.value })}
+                    required
+                  />
+                </FormField>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">
+                Trade Licence not available for this Hub.
+              </p>
+            )}
+          </div>
+
+          {/* SECTION 8: FINANCIAL INFORMATION */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                8
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                <IndianRupee className="w-4 h-4 text-apple-accent" />
+                <span>8. Financial Information (Numeric, Non-negative, 2 Decimals)</span>
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField label="Total Setup Cost (₹)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.totalSetupCost}
+                  onChange={(e) => setFormData({ ...formData, totalSetupCost: e.target.value })}
+                />
+              </FormField>
+
+              <FormField label="Refundable Advance Amount (₹)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.securityAdvance}
+                  onChange={(e) => setFormData({ ...formData, securityAdvance: e.target.value })}
+                />
+              </FormField>
+
+              <FormField label="Monthly Rent (₹)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.monthlyRent}
+                  onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* SECTION 9: ELECTRICITY INFORMATION */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                9
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-apple-accent" />
+                <span>9. Electricity Information</span>
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="Service Provider">
+                <Input
+                  placeholder="e.g. TSSPDCL, BESCOM, MSEDCL"
+                  value={formData.electricityProvider}
+                  onChange={(e) => setFormData({ ...formData, electricityProvider: e.target.value })}
+                />
+              </FormField>
+
+              <FormField label="Electricity Service Number">
+                <Input
+                  placeholder="e.g. 1029384756"
+                  value={formData.electricityServiceNumber}
+                  onChange={(e) => setFormData({ ...formData, electricityServiceNumber: e.target.value })}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* SECTION 10: LEASE CONTACT AND OWNER INFORMATION */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
+              <div className="w-6 h-6 rounded-lg bg-apple-accent/10 text-apple-accent flex items-center justify-center font-bold text-xs">
+                10
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                <Building className="w-4 h-4 text-apple-accent" />
+                <span>10. Lease Contact and Owner Information</span>
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="Lease Contact Name">
+                <Input
+                  placeholder="e.g. Rajesh Reddy (Owner / Agent)"
+                  value={formData.leaseContactName}
+                  onChange={(e) => setFormData({ ...formData, leaseContactName: e.target.value })}
+                />
+              </FormField>
+
+              <FormField label="Lease Contact Mobile Number (10 Digits)">
+                <Input
+                  placeholder="e.g. 9440011223"
+                  maxLength={10}
+                  value={formData.leaseContactMobile}
+                  onChange={(e) => setFormData({ ...formData, leaseContactMobile: e.target.value })}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Owner Address">
+              <Textarea
+                placeholder="Permanent residential or business address of the owner..."
+                rows={2}
+                value={formData.ownerAddress}
+                onChange={(e) => setFormData({ ...formData, ownerAddress: e.target.value })}
+              />
             </FormField>
           </div>
 
-          <FormField label="Internal Notes & Lease terms">
-            <Textarea
-              placeholder="Key specifications, power capacity, lease expiration dates..."
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            />
-          </FormField>
+          {/* Additional Notes */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08]">
+            <FormField label="Internal Notes & Specifications">
+              <Textarea
+                placeholder="Any special remarks, dock specifications, maintenance terms..."
+                rows={2}
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              />
+            </FormField>
+          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+          {/* Modal Actions */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08] sticky bottom-0 bg-apple-cardLight/95 dark:bg-apple-cardDark/95 backdrop-blur-md py-2">
             <Button
               type="button"
               variant="outline"
@@ -464,7 +1353,7 @@ export const Godowns: React.FC = () => {
               type="submit"
               loading={submitting}
             >
-              {editingGodown ? 'Update Hub' : 'Create Hub'}
+              {editingGodown ? 'Update Hub' : 'Add Hub'}
             </Button>
           </div>
         </form>

@@ -13,6 +13,7 @@ import { Godowns } from './pages/Godowns';
 import { GodownDetail } from './pages/GodownDetail';
 import { RentLedger } from './pages/RentLedger';
 import { Expenses } from './pages/Expenses';
+import { Finance } from './pages/Finance';
 import { StaffDirectory } from './pages/Staff';
 import { Assets } from './pages/Assets';
 import { Documents } from './pages/Documents';
@@ -37,6 +38,7 @@ export const App: React.FC = () => {
                   <Route path="hubs/:id" element={<GodownDetail />} />
                   <Route path="godowns" element={<Godowns />} />
                   <Route path="godowns/:id" element={<GodownDetail />} />
+                  <Route path="finance" element={<Finance />} />
                   <Route path="rent-ledger" element={<RentLedger />} />
                   <Route path="expenses" element={<Expenses />} />
                   <Route path="staff" element={<StaffDirectory />} />

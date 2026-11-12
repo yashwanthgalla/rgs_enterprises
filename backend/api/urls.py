@@ -22,6 +22,16 @@ urlpatterns = [
     path('godowns/<int:pk>', views.godown_detail_view, name='godown_detail'),
     path('godowns/<int:pk>/summary', views.godown_summary_view, name='godown_summary'),
 
+    # Broadband
+    path('hub-broadband', views.hub_broadband_view, name='hub_broadband'),
+    path('hub-broadband/<int:pk>', views.hub_broadband_detail_view, name='hub_broadband_detail'),
+
+    # Finance Module
+    path('finance/total-revenue', views.finance_total_revenue_view, name='finance_total_revenue'),
+    path('finance/total-revenue/<int:pk>', views.finance_total_revenue_detail_view, name='finance_total_revenue_detail'),
+    path('finance/rent', views.finance_rent_view, name='finance_rent'),
+    path('finance/rent/<int:pk>', views.finance_rent_detail_view, name='finance_rent_detail'),
+
     # Rent entries
     path('rent-entries', views.rent_entries_view, name='rent_entries'),
     path('rent-entries/godown/<int:godown_id>', views.rent_entries_by_godown_view, name='rent_entries_by_godown'),

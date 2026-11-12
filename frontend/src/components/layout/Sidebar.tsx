@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Warehouse,
+  Landmark,
   ReceiptText,
   Receipt,
   Users,
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'HUBS', path: '/hubs', icon: Warehouse },
+    { label: 'Finance', path: '/finance', icon: Landmark },
     { label: 'Rent Ledger', path: '/rent-ledger', icon: ReceiptText },
     { label: 'Expenses & Bills', path: '/expenses', icon: Receipt },
     { label: 'Staff Directory', path: '/staff', icon: Users },

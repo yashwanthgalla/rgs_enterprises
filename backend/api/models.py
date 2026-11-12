@@ -24,21 +24,59 @@ class AppUser(models.Model):
 class Godown(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=200)
+    erp_name = models.CharField(max_length=255, blank=True, null=True)
     code = models.CharField(unique=True, max_length=50)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
     address = models.TextField()
+    location_address = models.TextField(blank=True, null=True)
     pincode = models.CharField(max_length=20, blank=True, null=True)
     size_sqft = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_capacity = models.DecimalField(max_digits=12, decimal_places=2, default=0, blank=True, null=True)
     status = models.CharField(max_length=50, default='ACTIVE')
+    hub_status = models.CharField(max_length=50, default='ACTIVE', blank=True, null=True)
     current_tenant = models.CharField(max_length=200, blank=True, null=True)
     tenant_phone = models.CharField(max_length=50, blank=True, null=True)
     tenant_email = models.CharField(max_length=100, blank=True, null=True)
     lease_start_date = models.DateField(blank=True, null=True)
     lease_end_date = models.DateField(blank=True, null=True)
+    lease_duration_months = models.IntegerField(default=0, blank=True, null=True)
     monthly_rent = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     security_advance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    refundable_advance = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
+    hub_poc_name = models.CharField(max_length=200, blank=True, null=True)
+    hub_poc_contact = models.CharField(max_length=50, blank=True, null=True)
+    hub_model = models.CharField(max_length=50, blank=True, null=True)
+    google_location = models.TextField(blank=True, null=True)
+    operations_poc_name = models.CharField(max_length=200, blank=True, null=True)
+    operations_poc_mobile = models.CharField(max_length=50, blank=True, null=True)
+    ops_poc_name = models.CharField(max_length=200, blank=True, null=True)
+    ops_poc_mobile = models.CharField(max_length=50, blank=True, null=True)
+    broadband_details = models.JSONField(default=list, blank=True, null=True)
+    cctv_username = models.CharField(max_length=100, blank=True, null=True)
+    cctv_password = models.CharField(max_length=255, blank=True, null=True)
+    cctv_access_url = models.TextField(blank=True, null=True)
+    has_labour_licence = models.BooleanField(default=False)
+    labour_licence_available = models.BooleanField(default=False)
+    labour_licence_start_date = models.DateField(blank=True, null=True)
+    labour_licence_start = models.DateField(blank=True, null=True)
+    labour_licence_expiry_date = models.DateField(blank=True, null=True)
+    labour_licence_expiry = models.DateField(blank=True, null=True)
+    has_trade_licence = models.BooleanField(default=False)
+    trade_licence_available = models.BooleanField(default=False)
+    trade_licence_start_date = models.DateField(blank=True, null=True)
+    trade_licence_start = models.DateField(blank=True, null=True)
+    trade_licence_expiry_date = models.DateField(blank=True, null=True)
+    trade_licence_expiry = models.DateField(blank=True, null=True)
+    total_setup_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    electricity_provider = models.CharField(max_length=200, blank=True, null=True)
+    electricity_service_provider = models.CharField(max_length=200, blank=True, null=True)
+    electricity_service_number = models.CharField(max_length=100, blank=True, null=True)
+    lease_contact_name = models.CharField(max_length=200, blank=True, null=True)
+    lease_contact_mobile = models.CharField(max_length=50, blank=True, null=True)
+    owner_address = models.TextField(blank=True, null=True)
+    hub_details = models.JSONField(default=dict, blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
@@ -48,7 +86,76 @@ class Godown(models.Model):
         db_table = 'godown'
 
     def __str__(self):
-        return f"{self.name} ({self.code})"
+        return f"{self.erp_name or self.name} ({self.code})"
+
+
+class HubBroadband(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    hub = models.ForeignKey(Godown, on_delete=models.CASCADE, related_name='broadband_rows', db_column='hub_id')
+    network_provider = models.CharField(max_length=255, blank=True, null=True)
+    account_number = models.CharField(max_length=100, blank=True, null=True)
+    registered_mobile = models.CharField(max_length=20, blank=True, null=True)
+    user_id = models.CharField(max_length=100, blank=True, null=True)
+    current_plan_end_date = models.DateField(blank=True, null=True)
+    service_contact_number = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        managed = False
+        db_table = 'hub_broadband'
+
+    def __str__(self):
+        return f"{self.network_provider} ({self.hub.name})"
+
+
+class FinanceTotalRevenue(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    hub = models.ForeignKey(Godown, on_delete=models.CASCADE, related_name='total_revenues', db_column='hub_id')
+    financial_year = models.CharField(max_length=20)
+    rent = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    setup_cost_per_month = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    electricity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    manpower = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    housekeeping = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    wm_refreshment_petty_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        managed = False
+        db_table = 'finance_total_revenue'
+        unique_together = (('hub', 'financial_year'),)
+
+    def __str__(self):
+        return f"{self.hub.name} - FY {self.financial_year}"
+
+
+class FinanceRent(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    hub = models.ForeignKey(Godown, on_delete=models.CASCADE, related_name='finance_rents', db_column='hub_id')
+    period = models.CharField(max_length=50)  # e.g. "2026-03" or "March 2026"
+    rent = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    tds_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10, null=True, blank=True)
+    tds_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    total_rent_after_tds = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=18, null=True, blank=True)
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    total_rent_including_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    electricity_bill = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    sorter_payments = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    petty_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        managed = False
+        db_table = 'finance_rent'
+        unique_together = (('hub', 'period'),)
+
+    def __str__(self):
+        return f"{self.hub.name} - Rent {self.period}"
 
 
 class RentEntry(models.Model):

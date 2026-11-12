@@ -26,27 +26,107 @@ export interface AuthResponse {
   };
 }
 
+export interface BroadbandConnection {
+  id?: number;
+  hubId?: number;
+  networkProvider: string;
+  accountNumber: string;
+  registeredMobileNumber: string;
+  registeredMobile?: string;
+  userId: string;
+  currentPlanEndDate: string;
+  serviceContactNumber: string;
+}
+
 export interface Godown {
   id: number;
   name: string;
+  erpName?: string;
   code?: string;
   location: string;
+  locationAddress?: string;
   city?: string;
   state?: string;
   address?: string;
   pincode?: string;
   capacitySqFt: number;
+  totalCapacity?: number;
   sizeSqft?: number;
   occupiedSqFt?: number;
-  status: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE';
+  status: 'ACTIVE' | 'UNDER_MAINTENANCE' | 'YET_TO_LIVE' | 'CLOSED' | 'TERMINATED' | string;
+  hubStatus?: string;
+  hubModel?: 'LDP' | 'OSH' | 'ISH' | string;
   monthlyRent: number;
   securityAdvance?: number;
+  refundableAdvance?: number;
   currentTenant?: string;
   tenantPhone?: string;
   tenantEmail?: string;
   leaseStartDate?: string;
   leaseEndDate?: string;
+  leaseDurationMonths?: number;
+  hubPocName?: string;
+  hubPocContact?: string;
+  googleLocation?: string;
+  operationsPocName?: string;
+  operationsPocMobile?: string;
+  opsPocName?: string;
+  opsPocMobile?: string;
+  broadbandDetails?: BroadbandConnection[];
+  cctvUsername?: string;
+  cctvPassword?: string;
+  cctvAccessUrl?: string;
+  hasLabourLicence?: boolean;
+  labourLicenceStartDate?: string;
+  labourLicenceExpiryDate?: string;
+  hasTradeLicence?: boolean;
+  tradeLicenceStartDate?: string;
+  tradeLicenceExpiryDate?: string;
+  totalSetupCost?: number;
+  electricityProvider?: string;
+  electricityServiceNumber?: string;
+  leaseContactName?: string;
+  leaseContactMobile?: string;
+  ownerAddress?: string;
   notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type Hub = Godown;
+
+export interface FinanceTotalRevenue {
+  id: number;
+  hubId: number;
+  hubName?: string;
+  financialYear: string;
+  rent: number;
+  setupCostPerMonth: number;
+  electricity: number;
+  manpower: number;
+  housekeeping: number;
+  wmRefreshmentPettyCash: number;
+  totalRevenue: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FinanceRent {
+  id: number;
+  hubId: number;
+  hubName?: string;
+  period: string;
+  rent: number;
+  tdsPercent: number;
+  tdsAmount: number;
+  totalRentAfterTds: number;
+  gstPercent: number;
+  gstAmount: number;
+  totalRentIncludingGst: number;
+  electricityBill: number;
+  sorterPayments: number;
+  pettyCash: number;
+  total: number;
   createdAt?: string;
   updatedAt?: string;
 }

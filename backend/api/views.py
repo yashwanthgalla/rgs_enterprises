@@ -6,6 +6,7 @@ import bcrypt
 import jwt
 from decimal import Decimal
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Sum, Q, Count
 from django.http import HttpResponse
 from django.utils import timezone
@@ -16,13 +17,16 @@ from rest_framework.response import Response
 
 from .models import (
     AppUser, Godown, RentEntry, Expense, Employee,
-    SalaryPayment, Asset, Document, AppSettings, ActivityLog
+    SalaryPayment, Asset, Document, AppSettings, ActivityLog,
+    HubBroadband, FinanceTotalRevenue, FinanceRent
 )
 from .serializers import (
     AppUserSerializer, GodownSerializer, RentEntrySerializer,
     ExpenseSerializer, EmployeeSerializer, SalaryPaymentSerializer,
-    AssetSerializer, DocumentSerializer, AppSettingsSerializer
+    AssetSerializer, DocumentSerializer, AppSettingsSerializer,
+    HubBroadbandSerializer, FinanceTotalRevenueSerializer, FinanceRentSerializer
 )
+from .crypto import encrypt_password, decrypt_password
 
 
 def api_success(data=None, message="Success", status_code=status.HTTP_200_OK):
@@ -322,23 +326,62 @@ def godowns_view(request):
         })
 
     elif request.method == 'POST':
-        serializer = GodownSerializer(data=request.data)
+        data = request.data.copy()
+        if 'erpName' in data and not data.get('name'):
+            data['name'] = data['erpName']
+        if 'locationAddress' in data and not data.get('address'):
+            data['address'] = data['locationAddress']
+        elif 'location' in data and not data.get('address'):
+            data['address'] = data['location']
+        if not data.get('code'):
+            data['code'] = f"HUB-{int(timezone.now().timestamp()) % 10000}"
+        if not data.get('city'):
+            data['city'] = 'Hyderabad'
+        if not data.get('state'):
+            data['state'] = 'Telangana'
+
+        raw_cctv_pwd = data.get('cctvPassword')
+        broadband_list = data.get('broadbandDetails', [])
+
+        serializer = GodownSerializer(data=data)
         if serializer.is_valid():
-            godown = serializer.save()
-            if godown.current_tenant and godown.monthly_rent and godown.monthly_rent > 0:
-                current_month = timezone.now().strftime('%Y-%m')
-                due_date = timezone.now().date().replace(day=5)
-                RentEntry.objects.get_or_create(
-                    godown=godown,
-                    rent_month=current_month,
-                    defaults={
-                        'due_date': due_date,
-                        'due_amount': godown.monthly_rent,
-                        'paid_amount': Decimal('0'),
-                        'status': 'DUE',
-                        'notes': f"Initial rent cycle automatically generated for {godown.name}"
-                    }
-                )
+            with transaction.atomic():
+                godown = serializer.save()
+                
+                # Encrypt CCTV Password
+                if raw_cctv_pwd:
+                    godown.cctv_password = encrypt_password(raw_cctv_pwd)
+                    godown.save(update_fields=['cctv_password'])
+
+                # Save broadband rows in single transaction
+                if isinstance(broadband_list, list):
+                    HubBroadband.objects.filter(hub=godown).delete()
+                    for item in broadband_list:
+                        if isinstance(item, dict):
+                            HubBroadband.objects.create(
+                                hub=godown,
+                                network_provider=item.get('networkProvider') or item.get('network_provider'),
+                                account_number=item.get('accountNumber') or item.get('account_number'),
+                                registered_mobile=item.get('registeredMobile') or item.get('registeredMobileNumber') or item.get('registered_mobile'),
+                                user_id=item.get('userId') or item.get('user_id'),
+                                current_plan_end_date=item.get('currentPlanEndDate') or item.get('current_plan_end_date') or None,
+                                service_contact_number=item.get('serviceContactNumber') or item.get('service_contact_number'),
+                            )
+
+                if godown.current_tenant and godown.monthly_rent and godown.monthly_rent > 0:
+                    current_month = timezone.now().strftime('%Y-%m')
+                    due_date = timezone.now().date().replace(day=5)
+                    RentEntry.objects.get_or_create(
+                        godown=godown,
+                        rent_month=current_month,
+                        defaults={
+                            'due_date': due_date,
+                            'due_amount': godown.monthly_rent,
+                            'paid_amount': Decimal('0'),
+                            'status': 'DUE',
+                            'notes': f"Initial rent cycle automatically generated for {godown.name}"
+                        }
+                    )
             return api_success(GodownSerializer(godown).data, status_code=status.HTTP_201_CREATED)
         return api_error("Validation error", errors=serializer.errors)
 
@@ -369,9 +412,37 @@ def godown_detail_view(request, pk):
         return api_success(GodownSerializer(godown).data)
 
     elif request.method == 'PUT':
-        serializer = GodownSerializer(godown, data=request.data, partial=True)
+        data = request.data.copy()
+        if 'erpName' in data and not data.get('name'):
+            data['name'] = data['erpName']
+        if 'locationAddress' in data and not data.get('address'):
+            data['address'] = data['locationAddress']
+            
+        raw_cctv_pwd = data.get('cctvPassword')
+        broadband_list = data.get('broadbandDetails')
+
+        serializer = GodownSerializer(godown, data=data, partial=True)
         if serializer.is_valid():
-            updated = serializer.save()
+            with transaction.atomic():
+                updated = serializer.save()
+                
+                if raw_cctv_pwd is not None:
+                    updated.cctv_password = encrypt_password(raw_cctv_pwd)
+                    updated.save(update_fields=['cctv_password'])
+                    
+                if isinstance(broadband_list, list):
+                    HubBroadband.objects.filter(hub=updated).delete()
+                    for item in broadband_list:
+                        if isinstance(item, dict):
+                            HubBroadband.objects.create(
+                                hub=updated,
+                                network_provider=item.get('networkProvider') or item.get('network_provider'),
+                                account_number=item.get('accountNumber') or item.get('account_number'),
+                                registered_mobile=item.get('registeredMobile') or item.get('registeredMobileNumber') or item.get('registered_mobile'),
+                                user_id=item.get('userId') or item.get('user_id'),
+                                current_plan_end_date=item.get('currentPlanEndDate') or item.get('current_plan_end_date') or None,
+                                service_contact_number=item.get('serviceContactNumber') or item.get('service_contact_number'),
+                            )
             return api_success(GodownSerializer(updated).data)
         return api_error("Validation error", errors=serializer.errors)
 
@@ -401,6 +472,219 @@ def godown_summary_view(request, pk):
         "totalExpenses": float(total_expenses),
         "netIncome": float(total_rent_collected - total_expenses)
     })
+
+
+# ============================================================================
+# FINANCE MODULE (TOTAL REVENUE & RENT)
+# ============================================================================
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def finance_total_revenue_view(request):
+    if request.method == 'GET':
+        hub_id = request.GET.get('hubId')
+        financial_year = request.GET.get('financialYear')
+        qs = FinanceTotalRevenue.objects.select_related('hub').order_by('-financial_year', 'hub__name')
+        if hub_id:
+            qs = qs.filter(hub_id=hub_id)
+        if financial_year:
+            qs = qs.filter(financial_year=financial_year)
+        return api_success(FinanceTotalRevenueSerializer(qs, many=True).data)
+
+    elif request.method == 'POST':
+        data = request.data.copy()
+        hub_id = data.get('hubId')
+        financial_year = data.get('financialYear')
+        if not hub_id or not financial_year:
+            return api_error("hubId and financialYear are mandatory fields.")
+
+        # Auto calculate total revenue = rent + setup_cost_per_month + electricity + manpower + housekeeping + wm_refreshment_petty_cash
+        rent = Decimal(str(data.get('rent') or '0'))
+        setup_cost = Decimal(str(data.get('setupCostPerMonth') or '0'))
+        electricity = Decimal(str(data.get('electricity') or '0'))
+        manpower = Decimal(str(data.get('manpower') or '0'))
+        housekeeping = Decimal(str(data.get('housekeeping') or '0'))
+        wm = Decimal(str(data.get('wmRefreshmentPettyCash') or '0'))
+        total_rev = rent + setup_cost + electricity + manpower + housekeeping + wm
+        data['totalRevenue'] = total_rev
+
+        existing = FinanceTotalRevenue.objects.filter(hub_id=hub_id, financial_year=financial_year).first()
+        if existing:
+            serializer = FinanceTotalRevenueSerializer(existing, data=data, partial=True)
+            if serializer.is_valid():
+                saved = serializer.save()
+                return api_success(FinanceTotalRevenueSerializer(saved).data)
+            return api_error("Validation error", errors=serializer.errors)
+
+        serializer = FinanceTotalRevenueSerializer(data=data)
+        if serializer.is_valid():
+            saved = serializer.save()
+            return api_success(FinanceTotalRevenueSerializer(saved).data, status_code=status.HTTP_201_CREATED)
+        return api_error("Validation error", errors=serializer.errors)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def finance_total_revenue_detail_view(request, pk):
+    try:
+        obj = FinanceTotalRevenue.objects.select_related('hub').get(pk=pk)
+    except FinanceTotalRevenue.DoesNotExist:
+        return api_error("Finance Total Revenue record not found", status_code=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        return api_success(FinanceTotalRevenueSerializer(obj).data)
+
+    elif request.method == 'PUT':
+        data = request.data.copy()
+        rent = Decimal(str(data.get('rent', obj.rent) or '0'))
+        setup_cost = Decimal(str(data.get('setupCostPerMonth', obj.setup_cost_per_month) or '0'))
+        electricity = Decimal(str(data.get('electricity', obj.electricity) or '0'))
+        manpower = Decimal(str(data.get('manpower', obj.manpower) or '0'))
+        housekeeping = Decimal(str(data.get('housekeeping', obj.housekeeping) or '0'))
+        wm = Decimal(str(data.get('wmRefreshmentPettyCash', obj.wm_refreshment_petty_cash) or '0'))
+        data['totalRevenue'] = rent + setup_cost + electricity + manpower + housekeeping + wm
+
+        serializer = FinanceTotalRevenueSerializer(obj, data=data, partial=True)
+        if serializer.is_valid():
+            saved = serializer.save()
+            return api_success(FinanceTotalRevenueSerializer(saved).data)
+        return api_error("Validation error", errors=serializer.errors)
+
+    elif request.method == 'DELETE':
+        obj.delete()
+        return api_success({"message": "Record deleted successfully"})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def finance_rent_view(request):
+    if request.method == 'GET':
+        hub_id = request.GET.get('hubId')
+        period = request.GET.get('period')
+        qs = FinanceRent.objects.select_related('hub').order_by('-period', 'hub__name')
+        if hub_id:
+            qs = qs.filter(hub_id=hub_id)
+        if period:
+            qs = qs.filter(period=period)
+        return api_success(FinanceRentSerializer(qs, many=True).data)
+
+    elif request.method == 'POST':
+        data = request.data.copy()
+        hub_id = data.get('hubId')
+        period = data.get('period')
+        if not hub_id or not period:
+            return api_error("hubId and period are mandatory fields.")
+
+        # Live calculation formulas:
+        # TDS Amount = Rent * 10%
+        # Total Rent After TDS = Rent - TDS Amount
+        # GST Amount = Rent * 18%
+        # Total Rent Including GST = Total Rent After TDS + GST Amount
+        # Total = Total Rent Including GST + Electricity Bill + Sorter Payments + Petty Cash
+        rent = Decimal(str(data.get('rent') or '0'))
+        tds_percent = Decimal(str(data.get('tdsPercent') or '10'))
+        tds_amount = (rent * tds_percent) / Decimal('100')
+        rent_after_tds = rent - tds_amount
+        
+        gst_percent = Decimal(str(data.get('gstPercent') or '18'))
+        gst_amount = (rent * gst_percent) / Decimal('100')
+        rent_inc_gst = rent_after_tds + gst_amount
+        
+        elec_bill = Decimal(str(data.get('electricityBill') or '0'))
+        sorter_pay = Decimal(str(data.get('sorterPayments') or '0'))
+        petty_cash = Decimal(str(data.get('pettyCash') or '0'))
+        total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
+
+        data['tdsAmount'] = tds_amount
+        data['totalRentAfterTds'] = rent_after_tds
+        data['gstAmount'] = gst_amount
+        data['totalRentIncludingGst'] = rent_inc_gst
+        data['total'] = total
+
+        existing = FinanceRent.objects.filter(hub_id=hub_id, period=period).first()
+        if existing:
+            serializer = FinanceRentSerializer(existing, data=data, partial=True)
+            if serializer.is_valid():
+                saved = serializer.save()
+                return api_success(FinanceRentSerializer(saved).data)
+            return api_error("Validation error", errors=serializer.errors)
+
+        serializer = FinanceRentSerializer(data=data)
+        if serializer.is_valid():
+            saved = serializer.save()
+            return api_success(FinanceRentSerializer(saved).data, status_code=status.HTTP_201_CREATED)
+        return api_error("Validation error", errors=serializer.errors)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def finance_rent_detail_view(request, pk):
+    try:
+        obj = FinanceRent.objects.select_related('hub').get(pk=pk)
+    except FinanceRent.DoesNotExist:
+        return api_error("Finance Rent record not found", status_code=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        return api_success(FinanceRentSerializer(obj).data)
+
+    elif request.method == 'PUT':
+        data = request.data.copy()
+        rent = Decimal(str(data.get('rent', obj.rent) or '0'))
+        tds_percent = Decimal(str(data.get('tdsPercent', obj.tds_percent) or '10'))
+        tds_amount = (rent * tds_percent) / Decimal('100')
+        rent_after_tds = rent - tds_amount
+        
+        gst_percent = Decimal(str(data.get('gstPercent', obj.gst_percent) or '18'))
+        gst_amount = (rent * gst_percent) / Decimal('100')
+        rent_inc_gst = rent_after_tds + gst_amount
+        
+        elec_bill = Decimal(str(data.get('electricityBill', obj.electricity_bill) or '0'))
+        sorter_pay = Decimal(str(data.get('sorterPayments', obj.sorter_payments) or '0'))
+        petty_cash = Decimal(str(data.get('pettyCash', obj.petty_cash) or '0'))
+        total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
+
+        data['tdsAmount'] = tds_amount
+        data['totalRentAfterTds'] = rent_after_tds
+        data['gstAmount'] = gst_amount
+        data['totalRentIncludingGst'] = rent_inc_gst
+        data['total'] = total
+
+        serializer = FinanceRentSerializer(obj, data=data, partial=True)
+        if serializer.is_valid():
+            saved = serializer.save()
+            return api_success(FinanceRentSerializer(saved).data)
+        return api_error("Validation error", errors=serializer.errors)
+
+    elif request.method == 'DELETE':
+        obj.delete()
+        return api_success({"message": "Record deleted successfully"})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def hub_broadband_view(request):
+    if request.method == 'GET':
+        hub_id = request.GET.get('hubId')
+        qs = HubBroadband.objects.select_related('hub')
+        if hub_id:
+            qs = qs.filter(hub_id=hub_id)
+        return api_success(HubBroadbandSerializer(qs, many=True).data)
+    elif request.method == 'POST':
+        serializer = HubBroadbandSerializer(data=request.data)
+        if serializer.is_valid():
+            saved = serializer.save()
+            return api_success(HubBroadbandSerializer(saved).data, status_code=status.HTTP_201_CREATED)
+        return api_error("Validation error", errors=serializer.errors)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def hub_broadband_detail_view(request, pk):
+    try:
+        bb = HubBroadband.objects.get(pk=pk)
+        bb.delete()
+        return api_success({"message": "Broadband record deleted"})
+    except HubBroadband.DoesNotExist:
+        return api_error("Broadband record not found", status_code=status.HTTP_404_NOT_FOUND)
 
 
 # ============================================================================

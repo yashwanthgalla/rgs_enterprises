@@ -60,20 +60,47 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'rgs_backend.wsgi.application'
 
-# Database Configuration (Supabase PostgreSQL)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'postgres'),
-        'USER': os.getenv('DB_USER', 'postgres.ekkoeycylhhxykepbikl'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'RGS-enterprises@1'),
-        'HOST': os.getenv('DB_HOST', 'aws-0-eu-west-2.pooler.supabase.com'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',
-        },
+# Database Configuration (Supabase PostgreSQL / SQLite)
+DB_ENGINE = os.getenv('DB_ENGINE', 'postgresql').lower()
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DB_ENGINE == 'sqlite':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+elif DATABASE_URL:
+    import urllib.parse
+    parsed = urllib.parse.urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': parsed.path.lstrip('/') or 'postgres',
+            'USER': urllib.parse.unquote(parsed.username or 'postgres'),
+            'PASSWORD': urllib.parse.unquote(parsed.password or ''),
+            'HOST': parsed.hostname,
+            'PORT': str(parsed.port or 5432),
+            'OPTIONS': {
+                'sslmode': 'require',
+            },
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'postgres'),
+            'USER': os.getenv('DB_USER', 'postgres.gsnnpzbzdevsuupywwco'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'RGS@Enterprisesp5'),
+            'HOST': os.getenv('DB_HOST', 'aws-0-ap-south-1.pooler.supabase.com'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': {
+                'sslmode': 'require',
+            },
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

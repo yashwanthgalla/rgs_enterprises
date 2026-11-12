@@ -1318,12 +1318,31 @@ def reports_export_csv_view(request):
         sum_profit = 0.0
         sum_margin = 0.0
 
-        for m in range(1, 13):
-            period_str = f"{current_year:04d}-{m:02d}"
-            month_label = datetime.date(current_year, m, 1).strftime('%b %Y')
+        # Export only the entered months for this hub
+        f_rent_records = list(FinanceRent.objects.filter(hub=godown).order_by('period'))
+        if year_param:
+            year_filtered = [r for r in f_rent_records if r.period and r.period.startswith(year_str)]
+            if year_filtered:
+                f_rent_records = year_filtered
 
-            f_rent = FinanceRent.objects.filter(hub=godown, period=period_str).first()
-            if f_rent:
+        rent_entries = []
+        if not f_rent_records:
+            re_qs = list(RentEntry.objects.filter(godown=godown).order_by('rent_month'))
+            if year_param:
+                re_year = [re for re in re_qs if re.rent_month and re.rent_month.startswith(year_str)]
+                rent_entries = re_year if re_year else re_qs
+            else:
+                rent_entries = re_qs
+
+        if f_rent_records:
+            for f_rent in f_rent_records:
+                period_str = f_rent.period or ''
+                try:
+                    parts = period_str.split('-')
+                    month_label = datetime.date(int(parts[0]), int(parts[1]), 1).strftime('%b %Y')
+                except Exception:
+                    month_label = period_str or 'Month'
+
                 rent_val = float(f_rent.rent or 0)
                 tds_pct = float(f_rent.tds_percent or 10)
                 tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
@@ -1334,8 +1353,57 @@ def reports_export_csv_view(request):
                 sorter_payments = float(f_rent.sorter_payments or 0)
                 petty_cash_rent = float(f_rent.petty_cash or 0)
                 total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + sorter_payments + petty_cash_rent))
-            else:
-                rent_val = float(godown.monthly_rent or 0)
+
+                profit = total_revenue - total_rent
+                margin = profit - setup_cost
+                status_text = "Done"
+
+                sum_rev_rent += rev_rent
+                sum_setup_cost += setup_cost
+                sum_elec_rev += electricity_rev
+                sum_manpower += manpower
+                sum_housekeeping += housekeeping
+                sum_petty_rev += petty_cash_rev
+                sum_total_rev += total_revenue
+
+                sum_rent_outflow += rent_val
+                sum_tds_amt += tds_amt
+                sum_rent_after_tds += rent_after_tds
+                sum_rent_inc_gst += rent_inc_gst
+                sum_elec_bill += electricity_bill
+                sum_sorter += sorter_payments
+                sum_petty_rent += petty_cash_rent
+                sum_total_rent += total_rent
+                sum_profit += profit
+                sum_margin += margin
+
+                writer.writerow([
+                    month_label, vendor_name, hub_status, state, hub_model, owner, erp_name,
+                    start_date, end_date, tenure, area,
+                    round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
+                    round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+                    round(profit, 2), round(margin, 2), status_text
+                ])
+
+            # Bottom Total row for entered months
+            writer.writerow([
+                f'TOTAL ({len(f_rent_records)} Month{"s" if len(f_rent_records) != 1 else ""})', vendor_name, hub_status, state, hub_model, owner, erp_name,
+                start_date, end_date, tenure, area,
+                round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
+                round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+                round(sum_profit, 2), round(sum_margin, 2), 'Done'
+            ])
+
+        elif rent_entries:
+            for re in rent_entries:
+                period_str = re.rent_month or ''
+                try:
+                    parts = period_str.split('-')
+                    month_label = datetime.date(int(parts[0]), int(parts[1]), 1).strftime('%b %Y')
+                except Exception:
+                    month_label = period_str or 'Month'
+
+                rent_val = float(re.due_amount or godown.monthly_rent or 0)
                 tds_pct = 10.0
                 tds_amt = rent_val * 0.10
                 rent_after_tds = rent_val - tds_amt
@@ -1346,44 +1414,52 @@ def reports_export_csv_view(request):
                 petty_cash_rent = 0.0
                 total_rent = rent_inc_gst
 
-            profit = total_revenue - total_rent
-            margin = profit - setup_cost
-            status_text = "Done" if (f_rent or (datetime.date(current_year, m, 1) <= timezone.now().date())) else "Pending"
+                profit = total_revenue - total_rent
+                margin = profit - setup_cost
+                status_text = re.status or 'Done'
 
-            sum_rev_rent += rev_rent
-            sum_setup_cost += setup_cost
-            sum_elec_rev += electricity_rev
-            sum_manpower += manpower
-            sum_housekeeping += housekeeping
-            sum_petty_rev += petty_cash_rev
-            sum_total_rev += total_revenue
+                sum_rev_rent += rev_rent
+                sum_setup_cost += setup_cost
+                sum_elec_rev += electricity_rev
+                sum_manpower += manpower
+                sum_housekeeping += housekeeping
+                sum_petty_rev += petty_cash_rev
+                sum_total_rev += total_revenue
 
-            sum_rent_outflow += rent_val
-            sum_tds_amt += tds_amt
-            sum_rent_after_tds += rent_after_tds
-            sum_rent_inc_gst += rent_inc_gst
-            sum_elec_bill += electricity_bill
-            sum_sorter += sorter_payments
-            sum_petty_rent += petty_cash_rent
-            sum_total_rent += total_rent
-            sum_profit += profit
-            sum_margin += margin
+                sum_rent_outflow += rent_val
+                sum_tds_amt += tds_amt
+                sum_rent_after_tds += rent_after_tds
+                sum_rent_inc_gst += rent_inc_gst
+                sum_elec_bill += electricity_bill
+                sum_sorter += sorter_payments
+                sum_petty_rent += petty_cash_rent
+                sum_total_rent += total_rent
+                sum_profit += profit
+                sum_margin += margin
+
+                writer.writerow([
+                    month_label, vendor_name, hub_status, state, hub_model, owner, erp_name,
+                    start_date, end_date, tenure, area,
+                    round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
+                    round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+                    round(profit, 2), round(margin, 2), status_text
+                ])
 
             writer.writerow([
-                month_label, vendor_name, hub_status, state, hub_model, owner, erp_name,
+                f'TOTAL ({len(rent_entries)} Month{"s" if len(rent_entries) != 1 else ""})', vendor_name, hub_status, state, hub_model, owner, erp_name,
+                start_date, end_date, tenure, area,
+                round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
+                round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+                round(sum_profit, 2), round(sum_margin, 2), 'Done'
+            ])
+        else:
+            writer.writerow([
+                'No entered monthly records', vendor_name, hub_status, state, hub_model, owner, erp_name,
                 start_date, end_date, tenure, area,
                 round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
-                round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
-                round(profit, 2), round(margin, 2), status_text
+                0, '10.0%', 0, 0, '18.0%', 0, 0, 0, 0, 0,
+                round(total_revenue, 2), round(total_revenue - setup_cost, 2), 'Pending'
             ])
-
-        writer.writerow([
-            'ANNUAL TOTAL', vendor_name, hub_status, state, hub_model, owner, erp_name,
-            start_date, end_date, tenure, area,
-            round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
-            round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
-            round(sum_profit, 2), round(sum_margin, 2), 'Done'
-        ])
 
         return response
 

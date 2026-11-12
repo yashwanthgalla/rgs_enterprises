@@ -352,10 +352,10 @@ export const Reports: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-xs text-gray-900 dark:text-gray-100">
-                    Single Hub (Every Month)
+                    Single Hub (Entered Months Only)
                   </h4>
                   <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
-                    Month-by-month financial ledger (Jan – Dec) for a specific hub with annual totals.
+                    Monthly financial breakdown exported only for entered months for this hub, with total summary.
                   </p>
                 </div>
               </div>

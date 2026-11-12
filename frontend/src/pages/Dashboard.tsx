@@ -129,12 +129,16 @@ export const Dashboard: React.FC = () => {
         />
 
         <StatCard
-          title="Rent Expected"
-          value={formatCurrency(stats?.monthlyRentExpected || 0)}
-          subtitle={`Collected: ${formatCurrency(stats?.monthlyRentCollected || 0)}`}
-          icon={ReceiptText}
+          title="Profit / Month"
+          value={formatCurrency(stats?.monthlyProfit ?? ((stats?.monthlyTotalRevenue ?? 0) - (stats?.monthlyRentTotal ?? 0)))}
+          subtitle={`Rev: ${formatCurrency(stats?.monthlyTotalRevenue || 0)} - Rent: ${formatCurrency(stats?.monthlyRentTotal || 0)}`}
+          icon={TrendingUp}
           color="purple"
-          onClick={() => navigate('/rent-ledger')}
+          trend={{
+            value: (stats?.monthlyProfit ?? 0) >= 0 ? 'Net Profit' : 'Deficit',
+            isPositive: (stats?.monthlyProfit ?? 0) >= 0,
+          }}
+          onClick={() => navigate('/finance')}
         />
 
         <StatCard

@@ -191,6 +191,32 @@ def dashboard_stats_view(request):
     total_staff = Employee.objects.filter(is_deleted=False, status='ACTIVE').count()
     total_assets = Asset.objects.filter(is_deleted=False).count()
 
+    # Calculate Profit = Total Revenue - Rent Total per month across all hubs:
+    total_revenue_sum = Decimal('0')
+    total_rent_sum = Decimal('0')
+
+    for hub in godowns:
+        # Hub's Total Revenue: check FinanceTotalRevenue for this hub, else fallback to hub.monthly_rent
+        hub_rev_rec = FinanceTotalRevenue.objects.filter(hub=hub).order_by('-financial_year', '-id').first()
+        if hub_rev_rec and hub_rev_rec.total_revenue is not None:
+            hub_revenue = Decimal(str(hub_rev_rec.total_revenue))
+        else:
+            hub_revenue = Decimal(str(hub.monthly_rent or '0'))
+        total_revenue_sum += hub_revenue
+
+        # Hub's Rent Total: check FinanceRent for current month or latest period, else fallback to hub.monthly_rent
+        hub_rent_rec = FinanceRent.objects.filter(hub=hub, period=current_month_str).first()
+        if not hub_rent_rec:
+            hub_rent_rec = FinanceRent.objects.filter(hub=hub).order_by('-period', '-id').first()
+
+        if hub_rent_rec and hub_rent_rec.total is not None:
+            hub_rent = Decimal(str(hub_rent_rec.total))
+        else:
+            hub_rent = Decimal(str(hub.monthly_rent or '0'))
+        total_rent_sum += hub_rent
+
+    monthly_profit = total_revenue_sum - total_rent_sum
+
     return api_success({
         "totalGodowns": total_godowns,
         "activeGodowns": active_godowns,
@@ -200,9 +226,12 @@ def dashboard_stats_view(request):
         "occupancyRate": round(float(occupancy_rate), 1),
         "monthlyRentExpected": float(monthly_rent_expected),
         "monthlyRentCollected": float(monthly_rent_collected),
+        "monthlyTotalRevenue": float(total_revenue_sum),
+        "monthlyRentTotal": float(total_rent_sum),
+        "monthlyProfit": float(monthly_profit),
         "pendingRent": float(pending_rent),
         "monthlyExpenses": float(current_expenses),
-        "netIncome": float(monthly_rent_collected - current_expenses),
+        "netIncome": float(monthly_profit),
         "totalStaff": total_staff,
         "totalAssets": total_assets
     })

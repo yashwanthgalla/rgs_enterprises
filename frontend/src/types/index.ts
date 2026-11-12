@@ -238,6 +238,9 @@ export interface DashboardMetrics {
   occupancyRate: number;
   monthlyRentExpected: number;
   monthlyRentCollected: number;
+  monthlyTotalRevenue?: number;
+  monthlyRentTotal?: number;
+  monthlyProfit?: number;
   pendingRent: number;
   totalExpensesThisMonth: number;
   netRevenueThisMonth: number;

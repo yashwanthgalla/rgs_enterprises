@@ -17,6 +17,17 @@ import {
   CheckCircle2,
   Clock,
   ShieldCheck,
+  Building,
+  ExternalLink,
+  Wifi,
+  Video,
+  FileCheck2,
+  Zap,
+  UserCheck,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -72,6 +83,15 @@ export const GodownDetail: React.FC = () => {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [showCctvPassword, setShowCctvPassword] = useState(false);
+  const [copiedCctv, setCopiedCctv] = useState(false);
+
+  const handleCopyPassword = (pwd: string) => {
+    navigator.clipboard.writeText(pwd);
+    setCopiedCctv(true);
+    success('CCTV password copied to clipboard');
+    setTimeout(() => setCopiedCctv(false), 2000);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -166,8 +186,6 @@ export const GodownDetail: React.FC = () => {
     );
   }
 
-  const occupancyPct = godown.capacitySqFt > 0 ? Math.round(((godown.occupiedSqFt || 0) / godown.capacitySqFt) * 100) : 0;
-
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Top Bar with Back Button */}
@@ -183,13 +201,24 @@ export const GodownDetail: React.FC = () => {
           </Button>
           <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
           <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            {godown.name}
+            {godown.erpName || godown.name}
           </h1>
+          {godown.hubModel && (
+            <Badge variant="accent" size="sm">
+              Model: {godown.hubModel}
+            </Badge>
+          )}
           <Badge
-            variant={godown.status === 'ACTIVE' ? 'success' : godown.status === 'MAINTENANCE' ? 'warning' : 'neutral'}
+            variant={
+              godown.hubStatus === 'ACTIVE' || godown.status === 'ACTIVE'
+                ? 'success'
+                : godown.hubStatus === 'UNDER_MAINTENANCE' || godown.status === 'MAINTENANCE'
+                ? 'warning'
+                : 'neutral'
+            }
             size="sm"
           >
-            {godown.status}
+            {godown.hubStatus || godown.status}
           </Badge>
         </div>
 
@@ -197,18 +226,10 @@ export const GodownDetail: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setRentFormData({
-                amountDue: String(godown.monthlyRent || ''),
-                month: new Date().toISOString().slice(0, 7),
-                dueDate: new Date().toISOString().slice(0, 10),
-                tenantName: godown.currentTenant || '',
-              });
-              setIsRentModalOpen(true);
-            }}
-            icon={<Plus className="w-3.5 h-3.5" />}
+            onClick={() => navigate('/finance/rent')}
+            icon={<IndianRupee className="w-3.5 h-3.5" />}
           >
-            New Rent Due
+            Finance Rent
           </Button>
 
           <Button
@@ -226,44 +247,59 @@ export const GodownDetail: React.FC = () => {
       <Card className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold">Location</span>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-1 flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-apple-accent shrink-0" />
-              <span>{godown.location}</span>
+            <span className="text-xs text-gray-400 uppercase font-semibold">Hub Facility</span>
+            <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-1 flex items-center gap-2">
+              <Warehouse className="w-4 h-4 text-apple-accent shrink-0" />
+              <span className="truncate">{godown.erpName || godown.name}</span>
+            </p>
+            <p className="text-xs text-gray-400 mt-1 truncate">
+              {godown.locationAddress || godown.address || godown.location}
             </p>
           </div>
 
           <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold">Capacity & Occupancy</span>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-1">
-              {godown.capacitySqFt.toLocaleString('en-IN')} sq.ft ({occupancyPct}%)
+            <span className="text-xs text-gray-400 uppercase font-semibold">Total Capacity</span>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-1">
+              {(godown.totalCapacity || godown.capacitySqFt || 0).toLocaleString('en-IN')}
+              <span className="text-xs font-normal text-gray-400 ml-1">sq.ft</span>
             </p>
-            <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mt-2 overflow-hidden">
-              <div
-                className="h-full bg-apple-accent rounded-full"
-                style={{ width: `${Math.min(occupancyPct, 100)}%` }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold">Contract Rent</span>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5">
-              {formatCurrency(godown.monthlyRent)}
-              <span className="text-xs font-normal text-gray-400"> / month</span>
-            </p>
+            {godown.hubModel && (
+              <span className="inline-block mt-1 text-[11px] font-semibold text-apple-accent bg-apple-accent/10 px-2 py-0.5 rounded-md">
+                Model: {godown.hubModel}
+              </span>
+            )}
           </div>
 
           <div>
             <span className="text-xs text-gray-400 uppercase font-semibold">Current Tenant</span>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-1">
-              {godown.currentTenant || <span className="italic text-gray-400">Vacant</span>}
+            <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-1">
+              {godown.currentTenant || <span className="italic text-gray-400 font-normal">Vacant</span>}
             </p>
-            {godown.tenantPhone && (
-              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                <Phone className="w-3 h-3" />
-                <span>{godown.tenantPhone}</span>
+            {godown.hubPocName && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 truncate">
+                <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                <span>POC: {godown.hubPocName} {godown.hubPocContact ? `(${godown.hubPocContact})` : ''}</span>
               </p>
+            )}
+          </div>
+
+          <div>
+            <span className="text-xs text-gray-400 uppercase font-semibold">Monthly Rent</span>
+            <p className="text-xl font-extrabold text-gray-900 dark:text-gray-100 mt-1">
+              {formatCurrency(godown.monthlyRent || 0)}
+              <span className="text-xs font-normal text-gray-400"> / mo</span>
+            </p>
+            {godown.googleLocation && (
+              <a
+                href={godown.googleLocation}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-apple-accent hover:underline mt-1.5"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Open Google Location</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
             )}
           </div>
         </div>
@@ -300,58 +336,342 @@ export const GodownDetail: React.FC = () => {
 
       {/* Tab Content Panes */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h3 className="font-semibold text-sm mb-4">Facility Information</h3>
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Facility ID:</span>
-                <span className="font-mono">#{godown.id}</span>
+        <div className="space-y-6">
+          {/* Row 1: Hub Info, Lease & Operations, Financial Information */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Section 1: Hub Information */}
+            <Card className="p-6">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                <Building className="w-4 h-4 text-apple-accent" />
+                <span>Hub Information</span>
+              </h3>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">ERP Name:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">{godown.erpName || godown.name}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Hub Model:</span>
+                  <span className="font-medium">{godown.hubModel || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Hub Status:</span>
+                  <Badge variant={godown.hubStatus === 'ACTIVE' || godown.status === 'ACTIVE' ? 'success' : 'neutral'} size="sm">
+                    {godown.hubStatus || godown.status}
+                  </Badge>
+                </div>
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Total Capacity:</span>
+                  <span className="font-medium">{(godown.totalCapacity || godown.capacitySqFt || 0).toLocaleString('en-IN')} sq.ft</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Current Tenant:</span>
+                  <span className="font-semibold text-apple-accent">{godown.currentTenant || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Hub POC Name:</span>
+                  <span className="font-medium">{godown.hubPocName || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Hub POC Contact:</span>
+                  <span className="font-medium">{godown.hubPocContact || 'N/A'}</span>
+                </div>
+                {godown.googleLocation && (
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Google Location:</span>
+                    <a
+                      href={godown.googleLocation}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-apple-accent hover:underline flex items-center gap-1 font-medium"
+                    >
+                      <span>View Map</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+                <div className="pt-1">
+                  <span className="text-gray-400 block mb-1">Location Address:</span>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed bg-black/[0.02] dark:bg-white/[0.02] p-2 rounded-xl">
+                    {godown.locationAddress || godown.address || 'N/A'}
+                  </p>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Facility Code:</span>
-                <span>{godown.code || 'None'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Total Area:</span>
-                <span>{godown.capacitySqFt.toLocaleString('en-IN')} sq.ft</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Occupied Area:</span>
-                <span>{(godown.occupiedSqFt || 0).toLocaleString('en-IN')} sq.ft</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Vacant Space:</span>
-                <span>{Math.max(0, godown.capacitySqFt - (godown.occupiedSqFt || 0)).toLocaleString('en-IN')} sq.ft</span>
-              </div>
-            </div>
-          </Card>
+            </Card>
 
-          <Card className="p-6">
-            <h3 className="font-semibold text-sm mb-4">Contract & Tenancy Terms</h3>
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Tenant Name:</span>
-                <span className="font-medium">{godown.currentTenant || 'None'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Contact Email:</span>
-                <span>{godown.tenantEmail || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Contact Phone:</span>
-                <span>{godown.tenantPhone || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-gray-400">Lease Dates:</span>
-                <span>{godown.leaseStartDate || 'N/A'} to {godown.leaseEndDate || 'N/A'}</span>
-              </div>
+            {/* Section 2 & 3: Lease & Operations Information */}
+            <div className="space-y-6">
+              {/* Lease Information */}
+              <Card className="p-6">
+                <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Calendar className="w-4 h-4 text-indigo-500" />
+                  <span>Lease Information</span>
+                </h3>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Lease Start Date:</span>
+                    <span className="font-medium">{godown.leaseStartDate || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Lease End Date:</span>
+                    <span className="font-medium">{godown.leaseEndDate || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Total Duration:</span>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                      {godown.leaseDurationMonths ? `${godown.leaseDurationMonths} Months` : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Operations Information */}
+              <Card className="p-6">
+                <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <UserCheck className="w-4 h-4 text-emerald-500" />
+                  <span>Operations Information</span>
+                </h3>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Operations POC:</span>
+                    <span className="font-medium">{godown.operationsPocName || godown.opsPocName || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">POC Mobile:</span>
+                    <span className="font-medium">{godown.operationsPocMobile || godown.opsPocMobile || 'N/A'}</span>
+                  </div>
+                </div>
+              </Card>
             </div>
 
-            {godown.notes && (
-              <div className="mt-4 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-xs text-gray-500">
-                <span className="font-semibold block mb-1 text-gray-700 dark:text-gray-300">Notes:</span>
-                {godown.notes}
+            {/* Section 8: Financial Information */}
+            <Card className="p-6">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                <IndianRupee className="w-4 h-4 text-emerald-600" />
+                <span>Financial Information</span>
+              </h3>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.06]">
+                  <span className="text-gray-400 block text-[11px]">Monthly Rent</span>
+                  <span className="text-lg font-extrabold text-gray-900 dark:text-gray-100">
+                    {formatCurrency(godown.monthlyRent || 0)}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.06]">
+                  <span className="text-gray-400 block text-[11px]">Total Setup Cost</span>
+                  <span className="text-base font-bold text-gray-800 dark:text-gray-200">
+                    {formatCurrency(godown.totalSetupCost || 0)}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.06]">
+                  <span className="text-gray-400 block text-[11px]">Refundable Advance (Deposit)</span>
+                  <span className="text-base font-bold text-gray-800 dark:text-gray-200">
+                    {formatCurrency(godown.refundableAdvance || godown.securityAdvance || 0)}
+                  </span>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Row 2: CCTV Credentials, Licences, Electricity & Lease Contact */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Section 5: CCTV Details */}
+            <Card className="p-6">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                <Video className="w-4 h-4 text-blue-500" />
+                <span>CCTV Access Details</span>
+              </h3>
+              <div className="space-y-3 text-xs">
+                <div className="flex justify-between items-center py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                  <span className="text-gray-400">Username:</span>
+                  <span className="font-mono font-semibold">{godown.cctvUsername || 'N/A'}</span>
+                </div>
+                <div className="py-1 border-b border-black/[0.04] dark:border-white/[0.04] space-y-1">
+                  <span className="text-gray-400 block">Password:</span>
+                  <div className="flex items-center justify-between bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1.5 rounded-xl font-mono">
+                    <span>
+                      {showCctvPassword
+                        ? godown.cctvPassword || 'None'
+                        : godown.cctvPassword ? '••••••••••••' : 'None'}
+                    </span>
+                    {godown.cctvPassword && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowCctvPassword(!showCctvPassword)}
+                          className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                          title={showCctvPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showCctvPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPassword(godown.cctvPassword || '')}
+                          className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                          title="Copy password"
+                        >
+                          {copiedCctv ? <Check className="w-3.5 h-3.5 text-apple-success" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="py-1">
+                  <span className="text-gray-400 block mb-1">Access URL / IP:</span>
+                  {godown.cctvAccessUrl ? (
+                    <a
+                      href={godown.cctvAccessUrl.startsWith('http') ? godown.cctvAccessUrl : `http://${godown.cctvAccessUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-apple-accent hover:underline flex items-center gap-1 break-all font-mono text-[11px]"
+                    >
+                      <span className="truncate">{godown.cctvAccessUrl}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 italic">N/A</span>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Section 6 & 7: Licences & Compliance */}
+            <Card className="p-6">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                <FileCheck2 className="w-4 h-4 text-purple-500" />
+                <span>Licences & Compliance</span>
+              </h3>
+              <div className="space-y-4 text-xs">
+                {/* Labour Licence */}
+                <div className="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.06] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">Labour Licence</span>
+                    <Badge variant={godown.hasLabourLicence ? 'success' : 'neutral'} size="sm">
+                      {godown.hasLabourLicence ? 'Available' : 'Not Available'}
+                    </Badge>
+                  </div>
+                  {godown.hasLabourLicence && (
+                    <div className="text-[11px] text-gray-500 pt-1 flex justify-between border-t border-black/[0.04] dark:border-white/[0.04]">
+                      <span>Valid: {godown.labourLicenceStartDate || 'N/A'}</span>
+                      <span className="font-medium text-apple-accent">Exp: {godown.labourLicenceExpiryDate || 'N/A'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Trade Licence */}
+                <div className="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.06] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">Trade Licence</span>
+                    <Badge variant={godown.hasTradeLicence ? 'success' : 'neutral'} size="sm">
+                      {godown.hasTradeLicence ? 'Available' : 'Not Available'}
+                    </Badge>
+                  </div>
+                  {godown.hasTradeLicence && (
+                    <div className="text-[11px] text-gray-500 pt-1 flex justify-between border-t border-black/[0.04] dark:border-white/[0.04]">
+                      <span>Valid: {godown.tradeLicenceStartDate || 'N/A'}</span>
+                      <span className="font-medium text-apple-accent">Exp: {godown.tradeLicenceExpiryDate || 'N/A'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Section 9 & 10: Electricity & Lease Contact */}
+            <div className="space-y-6">
+              {/* Electricity */}
+              <Card className="p-6">
+                <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span>Electricity Information</span>
+                </h3>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Provider:</span>
+                    <span className="font-medium">{godown.electricityProvider || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Service Number:</span>
+                    <span className="font-mono font-medium">{godown.electricityServiceNumber || 'N/A'}</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Lease Contact & Owner */}
+              <Card className="p-6">
+                <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Phone className="w-4 h-4 text-rose-500" />
+                  <span>Lease Contact & Owner</span>
+                </h3>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Contact Person:</span>
+                    <span className="font-medium">{godown.leaseContactName || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-gray-400">Contact Mobile:</span>
+                    <span className="font-medium">{godown.leaseContactMobile || 'N/A'}</span>
+                  </div>
+                  <div className="pt-1">
+                    <span className="text-gray-400 block mb-1">Owner Address:</span>
+                    <p className="text-gray-700 dark:text-gray-300 bg-black/[0.02] dark:bg-white/[0.02] p-2 rounded-xl">
+                      {godown.ownerAddress || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Row 3: Broadband Details (Dynamic Connections) */}
+          <Card className="p-6">
+            <h3 className="font-bold text-sm mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+              <Wifi className="w-4 h-4 text-cyan-500" />
+              <span>Broadband Connections ({Array.isArray(godown.broadbandDetails) ? godown.broadbandDetails.length : 0})</span>
+            </h3>
+
+            {!Array.isArray(godown.broadbandDetails) || godown.broadbandDetails.length === 0 ? (
+              <div className="py-6 text-center text-xs text-gray-400">
+                No broadband connections configured for this facility.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {godown.broadbandDetails.map((bb, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-2">
+                      <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                        <Wifi className="w-3.5 h-3.5 text-cyan-500" />
+                        {bb.networkProvider || `Connection #${idx + 1}`}
+                      </span>
+                      <Badge variant="accent" size="sm">Line #{idx + 1}</Badge>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1 text-[11px]">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Account No:</span>
+                        <span className="font-mono font-medium">{bb.accountNumber || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Registered Mobile:</span>
+                        <span className="font-medium">{bb.registeredMobileNumber || bb.registeredMobile || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">User ID:</span>
+                        <span className="font-mono">{bb.userId || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Plan End Date:</span>
+                        <span className="font-medium text-apple-accent">{bb.currentPlanEndDate || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Service Contact:</span>
+                        <span className="font-medium">{bb.serviceContactNumber || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </Card>

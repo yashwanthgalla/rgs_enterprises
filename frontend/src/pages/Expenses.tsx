@@ -11,6 +11,7 @@ import {
   Plus,
   Radio,
   FileCheck2,
+  Info,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -35,7 +36,7 @@ export const Expenses: React.FC = () => {
     : 'electricity';
 
   const handleTabChange = (tab: 'electricity' | 'wifi') => {
-    navigate(`/expenses/${tab}`);
+    navigate(`/information/${tab}`);
   };
 
   // Selected Hub for Electricity and WiFi sub-tabs
@@ -205,15 +206,11 @@ export const Expenses: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
-            {activeTab === 'electricity' ? (
-              <Zap className="w-6 h-6 text-amber-500" />
-            ) : (
-              <Wifi className="w-6 h-6 text-cyan-500" />
-            )}
-            <span>Expenses & Utilities</span>
+            <Info className="w-6 h-6 text-apple-accent" />
+            <span>Information</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Manage electricity connections and WiFi networks with automatic synchronization to the Hub profile
+            Manage facility electricity connections and WiFi networks with automatic synchronization to the Hub profile
           </p>
         </div>
       </div>

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Zap,
   Wifi,
+  Info,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -47,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
     '/finance': true,
-    '/expenses': true,
+    '/information': true,
   });
 
   const navItems: NavItem[] = [
@@ -63,12 +64,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       ],
     },
     {
-      label: 'Expenses & Bills',
-      path: '/expenses',
-      icon: Receipt,
+      label: 'Information',
+      path: '/information',
+      icon: Info,
       children: [
-        { label: 'Electricity Information', path: '/expenses/electricity', icon: Zap },
-        { label: 'WiFi Information', path: '/expenses/wifi', icon: Wifi },
+        { label: 'Electricity Information', path: '/information/electricity', icon: Zap },
+        { label: 'WiFi Information', path: '/information/wifi', icon: Wifi },
       ],
     },
     { label: 'Staff Directory', path: '/staff', icon: Users },

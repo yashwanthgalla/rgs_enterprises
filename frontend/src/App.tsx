@@ -41,10 +41,14 @@ export const App: React.FC = () => {
                   <Route path="finance/revenue" element={<Finance />} />
                   <Route path="finance/rent" element={<Finance />} />
                   <Route path="rent-ledger" element={<Navigate to="/finance/rent" replace />} />
-                  <Route path="expenses" element={<Navigate to="/expenses/electricity" replace />} />
-                  <Route path="expenses/bills" element={<Navigate to="/expenses/electricity" replace />} />
-                  <Route path="expenses/electricity" element={<Expenses />} />
-                  <Route path="expenses/wifi" element={<Expenses />} />
+                  <Route path="information" element={<Navigate to="/information/electricity" replace />} />
+                  <Route path="information/electricity" element={<Expenses />} />
+                  <Route path="information/wifi" element={<Expenses />} />
+                  {/* Backwards compatibility for /expenses */}
+                  <Route path="expenses" element={<Navigate to="/information/electricity" replace />} />
+                  <Route path="expenses/bills" element={<Navigate to="/information/electricity" replace />} />
+                  <Route path="expenses/electricity" element={<Navigate to="/information/electricity" replace />} />
+                  <Route path="expenses/wifi" element={<Navigate to="/information/wifi" replace />} />
                   <Route path="staff" element={<StaffDirectory />} />
                   <Route path="assets" element={<Assets />} />
                   <Route path="documents" element={<Documents />} />

@@ -12,6 +12,7 @@ import {
   Calendar,
   Building,
   RefreshCw,
+  Info,
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
@@ -79,7 +80,7 @@ export const Dashboard: React.FC = () => {
               Welcome, {user?.fullName || user?.username || 'Administrator'}
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Real-time operations, occupancy tracking, and rental cashflow
+              Real-time operations, facility tracking, and rental cashflow
             </p>
           </div>
         </div>
@@ -116,16 +117,12 @@ export const Dashboard: React.FC = () => {
         />
 
         <StatCard
-          title="Occupancy Rate"
-          value={`${stats?.occupancyRate ? Math.round(stats.occupancyRate) : 0}%`}
-          subtitle={`${stats?.occupiedCapacitySqFt?.toLocaleString('en-IN') || 0} sq.ft leased`}
-          icon={Building}
+          title="Total Revenue / Month"
+          value={formatCurrency(stats?.monthlyTotalRevenue || 0)}
+          subtitle="Monthly portfolio revenue"
+          icon={TrendingUp}
           color="green"
-          trend={{
-            value: `${stats?.occupancyRate ? Math.round(stats.occupancyRate) : 0}% Active`,
-            isPositive: (stats?.occupancyRate || 0) >= 70,
-          }}
-          onClick={() => navigate('/hubs')}
+          onClick={() => navigate('/finance/revenue')}
         />
 
         <StatCard
@@ -290,10 +287,10 @@ export const Dashboard: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/expenses')}
-              icon={<Receipt className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/information/electricity')}
+              icon={<Info className="w-3.5 h-3.5" />}
             >
-              New Bill
+              Information
             </Button>
             <Button
               variant="outline"

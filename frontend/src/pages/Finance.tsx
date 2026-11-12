@@ -81,6 +81,7 @@ export const Finance: React.FC = () => {
     manpower: '',
     housekeeping: '',
     wmRefreshmentPettyCash: '',
+    totalRevenue: '',
   });
 
   // Tab 2: Rent State
@@ -94,6 +95,7 @@ export const Finance: React.FC = () => {
     electricityBill: '',
     sorterPayments: '',
     pettyCash: '',
+    total: '',
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -209,6 +211,7 @@ export const Finance: React.FC = () => {
       manpower: '',
       housekeeping: '',
       wmRefreshmentPettyCash: '',
+      totalRevenue: '',
     });
     setIsRevenueModalOpen(true);
   };
@@ -224,8 +227,16 @@ export const Finance: React.FC = () => {
       manpower: String(item.manpower || ''),
       housekeeping: String(item.housekeeping || ''),
       wmRefreshmentPettyCash: String(item.wmRefreshmentPettyCash || ''),
+      totalRevenue: String(item.totalRevenue ?? ''),
     });
     setIsRevenueModalOpen(true);
+  };
+
+  const handleRevenueFieldChange = (field: string, val: string) => {
+    const updated = { ...revenueForm, [field]: val };
+    const liveSum = calcTotalRevenue(updated);
+    updated.totalRevenue = liveSum > 0 ? String(liveSum) : '';
+    setRevenueForm(updated);
   };
 
   const handleRevenueSubmit = async (e: React.FormEvent) => {
@@ -236,6 +247,13 @@ export const Finance: React.FC = () => {
     }
     setSubmitting(true);
     try {
+      const calculatedSum = calcTotalRevenue(revenueForm);
+      const parsedUserTotal = parseFloat(revenueForm.totalRevenue);
+      const finalTotal =
+        !isNaN(parsedUserTotal) && revenueForm.totalRevenue.trim() !== ''
+          ? Number(parsedUserTotal.toFixed(2))
+          : calculatedSum;
+
       const payload = {
         hubId: Number(revenueForm.hubId),
         financialYear: revenueForm.financialYear,
@@ -245,7 +263,7 @@ export const Finance: React.FC = () => {
         manpower: Number(parseFloat(revenueForm.manpower || '0').toFixed(2)),
         housekeeping: Number(parseFloat(revenueForm.housekeeping || '0').toFixed(2)),
         wmRefreshmentPettyCash: Number(parseFloat(revenueForm.wmRefreshmentPettyCash || '0').toFixed(2)),
-        totalRevenue: calcTotalRevenue(revenueForm),
+        totalRevenue: finalTotal,
       };
 
       if (editingRevenue) {
@@ -285,6 +303,7 @@ export const Finance: React.FC = () => {
       electricityBill: '',
       sorterPayments: '',
       pettyCash: '',
+      total: '',
     });
     setIsRentModalOpen(true);
   };
@@ -298,8 +317,16 @@ export const Finance: React.FC = () => {
       electricityBill: String(item.electricityBill || ''),
       sorterPayments: String(item.sorterPayments || ''),
       pettyCash: String(item.pettyCash || ''),
+      total: String(item.total ?? ''),
     });
     setIsRentModalOpen(true);
+  };
+
+  const handleRentFieldChange = (field: string, val: string) => {
+    const updated = { ...rentForm, [field]: val };
+    const math = calcRentMath(updated);
+    updated.total = math.total > 0 ? String(math.total) : '';
+    setRentForm(updated);
   };
 
   const handleRentSubmit = async (e: React.FormEvent) => {
@@ -311,6 +338,12 @@ export const Finance: React.FC = () => {
     setSubmitting(true);
     try {
       const math = calcRentMath(rentForm);
+      const parsedUserTotal = parseFloat(rentForm.total);
+      const finalTotal =
+        !isNaN(parsedUserTotal) && rentForm.total.trim() !== ''
+          ? Number(parsedUserTotal.toFixed(2))
+          : math.total;
+
       const payload = {
         hubId: Number(rentForm.hubId),
         period: rentForm.period,
@@ -324,7 +357,7 @@ export const Finance: React.FC = () => {
         electricityBill: math.elec,
         sorterPayments: math.sorter,
         pettyCash: math.petty,
-        total: math.total,
+        total: finalTotal,
       };
 
       if (editingRent) {
@@ -651,7 +684,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="0.00"
                 value={revenueForm.rent}
-                onChange={(e) => setRevenueForm({ ...revenueForm, rent: e.target.value })}
+                onChange={(e) => handleRevenueFieldChange('rent', e.target.value)}
               />
             </FormField>
 
@@ -662,7 +695,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="0.00"
                 value={revenueForm.setupCostPerMonth}
-                onChange={(e) => setRevenueForm({ ...revenueForm, setupCostPerMonth: e.target.value })}
+                onChange={(e) => handleRevenueFieldChange('setupCostPerMonth', e.target.value)}
               />
             </FormField>
 
@@ -673,7 +706,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="0.00"
                 value={revenueForm.electricity}
-                onChange={(e) => setRevenueForm({ ...revenueForm, electricity: e.target.value })}
+                onChange={(e) => handleRevenueFieldChange('electricity', e.target.value)}
               />
             </FormField>
 
@@ -684,7 +717,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="0.00"
                 value={revenueForm.manpower}
-                onChange={(e) => setRevenueForm({ ...revenueForm, manpower: e.target.value })}
+                onChange={(e) => handleRevenueFieldChange('manpower', e.target.value)}
               />
             </FormField>
 
@@ -695,7 +728,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="0.00"
                 value={revenueForm.housekeeping}
-                onChange={(e) => setRevenueForm({ ...revenueForm, housekeeping: e.target.value })}
+                onChange={(e) => handleRevenueFieldChange('housekeeping', e.target.value)}
               />
             </FormField>
 
@@ -706,27 +739,48 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="0.00"
                 value={revenueForm.wmRefreshmentPettyCash}
-                onChange={(e) => setRevenueForm({ ...revenueForm, wmRefreshmentPettyCash: e.target.value })}
+                onChange={(e) => handleRevenueFieldChange('wmRefreshmentPettyCash', e.target.value)}
               />
             </FormField>
           </div>
 
-          {/* Auto Calculation Preview Banner */}
-          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <div>
-                <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 block">
-                  Total Revenue (Auto-calculated Sum)
-                </span>
-                <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
-                  Rent + Setup Cost + Electricity + Manpower + Housekeeping + WM/Petty Cash
-                </span>
+          {/* Total Revenue Editable Field & Auto-Sum Banner */}
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 block">
+                    Total Revenue (₹)
+                  </span>
+                  <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                    Auto-calculated sum: {formatCurrency(revenueTotalLive)}. You can edit or enter any custom total directly below.
+                  </span>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const liveSum = calcTotalRevenue(revenueForm);
+                  setRevenueForm({ ...revenueForm, totalRevenue: String(liveSum) });
+                }}
+                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 hover:underline px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 transition-colors"
+                title="Reset to calculated sum"
+              >
+                Reset to Sum
+              </button>
             </div>
-            <div className="text-xl font-extrabold text-emerald-700 dark:text-emerald-300">
-              {formatCurrency(revenueTotalLive)}
-            </div>
+
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={revenueForm.totalRevenue}
+              onChange={(e) => setRevenueForm({ ...revenueForm, totalRevenue: e.target.value })}
+              className="font-extrabold text-emerald-700 dark:text-emerald-300 text-lg bg-white dark:bg-apple-cardDark border-emerald-300 dark:border-emerald-700"
+              required
+            />
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
@@ -790,7 +844,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="e.g. 75000"
                 value={rentForm.rent}
-                onChange={(e) => setRentForm({ ...rentForm, rent: e.target.value })}
+                onChange={(e) => handleRentFieldChange('rent', e.target.value)}
               />
             </FormField>
 
@@ -801,7 +855,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="e.g. 12000"
                 value={rentForm.electricityBill}
-                onChange={(e) => setRentForm({ ...rentForm, electricityBill: e.target.value })}
+                onChange={(e) => handleRentFieldChange('electricityBill', e.target.value)}
               />
             </FormField>
 
@@ -812,7 +866,7 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="e.g. 5000"
                 value={rentForm.sorterPayments}
-                onChange={(e) => setRentForm({ ...rentForm, sorterPayments: e.target.value })}
+                onChange={(e) => handleRentFieldChange('sorterPayments', e.target.value)}
               />
             </FormField>
 
@@ -823,15 +877,15 @@ export const Finance: React.FC = () => {
                 min="0"
                 placeholder="e.g. 2500"
                 value={rentForm.pettyCash}
-                onChange={(e) => setRentForm({ ...rentForm, pettyCash: e.target.value })}
+                onChange={(e) => handleRentFieldChange('pettyCash', e.target.value)}
               />
             </FormField>
           </div>
 
-          {/* Live Auto Calculations Breakdown */}
-          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-2.5">
+          {/* Live Auto Calculations Breakdown & Editable Total */}
+          <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block border-b border-black/[0.06] dark:border-white/[0.08] pb-1.5 flex items-center justify-between">
-              <span>Live Automatic Calculations</span>
+              <span>Automatic Computations Breakdown</span>
               <span className="text-[10px] text-gray-400 font-normal">Formula Engine</span>
             </span>
 
@@ -865,13 +919,40 @@ export const Finance: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between mt-2">
-              <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                Grand Total Payable
-              </span>
-              <span className="text-base font-extrabold text-emerald-700 dark:text-emerald-300">
-                {formatCurrency(rentMathLive.total)}
-              </span>
+            {/* Editable Rent Total / Grand Total */}
+            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 block">
+                    Rent Total / Grand Total Payable (₹)
+                  </span>
+                  <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                    Formula Total: {formatCurrency(rentMathLive.total)}. You can edit or enter any custom total directly below.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const math = calcRentMath(rentForm);
+                    setRentForm({ ...rentForm, total: String(math.total) });
+                  }}
+                  className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 hover:underline px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 transition-colors"
+                  title="Reset to formula calculation"
+                >
+                  Reset to Formula
+                </button>
+              </div>
+
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={rentForm.total}
+                onChange={(e) => setRentForm({ ...rentForm, total: e.target.value })}
+                className="font-extrabold text-emerald-700 dark:text-emerald-300 text-lg bg-white dark:bg-apple-cardDark border-emerald-300 dark:border-emerald-700"
+                required
+              />
             </div>
           </div>
 

@@ -497,15 +497,18 @@ def finance_total_revenue_view(request):
         if not hub_id or not financial_year:
             return api_error("hubId and financialYear are mandatory fields.")
 
-        # Auto calculate total revenue = rent + setup_cost_per_month + electricity + manpower + housekeeping + wm_refreshment_petty_cash
+        # Auto calculate total revenue if not explicitly provided
         rent = Decimal(str(data.get('rent') or '0'))
         setup_cost = Decimal(str(data.get('setupCostPerMonth') or '0'))
         electricity = Decimal(str(data.get('electricity') or '0'))
         manpower = Decimal(str(data.get('manpower') or '0'))
         housekeeping = Decimal(str(data.get('housekeeping') or '0'))
         wm = Decimal(str(data.get('wmRefreshmentPettyCash') or '0'))
-        total_rev = rent + setup_cost + electricity + manpower + housekeeping + wm
-        data['totalRevenue'] = total_rev
+        computed_rev = rent + setup_cost + electricity + manpower + housekeeping + wm
+        if 'totalRevenue' in data and data.get('totalRevenue') is not None and str(data.get('totalRevenue')).strip() != '':
+            data['totalRevenue'] = Decimal(str(data.get('totalRevenue')))
+        else:
+            data['totalRevenue'] = computed_rev
 
         existing = FinanceTotalRevenue.objects.filter(hub_id=hub_id, financial_year=financial_year).first()
         if existing:
@@ -541,7 +544,11 @@ def finance_total_revenue_detail_view(request, pk):
         manpower = Decimal(str(data.get('manpower', obj.manpower) or '0'))
         housekeeping = Decimal(str(data.get('housekeeping', obj.housekeeping) or '0'))
         wm = Decimal(str(data.get('wmRefreshmentPettyCash', obj.wm_refreshment_petty_cash) or '0'))
-        data['totalRevenue'] = rent + setup_cost + electricity + manpower + housekeeping + wm
+        computed_rev = rent + setup_cost + electricity + manpower + housekeeping + wm
+        if 'totalRevenue' in data and data.get('totalRevenue') is not None and str(data.get('totalRevenue')).strip() != '':
+            data['totalRevenue'] = Decimal(str(data.get('totalRevenue')))
+        else:
+            data['totalRevenue'] = computed_rev
 
         serializer = FinanceTotalRevenueSerializer(obj, data=data, partial=True)
         if serializer.is_valid():
@@ -592,13 +599,16 @@ def finance_rent_view(request):
         elec_bill = Decimal(str(data.get('electricityBill') or '0'))
         sorter_pay = Decimal(str(data.get('sorterPayments') or '0'))
         petty_cash = Decimal(str(data.get('pettyCash') or '0'))
-        total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
+        computed_total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
 
         data['tdsAmount'] = tds_amount
         data['totalRentAfterTds'] = rent_after_tds
         data['gstAmount'] = gst_amount
         data['totalRentIncludingGst'] = rent_inc_gst
-        data['total'] = total
+        if 'total' in data and data.get('total') is not None and str(data.get('total')).strip() != '':
+            data['total'] = Decimal(str(data.get('total')))
+        else:
+            data['total'] = computed_total
 
         existing = FinanceRent.objects.filter(hub_id=hub_id, period=period).first()
         if existing:
@@ -640,13 +650,16 @@ def finance_rent_detail_view(request, pk):
         elec_bill = Decimal(str(data.get('electricityBill', obj.electricity_bill) or '0'))
         sorter_pay = Decimal(str(data.get('sorterPayments', obj.sorter_payments) or '0'))
         petty_cash = Decimal(str(data.get('pettyCash', obj.petty_cash) or '0'))
-        total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
+        computed_total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
 
         data['tdsAmount'] = tds_amount
         data['totalRentAfterTds'] = rent_after_tds
         data['gstAmount'] = gst_amount
         data['totalRentIncludingGst'] = rent_inc_gst
-        data['total'] = total
+        if 'total' in data and data.get('total') is not None and str(data.get('total')).strip() != '':
+            data['total'] = Decimal(str(data.get('total')))
+        else:
+            data['total'] = computed_total
 
         serializer = FinanceRentSerializer(obj, data=data, partial=True)
         if serializer.is_valid():

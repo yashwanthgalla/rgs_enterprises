@@ -92,6 +92,8 @@ export const Finance: React.FC = () => {
     hubId: '',
     period: new Date().toISOString().substring(0, 7), // YYYY-MM
     rent: '',
+    applyTds: false,
+    applyGst: false,
     electricityBill: '',
     sorterPayments: '',
     pettyCash: '',
@@ -170,16 +172,17 @@ export const Finance: React.FC = () => {
   };
 
   // Rent Live Auto Calculations
-  // TDS Amount = Rent * 10%
+  // Rent Live Auto Calculations with Gated TDS & GST:
+  // TDS Amount = applyTds ? (Rent * 10%) : 0
   // Total Rent After TDS = Rent - TDS Amount
-  // GST Amount = Rent * 18%
+  // GST Amount = applyGst ? (Rent * 18%) : 0
   // Total Rent Including GST = Total Rent After TDS + GST Amount
   // Total = Total Rent Including GST + Electricity Bill + Sorter Payments + Petty Cash
   const calcRentMath = (form: typeof rentForm) => {
     const rent = parseFloat(form.rent) || 0;
-    const tdsAmount = Number((rent * 0.10).toFixed(2));
+    const tdsAmount = form.applyTds ? Number((rent * 0.10).toFixed(2)) : 0;
     const totalRentAfterTds = Number((rent - tdsAmount).toFixed(2));
-    const gstAmount = Number((rent * 0.18).toFixed(2));
+    const gstAmount = form.applyGst ? Number((rent * 0.18).toFixed(2)) : 0;
     const totalRentIncludingGst = Number((totalRentAfterTds + gstAmount).toFixed(2));
     const elec = parseFloat(form.electricityBill) || 0;
     const sorter = parseFloat(form.sorterPayments) || 0;
@@ -300,6 +303,8 @@ export const Finance: React.FC = () => {
       hubId: selectedHubId !== 'ALL' ? selectedHubId : (hubs[0]?.id ? String(hubs[0].id) : ''),
       period: new Date().toISOString().substring(0, 7),
       rent: '',
+      applyTds: false,
+      applyGst: false,
       electricityBill: '',
       sorterPayments: '',
       pettyCash: '',
@@ -310,10 +315,21 @@ export const Finance: React.FC = () => {
 
   const openEditRentModal = (item: FinanceRent) => {
     setEditingRent(item);
+    const applyTds =
+      item.tdsApplied !== undefined
+        ? Boolean(item.tdsApplied)
+        : Number(item.tdsAmount || 0) > 0;
+    const applyGst =
+      item.gstApplied !== undefined
+        ? Boolean(item.gstApplied)
+        : Number(item.gstAmount || 0) > 0;
+
     setRentForm({
       hubId: String(item.hubId),
       period: item.period,
       rent: String(item.rent || ''),
+      applyTds,
+      applyGst,
       electricityBill: String(item.electricityBill || ''),
       sorterPayments: String(item.sorterPayments || ''),
       pettyCash: String(item.pettyCash || ''),
@@ -324,6 +340,20 @@ export const Finance: React.FC = () => {
 
   const handleRentFieldChange = (field: string, val: string) => {
     const updated = { ...rentForm, [field]: val };
+    const math = calcRentMath(updated);
+    updated.total = math.total > 0 ? String(math.total) : '';
+    setRentForm(updated);
+  };
+
+  const handleToggleTds = (checked: boolean) => {
+    const updated = { ...rentForm, applyTds: checked };
+    const math = calcRentMath(updated);
+    updated.total = math.total > 0 ? String(math.total) : '';
+    setRentForm(updated);
+  };
+
+  const handleToggleGst = (checked: boolean) => {
+    const updated = { ...rentForm, applyGst: checked };
     const math = calcRentMath(updated);
     updated.total = math.total > 0 ? String(math.total) : '';
     setRentForm(updated);
@@ -348,9 +378,11 @@ export const Finance: React.FC = () => {
         hubId: Number(rentForm.hubId),
         period: rentForm.period,
         rent: math.rent,
+        tdsApplied: rentForm.applyTds,
         tdsPercent: 10,
         tdsAmount: math.tdsAmount,
         totalRentAfterTds: math.totalRentAfterTds,
+        gstApplied: rentForm.applyGst,
         gstPercent: 18,
         gstAmount: math.gstAmount,
         totalRentIncludingGst: math.totalRentIncludingGst,
@@ -591,13 +623,21 @@ export const Finance: React.FC = () => {
                         </td>
                         <td className="p-3 text-right">{formatCurrency(item.rent)}</td>
                         <td className="p-3 text-right text-apple-danger font-mono">
-                          -{formatCurrency(item.tdsAmount)}
+                          {Number(item.tdsAmount) > 0 ? (
+                            `-${formatCurrency(item.tdsAmount)}`
+                          ) : (
+                            <span className="text-gray-400 font-normal">₹0</span>
+                          )}
                         </td>
                         <td className="p-3 text-right font-medium text-gray-800 dark:text-gray-200">
                           {formatCurrency(item.totalRentAfterTds)}
                         </td>
                         <td className="p-3 text-right text-indigo-600 dark:text-indigo-400 font-mono">
-                          +{formatCurrency(item.gstAmount)}
+                          {Number(item.gstAmount) > 0 ? (
+                            `+${formatCurrency(item.gstAmount)}`
+                          ) : (
+                            <span className="text-gray-400 font-normal">₹0</span>
+                          )}
                         </td>
                         <td className="p-3 text-right font-medium text-gray-800 dark:text-gray-200">
                           {formatCurrency(item.totalRentIncludingGst)}
@@ -882,6 +922,49 @@ export const Finance: React.FC = () => {
             </FormField>
           </div>
 
+          {/* Gated Tax Toggles: TDS & GST */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
+            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-apple-cardDark border border-black/[0.05] dark:border-white/[0.06] cursor-pointer hover:border-black/10 dark:hover:border-white/10 transition-all select-none">
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <span>Apply TDS (10%)</span>
+                  {rentForm.applyTds && (
+                    <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded">
+                      Active
+                    </span>
+                  )}
+                </span>
+                <span className="text-[11px] text-gray-400 block">Deduct 10% TDS from Base Rent</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={rentForm.applyTds}
+                onChange={(e) => handleToggleTds(e.target.checked)}
+                className="w-4 h-4 rounded text-apple-accent focus:ring-apple-accent border-gray-300 dark:border-gray-600 cursor-pointer"
+              />
+            </label>
+
+            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-apple-cardDark border border-black/[0.05] dark:border-white/[0.06] cursor-pointer hover:border-black/10 dark:hover:border-white/10 transition-all select-none">
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <span>Apply GST (18%)</span>
+                  {rentForm.applyGst && (
+                    <span className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.2 rounded">
+                      Active
+                    </span>
+                  )}
+                </span>
+                <span className="text-[11px] text-gray-400 block">Add 18% GST to Base Rent</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={rentForm.applyGst}
+                onChange={(e) => handleToggleGst(e.target.checked)}
+                className="w-4 h-4 rounded text-apple-accent focus:ring-apple-accent border-gray-300 dark:border-gray-600 cursor-pointer"
+              />
+            </label>
+          </div>
+
           {/* Live Auto Calculations Breakdown & Editable Total */}
           <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
             <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block border-b border-black/[0.06] dark:border-white/[0.08] pb-1.5 flex items-center justify-between">
@@ -891,9 +974,16 @@ export const Finance: React.FC = () => {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <div className="p-2.5 rounded-xl bg-white dark:bg-apple-cardDark border border-black/[0.04] dark:border-white/[0.06]">
-                <span className="text-[10px] text-gray-400 block">TDS (10%)</span>
-                <span className="font-semibold text-apple-danger font-mono">
-                  {formatCurrency(rentMathLive.tdsAmount)}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400 block">TDS (10%)</span>
+                  {!rentForm.applyTds && (
+                    <span className="text-[9px] font-medium text-gray-400 bg-black/[0.04] dark:bg-white/[0.06] px-1.5 py-0.5 rounded">
+                      Not applied
+                    </span>
+                  )}
+                </div>
+                <span className={`font-semibold font-mono ${rentForm.applyTds ? 'text-apple-danger' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {rentForm.applyTds ? formatCurrency(rentMathLive.tdsAmount) : '₹0'}
                 </span>
               </div>
 
@@ -905,9 +995,16 @@ export const Finance: React.FC = () => {
               </div>
 
               <div className="p-2.5 rounded-xl bg-white dark:bg-apple-cardDark border border-black/[0.04] dark:border-white/[0.06]">
-                <span className="text-[10px] text-gray-400 block">GST (18%)</span>
-                <span className="font-semibold text-indigo-600 dark:text-indigo-400 font-mono">
-                  {formatCurrency(rentMathLive.gstAmount)}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400 block">GST (18%)</span>
+                  {!rentForm.applyGst && (
+                    <span className="text-[9px] font-medium text-gray-400 bg-black/[0.04] dark:border-white/[0.06] px-1.5 py-0.5 rounded">
+                      Not applied
+                    </span>
+                  )}
+                </div>
+                <span className={`font-semibold font-mono ${rentForm.applyGst ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {rentForm.applyGst ? formatCurrency(rentMathLive.gstAmount) : '₹0'}
                 </span>
               </div>
 

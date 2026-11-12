@@ -611,25 +611,42 @@ def finance_rent_view(request):
             return api_error("hubId and period are mandatory fields.")
 
         # Live calculation formulas:
-        # TDS Amount = Rent * 10%
+        # TDS Amount = Rent * 10% (if tdsApplied, else 0)
         # Total Rent After TDS = Rent - TDS Amount
-        # GST Amount = Rent * 18%
+        # GST Amount = Rent * 18% (if gstApplied, else 0)
         # Total Rent Including GST = Total Rent After TDS + GST Amount
         # Total = Total Rent Including GST + Electricity Bill + Sorter Payments + Petty Cash
         rent = Decimal(str(data.get('rent') or '0'))
+
+        raw_tds_applied = data.get('tdsApplied') if 'tdsApplied' in data else data.get('tds_applied')
+        tds_applied = str(raw_tds_applied).lower() in ('true', '1') if raw_tds_applied is not None else False
+
+        raw_gst_applied = data.get('gstApplied') if 'gstApplied' in data else data.get('gst_applied')
+        gst_applied = str(raw_gst_applied).lower() in ('true', '1') if raw_gst_applied is not None else False
+
         tds_percent = Decimal(str(data.get('tdsPercent') or '10'))
-        tds_amount = (rent * tds_percent) / Decimal('100')
-        rent_after_tds = rent - tds_amount
+        if tds_applied:
+            tds_amount = (rent * tds_percent) / Decimal('100')
+            rent_after_tds = rent - tds_amount
+        else:
+            tds_amount = Decimal('0')
+            rent_after_tds = rent
         
         gst_percent = Decimal(str(data.get('gstPercent') or '18'))
-        gst_amount = (rent * gst_percent) / Decimal('100')
-        rent_inc_gst = rent_after_tds + gst_amount
+        if gst_applied:
+            gst_amount = (rent * gst_percent) / Decimal('100')
+            rent_inc_gst = rent_after_tds + gst_amount
+        else:
+            gst_amount = Decimal('0')
+            rent_inc_gst = rent_after_tds
         
         elec_bill = Decimal(str(data.get('electricityBill') or '0'))
         sorter_pay = Decimal(str(data.get('sorterPayments') or '0'))
         petty_cash = Decimal(str(data.get('pettyCash') or '0'))
         computed_total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
 
+        data['tdsApplied'] = tds_applied
+        data['gstApplied'] = gst_applied
         data['tdsAmount'] = tds_amount
         data['totalRentAfterTds'] = rent_after_tds
         data['gstAmount'] = gst_amount
@@ -668,19 +685,42 @@ def finance_rent_detail_view(request, pk):
     elif request.method == 'PUT':
         data = request.data.copy()
         rent = Decimal(str(data.get('rent', obj.rent) or '0'))
+
+        raw_tds_applied = data.get('tdsApplied') if 'tdsApplied' in data else data.get('tds_applied')
+        if raw_tds_applied is not None:
+            tds_applied = str(raw_tds_applied).lower() in ('true', '1')
+        else:
+            tds_applied = bool(getattr(obj, 'tds_applied', False))
+
+        raw_gst_applied = data.get('gstApplied') if 'gstApplied' in data else data.get('gst_applied')
+        if raw_gst_applied is not None:
+            gst_applied = str(raw_gst_applied).lower() in ('true', '1')
+        else:
+            gst_applied = bool(getattr(obj, 'gst_applied', False))
+
         tds_percent = Decimal(str(data.get('tdsPercent', obj.tds_percent) or '10'))
-        tds_amount = (rent * tds_percent) / Decimal('100')
-        rent_after_tds = rent - tds_amount
+        if tds_applied:
+            tds_amount = (rent * tds_percent) / Decimal('100')
+            rent_after_tds = rent - tds_amount
+        else:
+            tds_amount = Decimal('0')
+            rent_after_tds = rent
         
         gst_percent = Decimal(str(data.get('gstPercent', obj.gst_percent) or '18'))
-        gst_amount = (rent * gst_percent) / Decimal('100')
-        rent_inc_gst = rent_after_tds + gst_amount
+        if gst_applied:
+            gst_amount = (rent * gst_percent) / Decimal('100')
+            rent_inc_gst = rent_after_tds + gst_amount
+        else:
+            gst_amount = Decimal('0')
+            rent_inc_gst = rent_after_tds
         
         elec_bill = Decimal(str(data.get('electricityBill', obj.electricity_bill) or '0'))
         sorter_pay = Decimal(str(data.get('sorterPayments', obj.sorter_payments) or '0'))
         petty_cash = Decimal(str(data.get('pettyCash', obj.petty_cash) or '0'))
         computed_total = rent_inc_gst + elec_bill + sorter_pay + petty_cash
 
+        data['tdsApplied'] = tds_applied
+        data['gstApplied'] = gst_applied
         data['tdsAmount'] = tds_amount
         data['totalRentAfterTds'] = rent_after_tds
         data['gstAmount'] = gst_amount
@@ -1326,11 +1366,30 @@ def reports_export_csv_view(request):
                     month_label = period_str or 'Month'
 
                 rent_val = float(f_rent.rent or 0)
+                tds_applied = getattr(f_rent, 'tds_applied', None)
+                if tds_applied is None:
+                    tds_applied = (float(f_rent.tds_amount or 0) > 0)
+                
+                gst_applied = getattr(f_rent, 'gst_applied', None)
+                if gst_applied is None:
+                    gst_applied = (float(f_rent.gst_amount or 0) > 0)
+
                 tds_pct = float(f_rent.tds_percent or 10)
-                tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
-                rent_after_tds = float(f_rent.total_rent_after_tds if f_rent.total_rent_after_tds is not None else (rent_val - tds_amt))
+                if tds_applied:
+                    tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
+                    rent_after_tds = float(f_rent.total_rent_after_tds if f_rent.total_rent_after_tds is not None else (rent_val - tds_amt))
+                else:
+                    tds_amt = 0.0
+                    rent_after_tds = rent_val
+
                 gst_pct = float(f_rent.gst_percent or 18)
-                rent_inc_gst = float(f_rent.total_rent_including_gst if f_rent.total_rent_including_gst is not None else (rent_after_tds + (rent_after_tds * gst_pct / 100)))
+                if gst_applied:
+                    gst_amt = float(f_rent.gst_amount if f_rent.gst_amount is not None else (rent_val * gst_pct / 100))
+                    rent_inc_gst = float(f_rent.total_rent_including_gst if f_rent.total_rent_including_gst is not None else (rent_after_tds + gst_amt))
+                else:
+                    gst_amt = 0.0
+                    rent_inc_gst = rent_after_tds
+
                 electricity_bill = float(f_rent.electricity_bill or 0)
                 sorter_payments = float(f_rent.sorter_payments or 0)
                 petty_cash_rent = float(f_rent.petty_cash or 0)
@@ -1501,11 +1560,30 @@ def reports_export_csv_view(request):
 
         if f_rent:
             rent_val = float(f_rent.rent or 0)
+            tds_applied = getattr(f_rent, 'tds_applied', None)
+            if tds_applied is None:
+                tds_applied = (float(f_rent.tds_amount or 0) > 0)
+            
+            gst_applied = getattr(f_rent, 'gst_applied', None)
+            if gst_applied is None:
+                gst_applied = (float(f_rent.gst_amount or 0) > 0)
+
             tds_pct = float(f_rent.tds_percent or 10)
-            tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
-            rent_after_tds = float(f_rent.total_rent_after_tds if f_rent.total_rent_after_tds is not None else (rent_val - tds_amt))
+            if tds_applied:
+                tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
+                rent_after_tds = float(f_rent.total_rent_after_tds if f_rent.total_rent_after_tds is not None else (rent_val - tds_amt))
+            else:
+                tds_amt = 0.0
+                rent_after_tds = rent_val
+
             gst_pct = float(f_rent.gst_percent or 18)
-            rent_inc_gst = float(f_rent.total_rent_including_gst if f_rent.total_rent_including_gst is not None else (rent_after_tds + (rent_after_tds * gst_pct / 100)))
+            if gst_applied:
+                gst_amt = float(f_rent.gst_amount if f_rent.gst_amount is not None else (rent_val * gst_pct / 100))
+                rent_inc_gst = float(f_rent.total_rent_including_gst if f_rent.total_rent_including_gst is not None else (rent_after_tds + gst_amt))
+            else:
+                gst_amt = 0.0
+                rent_inc_gst = rent_after_tds
+
             electricity_bill = float(f_rent.electricity_bill or 0)
             sorter_payments = float(f_rent.sorter_payments or 0)
             petty_cash_rent = float(f_rent.petty_cash or 0)
@@ -1513,14 +1591,14 @@ def reports_export_csv_view(request):
         else:
             rent_val = float(godown.monthly_rent or 0)
             tds_pct = 10.0
-            tds_amt = rent_val * 0.10
-            rent_after_tds = rent_val - tds_amt
+            tds_amt = 0.0
+            rent_after_tds = rent_val
             gst_pct = 18.0
-            rent_inc_gst = rent_after_tds + (rent_after_tds * 0.18)
+            rent_inc_gst = rent_val
             electricity_bill = 0.0
             sorter_payments = 0.0
             petty_cash_rent = 0.0
-            total_rent = rent_inc_gst
+            total_rent = rent_val
 
         profit = total_revenue - total_rent
         margin = profit - setup_cost

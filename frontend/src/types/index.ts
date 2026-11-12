@@ -127,6 +127,8 @@ export interface FinanceRent {
   sorterPayments: number;
   pettyCash: number;
   total: number;
+  tdsApplied?: boolean;
+  gstApplied?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

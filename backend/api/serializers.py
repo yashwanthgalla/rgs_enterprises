@@ -74,6 +74,8 @@ class FinanceRentSerializer(serializers.ModelSerializer):
     sorterPayments = serializers.DecimalField(source='sorter_payments', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     pettyCash = serializers.DecimalField(source='petty_cash', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
+    tdsApplied = serializers.BooleanField(source='tds_applied', required=False, default=False)
+    gstApplied = serializers.BooleanField(source='gst_applied', required=False, default=False)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
 
@@ -83,6 +85,7 @@ class FinanceRentSerializer(serializers.ModelSerializer):
             'id', 'hubId', 'hubName', 'period', 'rent', 'tdsPercent', 'tdsAmount',
             'totalRentAfterTds', 'gstPercent', 'gstAmount', 'totalRentIncludingGst',
             'electricityBill', 'sorterPayments', 'pettyCash', 'total',
+            'tdsApplied', 'gstApplied',
             'createdAt', 'updatedAt'
         ]
 

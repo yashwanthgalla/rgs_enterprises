@@ -146,6 +146,8 @@ class FinanceRent(models.Model):
     sorter_payments = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
     petty_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
+    tds_applied = models.BooleanField(default=False)
+    gst_applied = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 

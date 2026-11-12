@@ -1248,50 +1248,261 @@ def reports_godown_pnl_view(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def reports_export_csv_view(request):
+    export_type = request.GET.get('exportType') or request.GET.get('type') or 'total'
+    hub_id = request.GET.get('hubId')
     year_param = request.GET.get('year')
     current_year = int(year_param) if year_param else timezone.now().year
     year_str = f"{current_year:04d}"
 
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="rgs_financial_report_{current_year}.csv"'
+    app_settings = AppSettings.objects.first()
+    vendor_name = app_settings.company_name if app_settings and app_settings.company_name else "RGS Enterprises"
 
+    template_headers = [
+        'Vendor', 'Hub Status', 'State', 'Hub Model', 'Owner', 'ERP Name',
+        'Start Date', 'End Date', 'Tenure', 'Area',
+        'Rent', 'Setup Cost/Month', 'Electricity', 'Manpower', 'Housekeeping', 'WM Refreshment/Petty Cash', 'Total Revenue',
+        'Rent', 'TDS 10 %', 'TDS Amount', 'Total Rent After TDS', 'GST 18%', 'Total Rent Including GST', 'Electricity Bill', 'Sorter Payments', 'Petty Cash', 'Total',
+        'Profit', 'Margin', 'Status'
+    ]
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+
+    # SINGLE HUB (MONTH-BY-MONTH) EXPORT
+    if export_type == 'single' and hub_id:
+        try:
+            godown = Godown.objects.get(pk=hub_id, is_deleted=False)
+        except Godown.DoesNotExist:
+            return api_error("Hub facility not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        hub_name_slug = (godown.erp_name or godown.name or f"hub_{godown.id}").replace(" ", "_")
+        response['Content-Disposition'] = f'attachment; filename="rgs_{hub_name_slug}_monthly_{current_year}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(['Month'] + template_headers)
+
+        hub_status = godown.hub_status or godown.status or 'Active'
+        state = godown.state or 'ANDHRA PRADESH'
+        hub_model = godown.hub_model or 'OSH'
+        owner = godown.lease_contact_name or godown.current_tenant or 'Owner'
+        erp_name = godown.erp_name or godown.name or f'Hub #{godown.id}'
+        start_date = godown.lease_start_date.isoformat() if godown.lease_start_date else ''
+        end_date = godown.lease_end_date.isoformat() if godown.lease_end_date else ''
+        tenure = godown.lease_duration_months or ''
+        area = float(godown.size_sqft or godown.total_capacity or 0)
+
+        f_rev = FinanceTotalRevenue.objects.filter(hub=godown).order_by('-financial_year', '-id').first()
+        rev_rent = float(f_rev.rent) if (f_rev and f_rev.rent is not None) else float(godown.monthly_rent or 0)
+        setup_cost = float(f_rev.setup_cost_per_month) if (f_rev and f_rev.setup_cost_per_month is not None) else 0.0
+        electricity_rev = float(f_rev.electricity) if (f_rev and f_rev.electricity is not None) else 0.0
+        manpower = float(f_rev.manpower) if (f_rev and f_rev.manpower is not None) else 0.0
+        housekeeping = float(f_rev.housekeeping) if (f_rev and f_rev.housekeeping is not None) else 0.0
+        petty_cash_rev = float(f_rev.wm_refreshment_petty_cash) if (f_rev and f_rev.wm_refreshment_petty_cash is not None) else 0.0
+        total_revenue = float(f_rev.total_revenue) if (f_rev and f_rev.total_revenue is not None) else (rev_rent + setup_cost + electricity_rev + manpower + housekeeping + petty_cash_rev)
+
+        sum_rev_rent = 0.0
+        sum_setup_cost = 0.0
+        sum_elec_rev = 0.0
+        sum_manpower = 0.0
+        sum_housekeeping = 0.0
+        sum_petty_rev = 0.0
+        sum_total_rev = 0.0
+
+        sum_rent_outflow = 0.0
+        sum_tds_amt = 0.0
+        sum_rent_after_tds = 0.0
+        sum_rent_inc_gst = 0.0
+        sum_elec_bill = 0.0
+        sum_sorter = 0.0
+        sum_petty_rent = 0.0
+        sum_total_rent = 0.0
+        sum_profit = 0.0
+        sum_margin = 0.0
+
+        for m in range(1, 13):
+            period_str = f"{current_year:04d}-{m:02d}"
+            month_label = datetime.date(current_year, m, 1).strftime('%b %Y')
+
+            f_rent = FinanceRent.objects.filter(hub=godown, period=period_str).first()
+            if f_rent:
+                rent_val = float(f_rent.rent or 0)
+                tds_pct = float(f_rent.tds_percent or 10)
+                tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
+                rent_after_tds = float(f_rent.total_rent_after_tds if f_rent.total_rent_after_tds is not None else (rent_val - tds_amt))
+                gst_pct = float(f_rent.gst_percent or 18)
+                rent_inc_gst = float(f_rent.total_rent_including_gst if f_rent.total_rent_including_gst is not None else (rent_after_tds + (rent_after_tds * gst_pct / 100)))
+                electricity_bill = float(f_rent.electricity_bill or 0)
+                sorter_payments = float(f_rent.sorter_payments or 0)
+                petty_cash_rent = float(f_rent.petty_cash or 0)
+                total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + sorter_payments + petty_cash_rent))
+            else:
+                rent_val = float(godown.monthly_rent or 0)
+                tds_pct = 10.0
+                tds_amt = rent_val * 0.10
+                rent_after_tds = rent_val - tds_amt
+                gst_pct = 18.0
+                rent_inc_gst = rent_after_tds + (rent_after_tds * 0.18)
+                electricity_bill = 0.0
+                sorter_payments = 0.0
+                petty_cash_rent = 0.0
+                total_rent = rent_inc_gst
+
+            profit = total_revenue - total_rent
+            margin = profit - setup_cost
+            status_text = "Done" if (f_rent or (datetime.date(current_year, m, 1) <= timezone.now().date())) else "Pending"
+
+            sum_rev_rent += rev_rent
+            sum_setup_cost += setup_cost
+            sum_elec_rev += electricity_rev
+            sum_manpower += manpower
+            sum_housekeeping += housekeeping
+            sum_petty_rev += petty_cash_rev
+            sum_total_rev += total_revenue
+
+            sum_rent_outflow += rent_val
+            sum_tds_amt += tds_amt
+            sum_rent_after_tds += rent_after_tds
+            sum_rent_inc_gst += rent_inc_gst
+            sum_elec_bill += electricity_bill
+            sum_sorter += sorter_payments
+            sum_petty_rent += petty_cash_rent
+            sum_total_rent += total_rent
+            sum_profit += profit
+            sum_margin += margin
+
+            writer.writerow([
+                month_label, vendor_name, hub_status, state, hub_model, owner, erp_name,
+                start_date, end_date, tenure, area,
+                round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
+                round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+                round(profit, 2), round(margin, 2), status_text
+            ])
+
+        writer.writerow([
+            'ANNUAL TOTAL', vendor_name, hub_status, state, hub_model, owner, erp_name,
+            start_date, end_date, tenure, area,
+            round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
+            round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+            round(sum_profit, 2), round(sum_margin, 2), 'Done'
+        ])
+
+        return response
+
+    # TOTAL HUBS (PORTFOLIO SUMMARY) EXPORT
+    response['Content-Disposition'] = f'attachment; filename="rgs_all_hubs_financial_report_{current_year}.csv"'
     writer = csv.writer(response)
-    writer.writerow(['Godown ID', 'Facility Name', 'Code', 'City', 'Tenant', 'Rent Collected (INR)', 'Operating Expenses (INR)', 'Staff Expense (INR)', 'Net Operating Profit (INR)', 'Status'])
+    writer.writerow(template_headers)
 
     godowns = Godown.objects.filter(is_deleted=False).order_by('name')
+
+    sum_area = 0.0
+    sum_rev_rent = 0.0
+    sum_setup_cost = 0.0
+    sum_elec_rev = 0.0
+    sum_manpower = 0.0
+    sum_housekeeping = 0.0
+    sum_petty_rev = 0.0
+    sum_total_rev = 0.0
+
+    sum_rent_outflow = 0.0
+    sum_tds_amt = 0.0
+    sum_rent_after_tds = 0.0
+    sum_rent_inc_gst = 0.0
+    sum_elec_bill = 0.0
+    sum_sorter = 0.0
+    sum_petty_rent = 0.0
+    sum_total_rent = 0.0
+    sum_profit = 0.0
+    sum_margin = 0.0
+
     for godown in godowns:
-        rev = RentEntry.objects.filter(
-            godown=godown
-        ).filter(
-            Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
-        ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+        hub_status = godown.hub_status or godown.status or 'Active'
+        state = godown.state or 'ANDHRA PRADESH'
+        hub_model = godown.hub_model or 'OSH'
+        owner = godown.lease_contact_name or godown.current_tenant or 'Owner'
+        erp_name = godown.erp_name or godown.name or f'Hub #{godown.id}'
+        start_date = godown.lease_start_date.isoformat() if godown.lease_start_date else ''
+        end_date = godown.lease_end_date.isoformat() if godown.lease_end_date else ''
+        tenure = godown.lease_duration_months or ''
+        area = float(godown.size_sqft or godown.total_capacity or 0)
 
-        exp = Expense.objects.filter(
-            godown=godown,
-            is_deleted=False,
-            bill_date__year=current_year
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        # Revenue
+        f_rev = FinanceTotalRevenue.objects.filter(hub=godown).order_by('-financial_year', '-id').first()
+        rev_rent = float(f_rev.rent) if (f_rev and f_rev.rent is not None) else float(godown.monthly_rent or 0)
+        setup_cost = float(f_rev.setup_cost_per_month) if (f_rev and f_rev.setup_cost_per_month is not None) else 0.0
+        electricity_rev = float(f_rev.electricity) if (f_rev and f_rev.electricity is not None) else 0.0
+        manpower = float(f_rev.manpower) if (f_rev and f_rev.manpower is not None) else 0.0
+        housekeeping = float(f_rev.housekeeping) if (f_rev and f_rev.housekeeping is not None) else 0.0
+        petty_cash_rev = float(f_rev.wm_refreshment_petty_cash) if (f_rev and f_rev.wm_refreshment_petty_cash is not None) else 0.0
+        total_revenue = float(f_rev.total_revenue) if (f_rev and f_rev.total_revenue is not None) else (rev_rent + setup_cost + electricity_rev + manpower + housekeeping + petty_cash_rev)
 
-        sal = SalaryPayment.objects.filter(
-            employee__godown=godown,
-            status='PAID'
-        ).filter(
-            Q(payment_month__startswith=year_str) | Q(payment_date__year=current_year)
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        # Rent outflow (current month or latest)
+        now_month_str = timezone.now().strftime('%Y-%m')
+        f_rent = FinanceRent.objects.filter(hub=godown, period=now_month_str).first()
+        if not f_rent:
+            f_rent = FinanceRent.objects.filter(hub=godown).order_by('-period', '-id').first()
 
-        net = rev - (exp + sal)
+        if f_rent:
+            rent_val = float(f_rent.rent or 0)
+            tds_pct = float(f_rent.tds_percent or 10)
+            tds_amt = float(f_rent.tds_amount if f_rent.tds_amount is not None else (rent_val * tds_pct / 100))
+            rent_after_tds = float(f_rent.total_rent_after_tds if f_rent.total_rent_after_tds is not None else (rent_val - tds_amt))
+            gst_pct = float(f_rent.gst_percent or 18)
+            rent_inc_gst = float(f_rent.total_rent_including_gst if f_rent.total_rent_including_gst is not None else (rent_after_tds + (rent_after_tds * gst_pct / 100)))
+            electricity_bill = float(f_rent.electricity_bill or 0)
+            sorter_payments = float(f_rent.sorter_payments or 0)
+            petty_cash_rent = float(f_rent.petty_cash or 0)
+            total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + sorter_payments + petty_cash_rent))
+        else:
+            rent_val = float(godown.monthly_rent or 0)
+            tds_pct = 10.0
+            tds_amt = rent_val * 0.10
+            rent_after_tds = rent_val - tds_amt
+            gst_pct = 18.0
+            rent_inc_gst = rent_after_tds + (rent_after_tds * 0.18)
+            electricity_bill = 0.0
+            sorter_payments = 0.0
+            petty_cash_rent = 0.0
+            total_rent = rent_inc_gst
+
+        profit = total_revenue - total_rent
+        margin = profit - setup_cost
+        status_text = "Done"
+
+        sum_area += area
+        sum_rev_rent += rev_rent
+        sum_setup_cost += setup_cost
+        sum_elec_rev += electricity_rev
+        sum_manpower += manpower
+        sum_housekeeping += housekeeping
+        sum_petty_rev += petty_cash_rev
+        sum_total_rev += total_revenue
+
+        sum_rent_outflow += rent_val
+        sum_tds_amt += tds_amt
+        sum_rent_after_tds += rent_after_tds
+        sum_rent_inc_gst += rent_inc_gst
+        sum_elec_bill += electricity_bill
+        sum_sorter += sorter_payments
+        sum_petty_rent += petty_cash_rent
+        sum_total_rent += total_rent
+        sum_profit += profit
+        sum_margin += margin
+
         writer.writerow([
-            godown.id,
-            godown.name,
-            godown.code,
-            godown.city or "Hyderabad",
-            godown.current_tenant or "Vacant",
-            float(rev),
-            float(exp),
-            float(sal),
-            float(net),
-            godown.status
+            vendor_name, hub_status, state, hub_model, owner, erp_name,
+            start_date, end_date, tenure, area,
+            round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
+            round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+            round(profit, 2), round(margin, 2), status_text
         ])
+
+    writer.writerow([
+        'TOTAL', '', '', '', '', f"{len(godowns)} Hubs",
+        '', '', '', round(sum_area, 2),
+        round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
+        round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+        round(sum_profit, 2), round(sum_margin, 2), 'Done'
+    ])
 
     return response
 

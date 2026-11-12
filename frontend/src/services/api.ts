@@ -492,8 +492,17 @@ export const reportApi = {
     api.get('/reports/summary', { params: { year } }).then(unwrap),
   getGodownPnl: (year?: number) =>
     api.get('/reports/godown-pnl', { params: { year } }).then(unwrap),
-  exportCsvUrl: (year?: number) =>
-    `${API_BASE_URL}/reports/export-csv${year ? `?year=${year}` : ''}`,
+  exportCsvUrl: (params?: { year?: number; type?: 'total' | 'single'; hubId?: number | string } | number) => {
+    if (typeof params === 'number') {
+      return `${API_BASE_URL}/reports/export-csv?year=${params}`;
+    }
+    const q = new URLSearchParams();
+    if (params?.year) q.append('year', String(params.year));
+    if (params?.type) q.append('type', params.type);
+    if (params?.hubId) q.append('hubId', String(params.hubId));
+    const qs = q.toString();
+    return `${API_BASE_URL}/reports/export-csv${qs ? `?${qs}` : ''}`;
+  },
 };
 
 export const settingsApi = {

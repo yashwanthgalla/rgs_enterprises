@@ -8,33 +8,57 @@ import {
   Warehouse,
   Receipt,
   IndianRupee,
+  FileSpreadsheet,
+  CheckCircle2,
+  Building,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Select } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { FormField, Select } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
-import { reportApi } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { reportApi, godownApi } from '../services/api';
+import { Godown } from '../types';
+import { clsx } from 'clsx';
 
 export const Reports: React.FC = () => {
   const { formatCurrency } = useSettings();
+  const { success, error } = useToast();
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [summary, setSummary] = useState<any>(null);
   const [pnlList, setPnlList] = useState<any[]>([]);
+  const [godowns, setGodowns] = useState<Godown[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Export Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<'total' | 'single'>('total');
+  const [selectedExportHubId, setSelectedExportHubId] = useState<string>('');
+  const [exportYear, setExportYear] = useState(new Date().getFullYear());
 
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const [sRes, pnlRes] = await Promise.all([
+      const [sRes, pnlRes, gRes] = await Promise.all([
         reportApi.getSummary(selectedYear),
         reportApi.getGodownPnl(selectedYear),
+        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
       ]);
 
       setSummary(sRes);
       setPnlList(Array.isArray(pnlRes) ? pnlRes : []);
-    } catch (err) {
+
+      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+      setGodowns(gList);
+      if (gList.length > 0 && !selectedExportHubId) {
+        setSelectedExportHubId(String(gList[0].id));
+      }
+    } catch (err: any) {
       console.error('Failed to load reports:', err);
     } finally {
       setLoading(false);
@@ -45,32 +69,69 @@ export const Reports: React.FC = () => {
     fetchReports();
   }, [selectedYear]);
 
-  const handleExportCsv = () => {
-    window.open(reportApi.exportCsvUrl(selectedYear), '_blank');
+  const handleDownloadCsv = () => {
+    if (exportScope === 'single' && !selectedExportHubId) {
+      error('Please select a Hub facility to export its monthly data.');
+      return;
+    }
+
+    const downloadUrl = reportApi.exportCsvUrl({
+      year: exportYear,
+      type: exportScope,
+      hubId: exportScope === 'single' ? selectedExportHubId : undefined,
+    });
+
+    window.open(downloadUrl, '_blank');
+    success(
+      exportScope === 'total'
+        ? 'Exporting Total Hubs financial report matching template...'
+        : 'Exporting Single Hub monthly financial breakdown...'
+    );
+    setIsExportModalOpen(false);
   };
 
-  const totalIncome = summary?.totalRentalIncome ?? summary?.totalRentCollected ?? summary?.totalRentBilled ?? 0;
-  const totalExpense = summary?.totalOperatingExpenses ?? (Number(summary?.totalCompanyExpenses || 0) + Number(summary?.totalSalariesPaid || 0));
-  const netProfit = summary?.netOperatingIncome ?? summary?.netOperatingProfit ?? (totalIncome - totalExpense);
-  const marginPct = totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
+  const totalIncome =
+    summary?.totalRentalIncome ??
+    summary?.totalRentCollected ??
+    summary?.totalRentBilled ??
+    0;
+  const totalExpense =
+    summary?.totalOperatingExpenses ??
+    Number(summary?.totalCompanyExpenses || 0) +
+      Number(summary?.totalSalariesPaid || 0);
+  const netProfit =
+    summary?.netOperatingIncome ??
+    summary?.netOperatingProfit ??
+    totalIncome - totalExpense;
+  const marginPct =
+    totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
+
+  const selectedExportGodown = godowns.find(
+    (g) => String(g.id) === String(selectedExportHubId)
+  );
 
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-            Financial & Tax Reports
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
+            <BarChart3 className="w-6 h-6 text-apple-accent" />
+            <span>Financial & Tax Reports</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Annual P&L statement, net operating cash flow, and Hub profitability
+            Standard enterprise profit & loss statements, revenue ledgers, and template CSV exports
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Select
             value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            onChange={(e) => {
+              const y = Number(e.target.value);
+              setSelectedYear(y);
+              setExportYear(y);
+            }}
             className="w-32"
           >
             <option value={2025}>FY 2025</option>
@@ -79,9 +140,10 @@ export const Reports: React.FC = () => {
           </Select>
 
           <Button
-            onClick={handleExportCsv}
+            onClick={() => setIsExportModalOpen(true)}
             icon={<Download className="w-4 h-4" />}
-            variant="outline"
+            variant="primary"
+            className="rounded-xl shadow-apple-sm font-semibold"
           >
             Export CSV
           </Button>
@@ -91,27 +153,47 @@ export const Reports: React.FC = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Rental Income</span>
-          <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">{formatCurrency(totalIncome)}</p>
-          <span className="text-[11px] text-apple-success font-semibold mt-1 block">Revenue</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Total Rental Income
+          </span>
+          <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+            {formatCurrency(totalIncome)}
+          </p>
+          <span className="text-[11px] text-apple-success font-semibold mt-1 block">
+            Revenue
+          </span>
         </Card>
 
         <Card className="p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Expenses</span>
-          <p className="text-xl font-bold text-apple-danger mt-1">{formatCurrency(totalExpense)}</p>
-          <span className="text-[11px] text-gray-400 mt-1 block">Maintenance & utilities</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Total Expenses
+          </span>
+          <p className="text-xl font-bold text-apple-danger mt-1">
+            {formatCurrency(totalExpense)}
+          </p>
+          <span className="text-[11px] text-gray-400 mt-1 block">
+            Maintenance & utilities
+          </span>
         </Card>
 
         <Card className="p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Net Operating Income</span>
-          <p className={`text-xl font-bold mt-1 ${netProfit >= 0 ? 'text-apple-success' : 'text-apple-danger'}`}>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Net Operating Income
+          </span>
+          <p
+            className={`text-xl font-bold mt-1 ${
+              netProfit >= 0 ? 'text-apple-success' : 'text-apple-danger'
+            }`}
+          >
             {formatCurrency(netProfit)}
           </p>
           <span className="text-[11px] text-gray-400 mt-1 block">Net balance</span>
         </Card>
 
         <Card className="p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Operating Margin</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Operating Margin
+          </span>
           <p className="text-xl font-bold text-apple-accent mt-1">{marginPct}%</p>
           <span className="text-[11px] text-gray-400 mt-1 block">Profit efficiency</span>
         </Card>
@@ -119,9 +201,25 @@ export const Reports: React.FC = () => {
 
       {/* Hub-by-Hub P&L Table */}
       <Card className="p-6">
-        <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4">
-          Hub Profit & Loss Analysis ({selectedYear})
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              Hub Profit & Loss Analysis ({selectedYear})
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Live financial margins calculated from Total Revenue and Rent ledgers
+            </p>
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsExportModalOpen(true)}
+            icon={<FileSpreadsheet className="w-3.5 h-3.5" />}
+          >
+            Export Template Format
+          </Button>
+        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -151,11 +249,14 @@ export const Reports: React.FC = () => {
                 pnlList.map((row, idx) => {
                   const income = row.rentalIncome ?? row.rentIncome ?? 0;
                   const exp = row.operatingExpenses ?? 0;
-                  const net = row.netIncome ?? row.netProfit ?? (income - exp);
+                  const net = row.netIncome ?? row.netProfit ?? income - exp;
                   const mPct = income > 0 ? Math.round((net / income) * 100) : 0;
 
                   return (
-                    <tr key={idx} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                    <tr
+                      key={idx}
+                      className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                    >
                       <td className="py-3.5 px-3 font-bold text-gray-900 dark:text-gray-100">
                         {row.godownName}
                       </td>
@@ -165,7 +266,11 @@ export const Reports: React.FC = () => {
                       <td className="py-3.5 px-3 font-semibold text-apple-danger">
                         {formatCurrency(exp)}
                       </td>
-                      <td className={`py-3.5 px-3 font-bold ${net >= 0 ? 'text-apple-success' : 'text-apple-danger'}`}>
+                      <td
+                        className={`py-3.5 px-3 font-bold ${
+                          net >= 0 ? 'text-apple-success' : 'text-apple-danger'
+                        }`}
+                      >
                         {formatCurrency(net)}
                       </td>
                       <td className="py-3.5 px-3">
@@ -181,7 +286,143 @@ export const Reports: React.FC = () => {
           </table>
         </div>
       </Card>
+
+      {/* ========================================================================= */}
+      {/* EXPORT CSV MODAL WITH TEMPLATE OPTIONS                                    */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Financial Report (CSV)"
+        description="Choose export mode. Output is generated following the exact standardized enterprise template."
+      >
+        <div className="space-y-5">
+          {/* Export Scope Selector (Option 1: Total Hubs vs Option 2: Single Hub) */}
+          <div className="space-y-2.5">
+            <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              Select Export Option:
+            </label>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: Total Hubs Data */}
+              <div
+                onClick={() => setExportScope('total')}
+                className={clsx(
+                  'p-3.5 rounded-2xl border cursor-pointer transition-all duration-150 select-none flex flex-col justify-between',
+                  exportScope === 'total'
+                    ? 'border-apple-accent bg-apple-accent/[0.06] shadow-apple-sm ring-1 ring-apple-accent'
+                    : 'border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                )}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 rounded-xl bg-apple-accent/10 text-apple-accent">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  {exportScope === 'total' && (
+                    <CheckCircle2 className="w-4 h-4 text-apple-accent" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold text-xs text-gray-900 dark:text-gray-100">
+                    Total Hubs Data
+                  </h4>
+                  <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                    Portfolio statement covering all registered hubs with revenue, rent, and margin columns.
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 2: Single Hub Every Month Data */}
+              <div
+                onClick={() => setExportScope('single')}
+                className={clsx(
+                  'p-3.5 rounded-2xl border cursor-pointer transition-all duration-150 select-none flex flex-col justify-between',
+                  exportScope === 'single'
+                    ? 'border-apple-accent bg-apple-accent/[0.06] shadow-apple-sm ring-1 ring-apple-accent'
+                    : 'border-black/[0.08] dark:border-white/[0.08] hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                )}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  {exportScope === 'single' && (
+                    <CheckCircle2 className="w-4 h-4 text-apple-accent" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold text-xs text-gray-900 dark:text-gray-100">
+                    Single Hub (Every Month)
+                  </h4>
+                  <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                    Month-by-month financial ledger (Jan – Dec) for a specific hub with annual totals.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Conditional: Hub Selection dropdown if Single Hub selected */}
+          {exportScope === 'single' && (
+            <FormField label="Select Hub Facility" required>
+              <Select
+                value={selectedExportHubId}
+                onChange={(e) => setSelectedExportHubId(e.target.value)}
+              >
+                {godowns.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.erpName || g.name} {g.code ? `(${g.code})` : ''} - {g.state || g.city || 'Hub'}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          )}
+
+          {/* Year Selection */}
+          <FormField label="Financial Year">
+            <Select
+              value={exportYear}
+              onChange={(e) => setExportYear(Number(e.target.value))}
+            >
+              <option value={2025}>2025 (FY 2025-26)</option>
+              <option value={2026}>2026 (FY 2026-27)</option>
+              <option value={2027}>2027 (FY 2027-28)</option>
+            </Select>
+          </FormField>
+
+          {/* Template Format Details Card */}
+          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+              Standard Template Columns Exported:
+            </span>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed font-mono">
+              Vendor, Hub Status, State, Hub Model, Owner, ERP Name, Start Date, End Date, Tenure, Area, Rent, Setup Cost/Month, Electricity, Manpower, Housekeeping, WM Refreshment/Petty Cash, Total Revenue, Rent, TDS 10%, TDS Amount, Total Rent After TDS, GST 18%, Total Rent Including GST, Electricity Bill, Sorter Payments, Petty Cash, Total, Profit, Margin, Status
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsExportModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleDownloadCsv}
+              icon={<Download className="w-4 h-4" />}
+              className="rounded-xl shadow-apple-sm font-semibold"
+            >
+              {exportScope === 'total'
+                ? 'Export All Hubs CSV'
+                : `Export ${selectedExportGodown?.erpName || selectedExportGodown?.name || 'Hub'} CSV`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
-

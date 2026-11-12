@@ -940,7 +940,7 @@ export const Expenses: React.FC = () => {
                       onClick={handleAddBroadbandLine}
                       icon={<PlusCircle className="w-3.5 h-3.5" />}
                     >
-                      + Add Connection
+                      Add Connection
                     </Button>
 
                     {broadbandList.length > 0 && selectedGodown?.broadbandDetails && (
@@ -1072,7 +1072,7 @@ export const Expenses: React.FC = () => {
                         onClick={handleAddBroadbandLine}
                         icon={<PlusCircle className="w-3.5 h-3.5" />}
                       >
-                        + Add Another Connection
+                        Add Another Connection
                       </Button>
 
                       <Button

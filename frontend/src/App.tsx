@@ -41,8 +41,8 @@ export const App: React.FC = () => {
                   <Route path="finance/revenue" element={<Finance />} />
                   <Route path="finance/rent" element={<Finance />} />
                   <Route path="rent-ledger" element={<Navigate to="/finance/rent" replace />} />
-                  <Route path="expenses" element={<Expenses />} />
-                  <Route path="expenses/bills" element={<Expenses />} />
+                  <Route path="expenses" element={<Navigate to="/expenses/electricity" replace />} />
+                  <Route path="expenses/bills" element={<Navigate to="/expenses/electricity" replace />} />
                   <Route path="expenses/electricity" element={<Expenses />} />
                   <Route path="expenses/wifi" element={<Expenses />} />
                   <Route path="staff" element={<StaffDirectory />} />

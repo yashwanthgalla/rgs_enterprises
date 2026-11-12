@@ -67,7 +67,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       path: '/expenses',
       icon: Receipt,
       children: [
-        { label: 'Bills & Expenses', path: '/expenses/bills', icon: Receipt },
         { label: 'Electricity Information', path: '/expenses/electricity', icon: Zap },
         { label: 'WiFi Information', path: '/expenses/wifi', icon: Wifi },
       ],

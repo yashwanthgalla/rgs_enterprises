@@ -1085,94 +1085,87 @@ def reports_summary_view(request):
     current_year = int(year_param) if year_param else timezone.now().year
     year_str = f"{current_year:04d}"
 
-    # Year-wide totals
-    year_rents = RentEntry.objects.filter(
-        Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
-    )
-    total_rent_billed = year_rents.aggregate(total=Sum('due_amount'))['total'] or Decimal('0')
-    total_rent_collected = year_rents.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
-    total_rent_outstanding = max(Decimal('0'), total_rent_billed - total_rent_collected)
+    godowns = Godown.objects.filter(is_deleted=False)
+    
+    total_revenue_sum = Decimal('0')
+    total_rent_sum = Decimal('0')
+    total_setup_cost_sum = Decimal('0')
 
-    year_expenses = Expense.objects.filter(
-        is_deleted=False,
-        bill_date__year=current_year
-    )
-    total_company_expenses = year_expenses.filter(responsibility='COMPANY').aggregate(total=Sum('amount'))['total'] or Decimal('0')
-    total_tenant_expenses = year_expenses.filter(responsibility='TENANT').aggregate(total=Sum('amount'))['total'] or Decimal('0')
-    all_expenses_sum = year_expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-    if total_company_expenses == 0 and all_expenses_sum > 0:
-        total_company_expenses = all_expenses_sum
+    now_month_str = timezone.now().strftime('%Y-%m')
 
-    year_salaries = SalaryPayment.objects.filter(
-        Q(payment_month__startswith=year_str) | Q(payment_date__year=current_year),
-        status='PAID'
-    )
-    total_salaries_paid = year_salaries.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    for hub in godowns:
+        # Hub Total Revenue
+        hub_rev_rec = FinanceTotalRevenue.objects.filter(hub=hub).order_by('-financial_year', '-id').first()
+        if hub_rev_rec and hub_rev_rec.total_revenue is not None:
+            hub_revenue = Decimal(str(hub_rev_rec.total_revenue))
+            setup_cost = Decimal(str(hub_rev_rec.setup_cost_per_month or 0))
+        else:
+            hub_revenue = Decimal(str(hub.monthly_rent or '0'))
+            setup_cost = Decimal('0')
+        total_revenue_sum += hub_revenue
+        total_setup_cost_sum += setup_cost
 
-    total_operating_expenses = total_company_expenses + total_salaries_paid
-    effective_income = total_rent_collected if total_rent_collected > 0 else total_rent_billed
-    net_operating_income = effective_income - total_operating_expenses
+        # Hub Rent Outflow
+        hub_rent_rec = FinanceRent.objects.filter(hub=hub, period=now_month_str).first()
+        if not hub_rent_rec:
+            hub_rent_rec = FinanceRent.objects.filter(hub=hub).order_by('-period', '-id').first()
 
-    # Categories breakdown
-    cat_qs = year_expenses.values('category').annotate(total=Sum('amount'))
-    expenses_by_category = {item['category']: float(item['total']) for item in cat_qs}
+        if hub_rent_rec and hub_rent_rec.total is not None:
+            hub_rent = Decimal(str(hub_rent_rec.total))
+        else:
+            hub_rent = Decimal(str(hub.monthly_rent or '0'))
+        total_rent_sum += hub_rent
 
-    # Aggregate by month for the year
+    total_profit = total_revenue_sum - total_rent_sum
+    total_margin = total_profit - total_setup_cost_sum
+    margin_percent = round(float((total_profit / total_revenue_sum * 100) if total_revenue_sum > 0 else Decimal('0')), 1)
+
+    # Monthly breakdown for the year
     monthly_data = []
-    for month_num in range(1, 13):
-        month_str = f"{current_year:04d}-{month_num:02d}"
-        month_label = datetime.date(current_year, month_num, 1).strftime('%B')
+    for m in range(1, 13):
+        month_str = f"{current_year:04d}-{m:02d}"
+        month_label = datetime.date(current_year, m, 1).strftime('%B')
+        
+        m_rev = Decimal('0')
+        m_rent = Decimal('0')
+        for hub in godowns:
+            f_rev = FinanceTotalRevenue.objects.filter(hub=hub).order_by('-financial_year', '-id').first()
+            if f_rev and f_rev.total_revenue is not None:
+                m_rev += Decimal(str(f_rev.total_revenue))
+            else:
+                m_rev += Decimal(str(hub.monthly_rent or '0'))
 
-        rev = RentEntry.objects.filter(
-            Q(rent_month=month_str) | Q(payment_date__year=current_year, payment_date__month=month_num)
-        ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+            f_rent = FinanceRent.objects.filter(hub=hub, period=month_str).first()
+            if f_rent and f_rent.total is not None:
+                m_rent += Decimal(str(f_rent.total))
+            elif datetime.date(current_year, m, 1) <= timezone.now().date():
+                m_rent += Decimal(str(hub.monthly_rent or '0'))
 
-        billed = RentEntry.objects.filter(
-            Q(rent_month=month_str) | Q(due_date__year=current_year, due_date__month=month_num)
-        ).aggregate(total=Sum('due_amount'))['total'] or Decimal('0')
-
-        month_rev = rev if rev > 0 else billed
-
-        exp = Expense.objects.filter(
-            is_deleted=False,
-            bill_date__year=current_year,
-            bill_date__month=month_num
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-
-        sal = SalaryPayment.objects.filter(
-            Q(payment_month=month_str) | Q(payment_date__year=current_year, payment_date__month=month_num),
-            status='PAID'
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-
-        month_expense = exp + sal
-        net = month_rev - month_expense
-
+        m_profit = m_rev - m_rent
         monthly_data.append({
             "month": month_str,
             "monthName": month_label,
-            "revenue": float(month_rev),
-            "expenses": float(month_expense),
-            "netProfit": float(net)
+            "revenue": float(m_rev),
+            "expenses": float(m_rent),
+            "netProfit": float(m_profit),
+            "totalProfit": float(m_profit)
         })
 
     return api_success({
         "year": current_year,
         "startDate": f"{current_year}-01-01",
         "endDate": f"{current_year}-12-31",
-        "totalRentalIncome": float(effective_income),
-        "totalRentCollected": float(total_rent_collected),
-        "totalRentBilled": float(total_rent_billed),
-        "totalRentOutstanding": float(total_rent_outstanding),
-        "totalOperatingExpenses": float(total_operating_expenses),
-        "totalCompanyExpenses": float(total_company_expenses),
-        "totalTenantExpenses": float(total_tenant_expenses),
-        "totalSalariesPaid": float(total_salaries_paid),
-        "netOperatingIncome": float(net_operating_income),
-        "netOperatingProfit": float(net_operating_income),
-        "netProfit": float(net_operating_income),
-        "totalRevenue": float(effective_income),
-        "totalExpenses": float(total_operating_expenses),
-        "expensesByCategory": expenses_by_category,
+        "totalRentalIncome": float(total_revenue_sum),
+        "totalRevenue": float(total_revenue_sum),
+        "totalOperatingExpenses": float(total_rent_sum),
+        "totalExpenses": float(total_rent_sum),
+        "totalRentOutflow": float(total_rent_sum),
+        "netOperatingIncome": float(total_profit),
+        "netOperatingProfit": float(total_profit),
+        "netProfit": float(total_profit),
+        "totalProfit": float(total_profit),
+        "totalMargin": float(total_margin),
+        "marginPercent": margin_percent,
         "monthlyBreakdown": monthly_data
     })
 
@@ -1186,60 +1179,49 @@ def reports_godown_pnl_view(request):
 
     godowns = Godown.objects.filter(is_deleted=False).order_by('name')
     pnl_list = []
+    now_month_str = timezone.now().strftime('%Y-%m')
 
     for godown in godowns:
-        rev_paid = RentEntry.objects.filter(
-            godown=godown
-        ).filter(
-            Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
-        ).aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+        f_rev = FinanceTotalRevenue.objects.filter(hub=godown).order_by('-financial_year', '-id').first()
+        if f_rev and f_rev.total_revenue is not None:
+            hub_rev = Decimal(str(f_rev.total_revenue))
+            setup_cost = Decimal(str(f_rev.setup_cost_per_month or 0))
+        else:
+            hub_rev = Decimal(str(godown.monthly_rent or '0'))
+            setup_cost = Decimal('0')
 
-        rev_billed = RentEntry.objects.filter(
-            godown=godown
-        ).filter(
-            Q(rent_month__startswith=year_str) | Q(due_date__year=current_year) | Q(payment_date__year=current_year)
-        ).aggregate(total=Sum('due_amount'))['total'] or Decimal('0')
+        f_rent = FinanceRent.objects.filter(hub=godown, period=now_month_str).first()
+        if not f_rent:
+            f_rent = FinanceRent.objects.filter(hub=godown).order_by('-period', '-id').first()
 
-        rev = rev_paid if rev_paid > 0 else rev_billed
+        if f_rent and f_rent.total is not None:
+            hub_rent = Decimal(str(f_rent.total))
+        else:
+            hub_rent = Decimal(str(godown.monthly_rent or '0'))
 
-        exp = Expense.objects.filter(
-            godown=godown,
-            is_deleted=False,
-            bill_date__year=current_year
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-
-        sal = SalaryPayment.objects.filter(
-            employee__godown=godown,
-            status='PAID'
-        ).filter(
-            Q(payment_month__startswith=year_str) | Q(payment_date__year=current_year)
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-
-        total_exp = exp + sal
-        net = rev - total_exp
-        margin = (net / rev * 100) if rev > 0 else Decimal('0')
+        hub_profit = hub_rev - hub_rent
+        hub_margin = hub_profit - setup_cost
+        margin_pct = round(float((hub_profit / hub_rev * 100) if hub_rev > 0 else 0), 1)
 
         pnl_list.append({
             "godownId": godown.id,
-            "godownName": godown.name,
+            "godownName": godown.erp_name or godown.name,
             "godownCode": godown.code,
             "city": godown.city or "Hyderabad",
             "tenantName": godown.current_tenant or "Vacant",
-            "occupancyStatus": godown.status,
-            "rentalIncome": float(rev),
-            "rentIncome": float(rev),
-            "grossRentCollected": float(rev_paid),
-            "rentBilled": float(rev_billed),
-            "revenue": float(rev),
-            "operatingExpenses": float(total_exp),
-            "utilityAndMaintExpenses": float(exp),
-            "staffExpense": float(sal),
-            "expenses": float(total_exp),
-            "netIncome": float(net),
-            "netOperatingIncome": float(net),
-            "netProfit": float(net),
-            "margin": round(float(margin), 1),
-            "profitMargin": round(float(margin), 1)
+            "status": godown.status,
+            "totalRevenue": float(hub_rev),
+            "rentalIncome": float(hub_rev),
+            "revenue": float(hub_rev),
+            "totalRent": float(hub_rent),
+            "operatingExpenses": float(hub_rent),
+            "expenses": float(hub_rent),
+            "totalProfit": float(hub_profit),
+            "netProfit": float(hub_profit),
+            "netOperatingIncome": float(hub_profit),
+            "netIncome": float(hub_profit),
+            "margin": float(hub_margin),
+            "profitMargin": margin_pct,
         })
 
     return api_success(pnl_list)

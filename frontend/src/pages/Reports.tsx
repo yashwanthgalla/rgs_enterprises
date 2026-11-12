@@ -90,21 +90,43 @@ export const Reports: React.FC = () => {
     setIsExportModalOpen(false);
   };
 
-  const totalIncome =
+  const totalRevenue =
+    summary?.totalRevenue ??
     summary?.totalRentalIncome ??
     summary?.totalRentCollected ??
-    summary?.totalRentBilled ??
     0;
-  const totalExpense =
+  const totalRent =
+    summary?.totalRentOutflow ??
     summary?.totalOperatingExpenses ??
-    Number(summary?.totalCompanyExpenses || 0) +
-      Number(summary?.totalSalariesPaid || 0);
-  const netProfit =
+    summary?.totalExpenses ??
+    0;
+  const totalProfit =
+    summary?.totalProfit ??
     summary?.netOperatingIncome ??
-    summary?.netOperatingProfit ??
-    totalIncome - totalExpense;
+    summary?.netProfit ??
+    totalRevenue - totalRent;
+  const totalMargin = summary?.totalMargin ?? totalProfit;
   const marginPct =
-    totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
+    summary?.marginPercent ??
+    (totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0);
+
+  // Sums across PnL list for table footer
+  const tableTotalRevenue = pnlList.reduce(
+    (acc, r) => acc + Number(r.totalRevenue ?? r.rentalIncome ?? 0),
+    0
+  );
+  const tableTotalRent = pnlList.reduce(
+    (acc, r) => acc + Number(r.totalRent ?? r.operatingExpenses ?? 0),
+    0
+  );
+  const tableTotalProfit = pnlList.reduce(
+    (acc, r) => acc + Number(r.totalProfit ?? r.netProfit ?? 0),
+    0
+  );
+  const tableTotalMargin = pnlList.reduce(
+    (acc, r) => acc + Number(r.margin ?? 0),
+    0
+  );
 
   const selectedExportGodown = godowns.find(
     (g) => String(g.id) === String(selectedExportHubId)
@@ -154,48 +176,54 @@ export const Reports: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="p-4">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-            Total Rental Income
+            Total Revenue
           </span>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-            {formatCurrency(totalIncome)}
+            {formatCurrency(totalRevenue)}
           </p>
           <span className="text-[11px] text-apple-success font-semibold mt-1 block">
-            Revenue
+            Portfolio Revenue
           </span>
         </Card>
 
         <Card className="p-4">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-            Total Expenses
+            Total Rent Outflow
           </span>
           <p className="text-xl font-bold text-apple-danger mt-1">
-            {formatCurrency(totalExpense)}
+            {formatCurrency(totalRent)}
           </p>
           <span className="text-[11px] text-gray-400 mt-1 block">
-            Maintenance & utilities
+            Rent & operational outflow
           </span>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 border-l-4 border-l-apple-success">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-            Net Operating Income
+            Total Profit
           </span>
           <p
-            className={`text-xl font-bold mt-1 ${
-              netProfit >= 0 ? 'text-apple-success' : 'text-apple-danger'
+            className={`text-xl font-extrabold mt-1 ${
+              totalProfit >= 0 ? 'text-apple-success' : 'text-apple-danger'
             }`}
           >
-            {formatCurrency(netProfit)}
+            {formatCurrency(totalProfit)}
           </p>
-          <span className="text-[11px] text-gray-400 mt-1 block">Net balance</span>
+          <span className="text-[11px] text-apple-success font-semibold mt-1 block">
+            Total Revenue − Total Rent
+          </span>
         </Card>
 
         <Card className="p-4">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-            Operating Margin
+            Total Margin
           </span>
-          <p className="text-xl font-bold text-apple-accent mt-1">{marginPct}%</p>
-          <span className="text-[11px] text-gray-400 mt-1 block">Profit efficiency</span>
+          <p className="text-xl font-bold text-apple-accent mt-1">
+            {formatCurrency(totalMargin)}
+          </p>
+          <span className="text-[11px] text-gray-400 mt-1 block">
+            Margin Efficiency ({marginPct}%)
+          </span>
         </Card>
       </div>
 
@@ -207,7 +235,7 @@ export const Reports: React.FC = () => {
               Hub Profit & Loss Analysis ({selectedYear})
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Live financial margins calculated from Total Revenue and Rent ledgers
+              Live financial margins and Total Profit calculated from Total Revenue and Rent ledgers
             </p>
           </div>
 
@@ -226,61 +254,106 @@ export const Reports: React.FC = () => {
             <thead>
               <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
                 <th className="py-3 px-3">Hub Facility</th>
-                <th className="py-3 px-3">Gross Rent Collected</th>
-                <th className="py-3 px-3">Utility & Maint. Expenses</th>
-                <th className="py-3 px-3">Net Operating Income</th>
+                <th className="py-3 px-3">Total Revenue</th>
+                <th className="py-3 px-3">Total Rent Outflow</th>
+                <th className="py-3 px-3">Total Profit</th>
                 <th className="py-3 px-3">Margin</th>
+                <th className="py-3 px-3 text-right">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-400">
+                  <td colSpan={6} className="py-12 text-center text-gray-400">
                     Computing financial summary...
                   </td>
                 </tr>
               ) : pnlList.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-400">
+                  <td colSpan={6} className="py-12 text-center text-gray-400">
                     No financial data recorded for {selectedYear}.
                   </td>
                 </tr>
               ) : (
-                pnlList.map((row, idx) => {
-                  const income = row.rentalIncome ?? row.rentIncome ?? 0;
-                  const exp = row.operatingExpenses ?? 0;
-                  const net = row.netIncome ?? row.netProfit ?? income - exp;
-                  const mPct = income > 0 ? Math.round((net / income) * 100) : 0;
+                <>
+                  {pnlList.map((row, idx) => {
+                    const rowRev = Number(row.totalRevenue ?? row.rentalIncome ?? 0);
+                    const rowRent = Number(row.totalRent ?? row.operatingExpenses ?? 0);
+                    const rowProfit = Number(row.totalProfit ?? row.netProfit ?? (rowRev - rowRent));
+                    const rowMargin = Number(row.margin ?? 0);
+                    const mPct = rowRev > 0 ? Math.round((rowProfit / rowRev) * 100) : 0;
 
-                  return (
-                    <tr
-                      key={idx}
-                      className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
-                    >
-                      <td className="py-3.5 px-3 font-bold text-gray-900 dark:text-gray-100">
-                        {row.godownName}
-                      </td>
-                      <td className="py-3.5 px-3 font-semibold text-apple-success">
-                        {formatCurrency(income)}
-                      </td>
-                      <td className="py-3.5 px-3 font-semibold text-apple-danger">
-                        {formatCurrency(exp)}
-                      </td>
-                      <td
-                        className={`py-3.5 px-3 font-bold ${
-                          net >= 0 ? 'text-apple-success' : 'text-apple-danger'
-                        }`}
+                    return (
+                      <tr
+                        key={idx}
+                        className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                       >
-                        {formatCurrency(net)}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <Badge variant={net >= 0 ? 'success' : 'danger'} size="sm">
-                          {mPct}%
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })
+                        <td className="py-3.5 px-3">
+                          <p className="font-bold text-gray-900 dark:text-gray-100">
+                            {row.godownName}
+                          </p>
+                          {row.godownCode && (
+                            <p className="text-[10px] text-gray-400 font-mono">
+                              {row.godownCode} • {row.city || 'Hub'}
+                            </p>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
+                          {formatCurrency(rowRev)}
+                        </td>
+                        <td className="py-3.5 px-3 font-semibold text-apple-danger">
+                          {formatCurrency(rowRent)}
+                        </td>
+                        <td
+                          className={`py-3.5 px-3 font-extrabold ${
+                            rowProfit >= 0 ? 'text-apple-success' : 'text-apple-danger'
+                          }`}
+                        >
+                          {formatCurrency(rowProfit)}
+                        </td>
+                        <td className="py-3.5 px-3 font-semibold text-apple-accent">
+                          {formatCurrency(rowMargin)}
+                          <span className="text-[10px] text-gray-400 ml-1.5">
+                            ({mPct}%)
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3 text-right">
+                          <Badge variant={rowProfit >= 0 ? 'success' : 'danger'} size="sm">
+                            {rowProfit >= 0 ? 'Profitable' : 'Deficit'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Summary Total Row */}
+                  <tr className="bg-black/[0.03] dark:bg-white/[0.04] font-bold border-t-2 border-black/[0.08] dark:border-white/[0.08]">
+                    <td className="py-3.5 px-3 uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                      TOTAL ({pnlList.length} Hub{pnlList.length !== 1 ? 's' : ''})
+                    </td>
+                    <td className="py-3.5 px-3 text-gray-900 dark:text-gray-100">
+                      {formatCurrency(tableTotalRevenue)}
+                    </td>
+                    <td className="py-3.5 px-3 text-apple-danger">
+                      {formatCurrency(tableTotalRent)}
+                    </td>
+                    <td
+                      className={`py-3.5 px-3 font-black text-sm ${
+                        tableTotalProfit >= 0 ? 'text-apple-success' : 'text-apple-danger'
+                      }`}
+                    >
+                      {formatCurrency(tableTotalProfit)}
+                    </td>
+                    <td className="py-3.5 px-3 text-apple-accent">
+                      {formatCurrency(tableTotalMargin)}
+                    </td>
+                    <td className="py-3.5 px-3 text-right">
+                      <Badge variant="accent" size="sm">
+                        Portfolio Total
+                      </Badge>
+                    </td>
+                  </tr>
+                </>
               )}
             </tbody>
           </table>

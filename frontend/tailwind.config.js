@@ -9,23 +9,28 @@ export default {
     extend: {
       colors: {
         apple: {
-          bg: '#F5F5F7',
+          bg: '#0a0a0c',
           darkBg: '#0a0a0c',
-          surface: '#FFFFFF',
+          surface: '#121315',
           darkSurface: '#121315',
-          card: 'rgba(255, 255, 255, 0.82)',
+          card: '#121315',
           darkCard: '#121315',
-          border: 'rgba(0, 0, 0, 0.08)',
+          border: '#222325',
           darkBorder: '#222325',
-          accent: '#0071E3',
-          accentHover: '#0077ED',
+          accent: '#c8303a',
+          accentHover: '#e03642',
           brand: '#c8303a',
-          brandHover: '#b2252e',
-          secondary: '#86868B',
+          brandHover: '#e03642',
+          button: '#16161a',
+          buttonHover: '#1f2024',
+          secondary: '#d6d6d5',
+          textPrimary: '#faf8f9',
+          textSecondary: '#e5e5e4',
+          textMuted: '#d6d6d5',
           success: '#34C759',
           warning: '#FF9500',
           danger: '#FF3B30',
-          info: '#5856D6',
+          info: '#c8303a',
         }
       },
       fontFamily: {
@@ -41,10 +46,11 @@ export default {
         ],
       },
       boxShadow: {
-        'apple-sm': '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
-        'apple-md': '0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04)',
-        'apple-lg': '0 16px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04)',
-        'apple-modal': '0 24px 60px rgba(0, 0, 0, 0.18), 0 8px 20px rgba(0, 0, 0, 0.08)',
+        'apple-sm': '0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2)',
+        'apple-md': '0 8px 24px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4)',
+        'apple-lg': '0 16px 40px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.4)',
+        'apple-modal': '0 24px 60px rgba(0, 0, 0, 0.9), 0 8px 20px rgba(0, 0, 0, 0.6)',
+        'brand-glow': '0 0 25px -4px rgba(200, 48, 58, 0.35)',
       },
       keyframes: {
         fadeIn: {
@@ -69,4 +75,3 @@ export default {
   },
   plugins: [],
 }
-

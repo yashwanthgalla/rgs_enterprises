@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Zap,
   Wifi,
-  Building,
   Save,
   ExternalLink,
   PlusCircle,
@@ -13,10 +12,6 @@ import {
   Info,
   Pencil,
   X,
-  CheckCircle,
-  Search,
-  Filter,
-  RotateCcw,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -53,18 +48,10 @@ export const Expenses: React.FC = () => {
   const [electricityServiceNumber, setElectricityServiceNumber] = useState('');
   const [savingElectricity, setSavingElectricity] = useState(false);
 
-  // Electricity Search & Filter State
-  const [elecSearchQuery, setElecSearchQuery] = useState('');
-  const [elecStatusFilter, setElecStatusFilter] = useState<'ALL' | 'CONFIGURED' | 'PENDING'>('ALL');
-
   // WiFi State
   const [isWifiEditing, setIsWifiEditing] = useState(false);
   const [broadbandList, setBroadbandList] = useState<BroadbandConnection[]>([]);
   const [savingWifi, setSavingWifi] = useState(false);
-
-  // WiFi Search & Filter State
-  const [wifiSearchQuery, setWifiSearchQuery] = useState('');
-  const [wifiStatusFilter, setWifiStatusFilter] = useState<'ALL' | 'CONFIGURED' | 'PENDING'>('ALL');
 
   const fetchGodowns = async () => {
     setLoading(true);
@@ -224,54 +211,14 @@ export const Expenses: React.FC = () => {
     );
   };
 
-  // Filtered Hubs for Electricity
-  const filteredElecHubs = godowns.filter((g) => {
-    const isConfigured = Boolean((g.electricityProvider || '').trim() || (g.electricityServiceNumber || '').trim());
-    if (elecStatusFilter === 'CONFIGURED' && !isConfigured) return false;
-    if (elecStatusFilter === 'PENDING' && isConfigured) return false;
-
-    if (elecSearchQuery.trim()) {
-      const q = elecSearchQuery.toLowerCase().trim();
-      const matchName = (g.erpName || g.name || '').toLowerCase().includes(q);
-      const matchCode = (g.code || '').toLowerCase().includes(q);
-      const matchCity = (g.city || g.location || '').toLowerCase().includes(q);
-      const matchProvider = (g.electricityProvider || '').toLowerCase().includes(q);
-      const matchService = (g.electricityServiceNumber || '').toLowerCase().includes(q);
-      return matchName || matchCode || matchCity || matchProvider || matchService;
+  // Handle "Add New" button on top left
+  const handleAddNew = () => {
+    if (activeTab === 'electricity') {
+      setIsElectricityEditing(true);
+    } else {
+      handleAddBroadbandLine();
     }
-    return true;
-  });
-
-  const configuredElecCount = godowns.filter((g) =>
-    Boolean((g.electricityProvider || '').trim() || (g.electricityServiceNumber || '').trim())
-  ).length;
-
-  // Filtered Hubs for WiFi
-  const filteredWifiHubs = godowns.filter((g) => {
-    const bbs = Array.isArray(g.broadbandDetails) ? g.broadbandDetails : [];
-    const hasLines = bbs.length > 0;
-    if (wifiStatusFilter === 'CONFIGURED' && !hasLines) return false;
-    if (wifiStatusFilter === 'PENDING' && hasLines) return false;
-
-    if (wifiSearchQuery.trim()) {
-      const q = wifiSearchQuery.toLowerCase().trim();
-      const matchName = (g.erpName || g.name || '').toLowerCase().includes(q);
-      const matchCode = (g.code || '').toLowerCase().includes(q);
-      const matchCity = (g.city || g.location || '').toLowerCase().includes(q);
-      const matchLines = bbs.some((b) =>
-        (b.networkProvider || '').toLowerCase().includes(q) ||
-        (b.accountNumber || '').toLowerCase().includes(q) ||
-        (b.userId || '').toLowerCase().includes(q) ||
-        (b.registeredMobileNumber || b.registeredMobile || '').toLowerCase().includes(q)
-      );
-      return matchName || matchCode || matchCity || matchLines;
-    }
-    return true;
-  });
-
-  const configuredWifiCount = godowns.filter(
-    (g) => Array.isArray(g.broadbandDetails) && g.broadbandDetails.length > 0
-  ).length;
+  };
 
   const hasSavedElectricity = Boolean(selectedGodown?.electricityProvider || selectedGodown?.electricityServiceNumber);
 
@@ -285,40 +232,71 @@ export const Expenses: React.FC = () => {
             <span>Information</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Search, filter, and configure facility electricity connections and WiFi networks across all hubs
+            Manage facility electricity connections and WiFi networks across all hubs
           </p>
         </div>
       </div>
 
-      {/* Sub-Tabs Bar: Electricity Information / WiFi Information */}
-      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] w-fit">
-        <button
-          type="button"
-          onClick={() => handleTabChange('electricity')}
-          className={clsx(
-            'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all duration-150',
-            activeTab === 'electricity'
-              ? 'bg-apple-accent text-white shadow-apple-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
-          )}
-        >
-          <Zap className="w-3.5 h-3.5" />
-          <span>Electricity Information</span>
-        </button>
+      {/* Top Controls: "Add New" on top left, Subtabs, and Hub selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Add New Button on top left */}
+          <Button
+            variant="primary"
+            onClick={handleAddNew}
+            icon={<Plus className="w-4 h-4" />}
+            className="rounded-xl shadow-apple-sm text-xs font-semibold px-4 py-2"
+          >
+            Add New
+          </Button>
 
-        <button
-          type="button"
-          onClick={() => handleTabChange('wifi')}
-          className={clsx(
-            'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-tight transition-all duration-150',
-            activeTab === 'wifi'
-              ? 'bg-apple-accent text-white shadow-apple-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
-          )}
-        >
-          <Wifi className="w-3.5 h-3.5" />
-          <span>WiFi Information</span>
-        </button>
+          {/* Sub-Tabs: Electricity Information / WiFi Information */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08]">
+            <button
+              type="button"
+              onClick={() => handleTabChange('electricity')}
+              className={clsx(
+                'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold tracking-tight transition-all duration-150',
+                activeTab === 'electricity'
+                  ? 'bg-apple-accent text-white shadow-apple-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+              )}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Electricity Information</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange('wifi')}
+              className={clsx(
+                'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold tracking-tight transition-all duration-150',
+                activeTab === 'wifi'
+                  ? 'bg-apple-accent text-white shadow-apple-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+              )}
+            >
+              <Wifi className="w-3.5 h-3.5" />
+              <span>WiFi Information</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Hub Selector on the right */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 font-semibold shrink-0">Select Hub:</span>
+          <Select
+            value={selectedHubId}
+            onChange={(e) => setSelectedHubId(e.target.value)}
+            className="text-xs h-9 font-semibold min-w-[220px]"
+          >
+            {godowns.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -326,117 +304,11 @@ export const Expenses: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'electricity' && (
         <div className="space-y-6">
-          {/* Search and Filter Toolbar for Electricity */}
-          <Card className="p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <span>Search & Filter Electricity Hubs</span>
-                    <Badge variant="neutral" size="sm">
-                      {filteredElecHubs.length} of {godowns.length} Hubs
-                    </Badge>
-                  </h3>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                    Search and filter facilities by name, code, power provider, or service / USC connection number.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  {configuredElecCount} Configured
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  <Info className="w-3.5 h-3.5" />
-                  {godowns.length - configuredElecCount} Pending
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
-              {/* Search text input */}
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <Input
-                  placeholder="Search by hub name, code, city, provider, service number..."
-                  value={elecSearchQuery}
-                  onChange={(e) => setElecSearchQuery(e.target.value)}
-                  className="pl-9 pr-8 text-xs h-9"
-                />
-                {elecSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setElecSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <Select
-                  value={elecStatusFilter}
-                  onChange={(e) => setElecStatusFilter(e.target.value as any)}
-                  className="text-xs h-9 font-semibold min-w-[170px]"
-                >
-                  <option value="ALL">All Statuses ({godowns.length})</option>
-                  <option value="CONFIGURED">Configured ({configuredElecCount})</option>
-                  <option value="PENDING">Pending Setup ({godowns.length - configuredElecCount})</option>
-                </Select>
-              </div>
-
-              {/* Hub Dropdown Selector */}
-              <div className="flex items-center gap-2">
-                <Select
-                  value={selectedHubId}
-                  onChange={(e) => setSelectedHubId(e.target.value)}
-                  className="text-xs h-9 font-semibold min-w-[210px]"
-                >
-                  {filteredElecHubs.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                    </option>
-                  ))}
-                  {filteredElecHubs.length === 0 && (
-                    <option value="" disabled>
-                      No matching hubs
-                    </option>
-                  )}
-                </Select>
-              </div>
-
-              {/* Reset Filter Button */}
-              {(elecSearchQuery || elecStatusFilter !== 'ALL') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setElecSearchQuery('');
-                    setElecStatusFilter('ALL');
-                  }}
-                  icon={<RotateCcw className="w-3 h-3" />}
-                  className="h-9 px-2 text-xs text-gray-500 hover:text-gray-800 shrink-0"
-                  title="Reset Filters"
-                >
-                  Reset
-                </Button>
-              )}
-            </div>
-          </Card>
-
           {/* Active Hub Electricity Connection Card */}
           {selectedGodown ? (
             <div>
               {!isElectricityEditing && hasSavedElectricity ? (
-                /* SAVED DISPLAY CARD */
+                /* SAVED DISPLAY CARD (Matches Reference Image) */
                 <Card className="p-6 overflow-hidden relative">
                   {/* Card Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
@@ -598,120 +470,11 @@ export const Expenses: React.FC = () => {
                 </Card>
               )}
             </div>
-          ) : null}
-
-          {/* All Hubs Electricity Overview Table */}
-          <Card className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
-                  <Building className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <span>Facilities Electricity Overview</span>
-                    <Badge variant="neutral" size="sm">
-                      {filteredElecHubs.length} {filteredElecHubs.length === 1 ? 'Hub' : 'Hubs'}
-                    </Badge>
-                  </h4>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    Click any facility to view or edit its electricity configuration.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="py-8 text-center text-xs text-gray-400">Loading facilities...</div>
-            ) : filteredElecHubs.length === 0 ? (
-              <div className="py-8 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400 space-y-2">
-                <p>No facilities match your search query &quot;{elecSearchQuery}&quot;.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setElecSearchQuery('');
-                    setElecStatusFilter('ALL');
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
-                      <th className="py-2.5 px-3">Hub Facility</th>
-                      <th className="py-2.5 px-3">City / Location</th>
-                      <th className="py-2.5 px-3">Electricity Provider</th>
-                      <th className="py-2.5 px-3">Service / USC Number</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                    {filteredElecHubs.map((g) => {
-                      const isConfig = Boolean((g.electricityProvider || '').trim() || (g.electricityServiceNumber || '').trim());
-                      const isSelected = String(g.id) === String(selectedHubId);
-                      return (
-                        <tr
-                          key={g.id}
-                          className={clsx(
-                            'transition-colors cursor-pointer',
-                            isSelected
-                              ? 'bg-amber-500/5 dark:bg-amber-500/10'
-                              : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
-                          )}
-                          onClick={() => setSelectedHubId(String(g.id))}
-                        >
-                          <td className="py-2.5 px-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900 dark:text-gray-100">
-                                {g.erpName || g.name}
-                              </span>
-                              {g.code && <Badge variant="accent" size="sm">{g.code}</Badge>}
-                              {isSelected && (
-                                <Badge variant="neutral" size="sm">Active</Badge>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
-                            {g.city || g.location || '—'}
-                          </td>
-                          <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
-                            {g.electricityProvider || <span className="text-gray-400 font-normal italic">Not set</span>}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-medium text-gray-700 dark:text-gray-300">
-                            {g.electricityServiceNumber || <span className="text-gray-400 font-normal italic">—</span>}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <Badge variant={isConfig ? 'success' : 'warning'} size="sm">
-                              {isConfig ? 'Configured' : 'Pending'}
-                            </Badge>
-                          </td>
-                          <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant={isSelected ? 'primary' : 'outline'}
-                              size="sm"
-                              onClick={() => {
-                                setSelectedHubId(String(g.id));
-                                setIsElectricityEditing(true);
-                              }}
-                              icon={<Pencil className="w-3 h-3" />}
-                              className="text-[11px] h-7 px-2.5"
-                            >
-                              Edit
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
+          ) : (
+            <Card className="p-8 text-center text-xs text-gray-400">
+              {loading ? 'Loading hub facilities...' : 'No hub facilities found.'}
+            </Card>
+          )}
         </div>
       )}
 
@@ -720,112 +483,6 @@ export const Expenses: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'wifi' && (
         <div className="space-y-6">
-          {/* Search and Filter Toolbar for WiFi */}
-          <Card className="p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
-                  <Wifi className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <span>Search & Filter WiFi & Broadband Hubs</span>
-                    <Badge variant="neutral" size="sm">
-                      {filteredWifiHubs.length} of {godowns.length} Hubs
-                    </Badge>
-                  </h3>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                    Search and filter facilities by name, code, ISP network provider, account number, or user ID.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  {configuredWifiCount} With WiFi
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  <Info className="w-3.5 h-3.5" />
-                  {godowns.length - configuredWifiCount} No Connections
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
-              {/* Search text input */}
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <Input
-                  placeholder="Search by hub name, code, provider (Airtel, ACT, Jio), account no..."
-                  value={wifiSearchQuery}
-                  onChange={(e) => setWifiSearchQuery(e.target.value)}
-                  className="pl-9 pr-8 text-xs h-9"
-                />
-                {wifiSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setWifiSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <Select
-                  value={wifiStatusFilter}
-                  onChange={(e) => setWifiStatusFilter(e.target.value as any)}
-                  className="text-xs h-9 font-semibold min-w-[170px]"
-                >
-                  <option value="ALL">All Statuses ({godowns.length})</option>
-                  <option value="CONFIGURED">With WiFi ({configuredWifiCount})</option>
-                  <option value="PENDING">No Connections ({godowns.length - configuredWifiCount})</option>
-                </Select>
-              </div>
-
-              {/* Hub Dropdown Selector */}
-              <div className="flex items-center gap-2">
-                <Select
-                  value={selectedHubId}
-                  onChange={(e) => setSelectedHubId(e.target.value)}
-                  className="text-xs h-9 font-semibold min-w-[210px]"
-                >
-                  {filteredWifiHubs.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                    </option>
-                  ))}
-                  {filteredWifiHubs.length === 0 && (
-                    <option value="" disabled>
-                      No matching hubs
-                    </option>
-                  )}
-                </Select>
-              </div>
-
-              {/* Reset Filter Button */}
-              {(wifiSearchQuery || wifiStatusFilter !== 'ALL') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setWifiSearchQuery('');
-                    setWifiStatusFilter('ALL');
-                  }}
-                  icon={<RotateCcw className="w-3 h-3" />}
-                  className="h-9 px-2 text-xs text-gray-500 hover:text-gray-800 shrink-0"
-                  title="Reset Filters"
-                >
-                  Reset
-                </Button>
-              )}
-            </div>
-          </Card>
-
           {/* Active Hub Broadband Connections Card */}
           {selectedGodown ? (
             <div>
@@ -971,7 +628,7 @@ export const Expenses: React.FC = () => {
                         <Button
                           type="submit"
                           loading={savingWifi}
-                          icon={<Save className="w-3.5 h-3.5" />}
+                          icon={<Save className="w-4 h-4" />}
                           className="rounded-xl shadow-apple-sm"
                         >
                           Save WiFi Details
@@ -1104,130 +761,11 @@ export const Expenses: React.FC = () => {
                 </form>
               )}
             </div>
-          ) : null}
-
-          {/* All Hubs WiFi Overview Table */}
-          <Card className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
-                  <Building className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <span>Facilities WiFi & Broadband Overview</span>
-                    <Badge variant="neutral" size="sm">
-                      {filteredWifiHubs.length} {filteredWifiHubs.length === 1 ? 'Hub' : 'Hubs'}
-                    </Badge>
-                  </h4>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    Click any facility to view or configure its broadband network connections.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="py-8 text-center text-xs text-gray-400">Loading facilities...</div>
-            ) : filteredWifiHubs.length === 0 ? (
-              <div className="py-8 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400 space-y-2">
-                <p>No facilities match your search query &quot;{wifiSearchQuery}&quot;.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setWifiSearchQuery('');
-                    setWifiStatusFilter('ALL');
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
-                      <th className="py-2.5 px-3">Hub Facility</th>
-                      <th className="py-2.5 px-3">City / Location</th>
-                      <th className="py-2.5 px-3">Broadband Lines</th>
-                      <th className="py-2.5 px-3">Active Providers</th>
-                      <th className="py-2.5 px-3">Account / Consumer IDs</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                    {filteredWifiHubs.map((g) => {
-                      const bbs = Array.isArray(g.broadbandDetails) ? g.broadbandDetails : [];
-                      const hasLines = bbs.length > 0;
-                      const providers = Array.from(new Set(bbs.map((b) => b.networkProvider).filter(Boolean))).join(', ');
-                      const accountNos = bbs.map((b) => b.accountNumber).filter(Boolean).join(', ');
-                      const isSelected = String(g.id) === String(selectedHubId);
-
-                      return (
-                        <tr
-                          key={g.id}
-                          className={clsx(
-                            'transition-colors cursor-pointer',
-                            isSelected
-                              ? 'bg-cyan-500/5 dark:bg-cyan-500/10'
-                              : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
-                          )}
-                          onClick={() => setSelectedHubId(String(g.id))}
-                        >
-                          <td className="py-2.5 px-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900 dark:text-gray-100">
-                                {g.erpName || g.name}
-                              </span>
-                              {g.code && <Badge variant="accent" size="sm">{g.code}</Badge>}
-                              {isSelected && (
-                                <Badge variant="neutral" size="sm">Active</Badge>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
-                            {g.city || g.location || '—'}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <Badge variant={hasLines ? 'accent' : 'neutral'} size="sm">
-                              {bbs.length} {bbs.length === 1 ? 'Line' : 'Lines'}
-                            </Badge>
-                          </td>
-                          <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
-                            {providers || <span className="text-gray-400 font-normal italic">None</span>}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-medium text-gray-700 dark:text-gray-300">
-                            {accountNos || <span className="text-gray-400 font-normal italic">—</span>}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <Badge variant={hasLines ? 'success' : 'warning'} size="sm">
-                              {hasLines ? 'Active Lines' : 'No Lines'}
-                            </Badge>
-                          </td>
-                          <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant={isSelected ? 'primary' : 'outline'}
-                              size="sm"
-                              onClick={() => {
-                                setSelectedHubId(String(g.id));
-                                setIsWifiEditing(true);
-                              }}
-                              icon={<Pencil className="w-3 h-3" />}
-                              className="text-[11px] h-7 px-2.5"
-                            >
-                              Configure
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
+          ) : (
+            <Card className="p-8 text-center text-xs text-gray-400">
+              {loading ? 'Loading hub facilities...' : 'No hub facilities found.'}
+            </Card>
+          )}
         </div>
       )}
     </div>

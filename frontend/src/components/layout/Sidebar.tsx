@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -43,12 +43,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    if (location.pathname.startsWith('/finance')) initial['/finance'] = true;
-    if (location.pathname.startsWith('/information')) initial['/information'] = true;
-    return initial;
+  // Accordion behavior: only one dropdown can be open at a time ('/finance', '/information', or null)
+  const [openMenu, setOpenMenu] = useState<string | null>(() => {
+    if (location.pathname.startsWith('/finance')) return '/finance';
+    if (location.pathname.startsWith('/information')) return '/information';
+    return null;
   });
+
+  // Automatically sync with route changes: open only the active section
+  useEffect(() => {
+    if (location.pathname.startsWith('/finance')) {
+      setOpenMenu('/finance');
+    } else if (location.pathname.startsWith('/information')) {
+      setOpenMenu('/information');
+    }
+  }, [location.pathname]);
 
   const navItems: NavItem[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -78,10 +87,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   ];
 
   const handleToggle = (path: string, defaultChildPath: string) => {
-    const isCurrentlyOpen = !!openMenus[path];
-    setOpenMenus((prev) => ({ ...prev, [path]: !isCurrentlyOpen }));
-    if (!isCurrentlyOpen && !location.pathname.startsWith(path)) {
-      navigate(defaultChildPath);
+    if (openMenu === path) {
+      setOpenMenu(null);
+    } else {
+      // Opening one menu automatically collapses the other
+      setOpenMenu(path);
+      if (!location.pathname.startsWith(path)) {
+        navigate(defaultChildPath);
+      }
     }
   };
 
@@ -126,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             // Render NavItem with Sub-items (Finance & Expenses)
             if (item.children) {
               const isGroupActive = location.pathname.startsWith(item.path);
-              const isGroupOpen = !!openMenus[item.path];
+              const isGroupOpen = openMenu === item.path;
               const defaultChildPath = item.children[0]?.path || item.path;
 
               return (

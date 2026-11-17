@@ -483,9 +483,20 @@ export const Expenses: React.FC = () => {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500">
-                        Live connection parameters recorded on facility records
-                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[11px] text-gray-500 font-semibold">Select Hub:</span>
+                        <Select
+                          value={selectedHubId}
+                          onChange={(e) => setSelectedHubId(e.target.value)}
+                          className="font-bold text-xs py-1 px-2.5 h-7.5 min-w-[220px]"
+                        >
+                          {godowns.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
                     </div>
                   </div>
 
@@ -619,16 +630,30 @@ export const Expenses: React.FC = () => {
           ) : (
             /* EDIT FORM VIEW */
             <Card className="p-6">
-              <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                <div className="flex items-center gap-2.5">
-                  <Zap className="w-5 h-5 text-amber-500" />
-                  <div>
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                      {selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Electricity Connection
-                    </h4>
-                    <p className="text-[11px] text-gray-500">
-                      Enter connection parameters. Once saved, details will display as a card with an Add Bill button.
-                    </p>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-amber-500" />
+                    <span>{selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Electricity Connection</span>
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 shrink-0">
+                      Select Hub:
+                    </label>
+                    <Select
+                      value={selectedHubId}
+                      onChange={(e) => setSelectedHubId(e.target.value)}
+                      className="font-bold text-xs py-1 px-3 h-8 min-w-[240px] max-w-xs"
+                    >
+                      {godowns.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                    <span className="text-[11px] text-gray-400">
+                      Editing parameters for <strong className="text-gray-700 dark:text-gray-300 font-semibold">{selectedGodown?.erpName || selectedGodown?.name}</strong>
+                    </span>
                   </div>
                 </div>
 
@@ -638,6 +663,7 @@ export const Expenses: React.FC = () => {
                     variant="ghost"
                     onClick={() => setIsElectricityEditing(false)}
                     icon={<X className="w-3.5 h-3.5" />}
+                    className="shrink-0"
                   >
                     Cancel
                   </Button>
@@ -762,9 +788,20 @@ export const Expenses: React.FC = () => {
                     <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
                       {selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Broadband Connections ({broadbandList.length})
                     </h4>
-                    <p className="text-[11px] text-gray-500">
-                      Active Internet leased lines and fiber networks synced with facility profile
-                    </p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[11px] text-gray-500 font-semibold">Select Hub:</span>
+                      <Select
+                        value={selectedHubId}
+                        onChange={(e) => setSelectedHubId(e.target.value)}
+                        className="font-bold text-xs py-1 px-2.5 h-7.5 min-w-[220px]"
+                      >
+                        {godowns.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                   </div>
                 </div>
 
@@ -921,18 +958,34 @@ export const Expenses: React.FC = () => {
             /* EDIT FORM VIEW */
             <form onSubmit={handleSaveWifi} className="space-y-6">
               <Card className="p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                  <div>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                  <div className="space-y-1.5">
                     <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
                       <Wifi className="w-4 h-4 text-cyan-500" />
                       <span>Configure Broadband Connections ({broadbandList.length})</span>
                     </h4>
-                    <p className="text-[11px] text-gray-500">
-                      Add and configure lines for {selectedGodown?.erpName || selectedGodown?.name}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <label className="text-xs font-bold text-gray-600 dark:text-gray-400 shrink-0">
+                        Select Hub:
+                      </label>
+                      <Select
+                        value={selectedHubId}
+                        onChange={(e) => setSelectedHubId(e.target.value)}
+                        className="font-bold text-xs py-1 px-3 h-8 min-w-[240px] max-w-xs"
+                      >
+                        {godowns.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                          </option>
+                        ))}
+                      </Select>
+                      <span className="text-[11px] text-gray-400">
+                        Configuring lines for <strong className="text-gray-700 dark:text-gray-300 font-semibold">{selectedGodown?.erpName || selectedGodown?.name}</strong>
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Button
                       type="button"
                       variant="outline"

@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'solid';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   icon?: React.ReactNode;
@@ -20,20 +20,26 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-200 select-none active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none rounded-none border';
+  const baseStyles = 'inline-flex items-center justify-center font-semibold uppercase tracking-[0.1em] rounded-none transition-all duration-150 select-none active:translate-y-px disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF3D00] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0A]';
 
   const variants = {
-    primary: 'bg-[#16161a] hover:bg-[#1f2024] text-[#faf8f9] border-[#222325] hover:border-apple-accent/50 shadow-sm hover:shadow-[0_0_15px_-3px_rgba(200,48,58,0.35)]',
-    secondary: 'bg-[#16161a] hover:bg-[#202126] text-[#faf8f9] border-[#222325]',
-    outline: 'border-[#222325] hover:border-[#383a40] bg-[#121315] hover:bg-[#16161a] text-[#faf8f9]',
-    ghost: 'border-transparent bg-transparent hover:bg-white/5 text-[#faf8f9]',
-    danger: 'bg-apple-danger hover:bg-red-700 text-white border-transparent',
+    // Primary: Text in vermillion accent with animated underline
+    primary: 'relative bg-transparent text-[#FF3D00] hover:text-[#FF3D00] px-3 border-b-2 border-[#FF3D00] hover:border-[#FF5722]',
+    // Solid: High-contrast vermillion action block
+    solid: 'bg-[#FF3D00] text-[#0A0A0A] hover:bg-[#E03600] px-6 border-0',
+    // Secondary / Outline: 1px border foreground, inverts on hover
+    secondary: 'border border-[#FAFAFA] text-[#FAFAFA] bg-transparent hover:bg-[#FAFAFA] hover:text-[#0A0A0A] px-6',
+    outline: 'border border-[#262626] hover:border-[#FAFAFA] bg-transparent text-[#FAFAFA] hover:bg-[#FAFAFA] hover:text-[#0A0A0A] px-5',
+    // Ghost: Muted text, reveals underline on hover
+    ghost: 'border-0 bg-transparent text-[#737373] hover:text-[#FAFAFA] px-4 hover:underline underline-offset-4 decoration-[#FF3D00]',
+    // Danger
+    danger: 'bg-[#FF3B30] text-white hover:bg-red-700 px-5 border-0',
   };
 
   const sizes = {
-    sm: 'text-xs px-3 py-1.5 gap-1.5',
-    md: 'text-sm px-4 py-2 gap-2',
-    lg: 'text-base px-6 py-3 gap-2.5',
+    sm: 'text-xs py-2 gap-2',
+    md: 'text-sm py-2.5 gap-2.5',
+    lg: 'text-base py-3.5 gap-3',
   };
 
   return (

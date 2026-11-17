@@ -20,18 +20,18 @@ export const FormField: React.FC<FormFieldProps> = ({
   className,
 }) => {
   return (
-    <div className={twMerge('flex flex-col gap-1.5', className)}>
+    <div className={twMerge('flex flex-col gap-2', className)}>
       {label && (
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#d6d6d5]">
-          {label} {required && <span className="text-apple-accent">*</span>}
+        <label className="text-xs font-semibold uppercase tracking-[0.1em] text-[#737373]">
+          {label} {required && <span className="text-[#FF3D00]">*</span>}
         </label>
       )}
       {children}
       {hint && !error && (
-        <span className="text-xs text-[#d6d6d5]/60">{hint}</span>
+        <span className="text-xs text-[#737373]/80">{hint}</span>
       )}
       {error && (
-        <span className="text-xs text-apple-danger font-medium">{error}</span>
+        <span className="text-xs text-[#FF3B30] font-medium">{error}</span>
       )}
     </div>
   );
@@ -48,8 +48,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'w-full px-3.5 py-2.5 rounded-none text-sm bg-[#121315] border border-[#222325] text-[#faf8f9] placeholder:text-[#d6d6d5]/40 outline-none transition-all duration-200 focus:border-apple-accent focus:ring-1 focus:ring-apple-accent/40 disabled:opacity-50 disabled:pointer-events-none',
-            error && 'border-apple-danger focus:border-apple-danger focus:ring-apple-danger/20',
+            'w-full px-4 h-12 rounded-none text-base bg-[#1A1A1A] border border-[#262626] text-[#FAFAFA] placeholder:text-[#737373] outline-none transition-colors duration-150 focus:border-[#FF3D00] disabled:opacity-50 disabled:cursor-not-allowed',
+            error && 'border-[#FF3B30] focus:border-[#FF3B30]',
             className
           )
         )}
@@ -71,8 +71,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'w-full px-3.5 py-2.5 rounded-none text-sm bg-[#121315] border border-[#222325] text-[#faf8f9] placeholder:text-[#d6d6d5]/40 outline-none transition-all duration-200 focus:border-apple-accent focus:ring-1 focus:ring-apple-accent/40 disabled:opacity-50 disabled:pointer-events-none',
-            error && 'border-apple-danger focus:border-apple-danger focus:ring-apple-danger/20',
+            'w-full p-4 rounded-none text-base bg-[#1A1A1A] border border-[#262626] text-[#FAFAFA] placeholder:text-[#737373] outline-none transition-colors duration-150 focus:border-[#FF3D00] disabled:opacity-50 disabled:cursor-not-allowed',
+            error && 'border-[#FF3B30] focus:border-[#FF3B30]',
             className
           )
         )}
@@ -94,8 +94,8 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'w-full px-3.5 py-2.5 rounded-none text-sm bg-[#121315] border border-[#222325] text-[#faf8f9] outline-none transition-all duration-200 focus:border-apple-accent focus:ring-1 focus:ring-apple-accent/40 disabled:opacity-50 disabled:pointer-events-none cursor-pointer',
-            error && 'border-apple-danger focus:border-apple-danger focus:ring-apple-danger/20',
+            'w-full px-4 h-12 rounded-none text-base bg-[#1A1A1A] border border-[#262626] text-[#FAFAFA] outline-none transition-colors duration-150 focus:border-[#FF3D00] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
+            error && 'border-[#FF3B30] focus:border-[#FF3B30]',
             className
           )
         )}

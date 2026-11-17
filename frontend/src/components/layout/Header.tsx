@@ -25,31 +25,29 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 glass-panel border-b border-black/[0.06] dark:border-white/[0.08] px-4 lg:px-8 flex items-center justify-between">
+    <header className="sticky top-0 z-30 h-16 glass-panel border-b border-[#262626] px-4 lg:px-8 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileMenu}
-          className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10 lg:hidden"
+          className="p-2 rounded-none text-[#737373] hover:text-[#FAFAFA] hover:bg-[#1A1A1A] lg:hidden"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-5 h-5" strokeWidth={1.5} />
         </button>
-
-
       </div>
 
       <div className="flex items-center gap-3">
         {/* Dark mode toggle */}
         <button
           onClick={toggleDarkMode}
-          className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors"
+          className="p-2 rounded-none text-[#737373] hover:text-[#FAFAFA] hover:bg-[#1A1A1A] transition-colors"
           title="Toggle appearance"
         >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {isDark ? <Sun className="w-4 h-4" strokeWidth={1.5} /> : <Moon className="w-4 h-4" strokeWidth={1.5} />}
         </button>
 
         {/* User status pill */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-apple-accent/10 border border-apple-accent/20 text-xs font-medium text-apple-accent">
-          <ShieldCheck className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-none bg-[#1A1A1A] border border-[#262626] text-xs font-mono tracking-wide text-[#FAFAFA]">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#FF3D00]" strokeWidth={1.5} />
           <span className="font-semibold">{user?.fullName || user?.username}</span>
         </div>
       </div>

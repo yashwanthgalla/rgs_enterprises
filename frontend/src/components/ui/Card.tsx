@@ -4,11 +4,13 @@ import { twMerge } from 'tailwind-merge';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   hoverable?: boolean;
+  highlighted?: boolean;
 }
 
 export const Card: React.FC<CardProps> = ({
   children,
   hoverable = false,
+  highlighted = false,
   className,
   ...props
 }) => {
@@ -16,8 +18,9 @@ export const Card: React.FC<CardProps> = ({
     <div
       className={twMerge(
         clsx(
-          'glass-card rounded-none transition-all duration-200 border border-[#222325]',
-          hoverable && 'hover:shadow-brand-glow hover:-translate-y-0.5 hover:border-apple-accent/40',
+          'glass-card rounded-none transition-colors duration-150',
+          highlighted ? 'border-2 border-[#FF3D00]' : 'border border-[#262626]',
+          hoverable && 'hover:border-[#737373] cursor-pointer',
           className
         )
       )}

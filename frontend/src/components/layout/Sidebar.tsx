@@ -100,13 +100,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {/* Sidebar Container */}
       <aside
         className={clsx(
-          'fixed top-0 bottom-0 left-0 z-40 w-64 glass-panel border-r border-black/[0.08] dark:border-white/[0.08] flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0',
+          'fixed top-0 bottom-0 left-0 z-40 w-64 glass-panel border-r border-[#262626] flex flex-col transition-transform duration-150 ease-in-out lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Brand Header */}
-        <div className="p-5 pb-4 flex items-center gap-3 border-b border-black/[0.06] dark:border-white/[0.08]">
-          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-apple-sm border border-black/10 dark:border-white/10 shrink-0 bg-white">
+        <div className="p-5 pb-4 flex items-center gap-3 border-b border-[#262626]">
+          <div className="w-10 h-10 rounded-none overflow-hidden border border-[#262626] shrink-0 bg-white">
             <img
               src="/2.jpeg"
               alt="RGS Enterprises Logo"
@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             />
           </div>
           <div className="overflow-hidden">
-            <h1 className="text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100 truncate">
+            <h1 className="text-sm font-bold tracking-tight text-[#FAFAFA] truncate">
               RGS ENTERPRISES
             </h1>
           </div>
@@ -137,17 +137,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     type="button"
                     onClick={() => handleToggle(item.path, defaultChildPath)}
                     className={clsx(
-                      'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150 select-none cursor-pointer',
+                      'w-full flex items-center justify-between px-3.5 py-2.5 rounded-none text-xs font-semibold tracking-wide transition-colors duration-150 select-none cursor-pointer border-l-2',
                       isGroupActive
-                        ? 'bg-apple-accent/10 dark:bg-apple-accent/15 text-apple-accent font-bold'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                        ? 'border-[#FF3D00] bg-[#1A1A1A] text-[#FAFAFA]'
+                        : 'border-transparent text-[#737373] hover:text-[#FAFAFA] hover:bg-[#1A1A1A]/50'
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <Icon className="w-4 h-4 shrink-0" />
                       <span>{item.label}</span>
                     </div>
-                    <div className="p-1 rounded-lg text-gray-400">
+                    <div className="p-1 text-[#737373]">
                       {isGroupOpen ? (
                         <ChevronDown className="w-3.5 h-3.5" />
                       ) : (
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
                   {/* Submenu Items */}
                   {isGroupOpen && (
-                    <div className="ml-4 pl-3 border-l-2 border-black/[0.08] dark:border-white/[0.08] space-y-1 my-1">
+                    <div className="ml-4 pl-3 border-l-2 border-[#262626] space-y-1 my-1">
                       {item.children.map((sub, idx) => {
                         const SubIcon = sub.icon;
                         const isSubActive =
@@ -177,10 +177,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             to={sub.path}
                             onClick={onClose}
                             className={clsx(
-                              'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-150',
+                              'flex items-center gap-2.5 px-3 py-2 rounded-none text-[11px] font-semibold tracking-wide transition-colors duration-150 border-l-2',
                               isSubActive
-                                ? 'bg-apple-accent text-white shadow-apple-sm'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                                ? 'border-[#FF3D00] bg-[#1A1A1A] text-[#FF3D00]'
+                                : 'border-transparent text-[#737373] hover:text-[#FAFAFA] hover:bg-[#1A1A1A]/30'
                             )}
                           >
                             <SubIcon className="w-3.5 h-3.5 shrink-0" />
@@ -203,10 +203,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 end={item.path === '/'}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150',
+                    'flex items-center gap-3 px-3.5 py-2.5 rounded-none text-xs font-semibold tracking-wide transition-colors duration-150 border-l-2',
                     isActive
-                      ? 'bg-apple-accent text-white shadow-apple-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                      ? 'border-[#FF3D00] bg-[#1A1A1A] text-[#FAFAFA]'
+                      : 'border-transparent text-[#737373] hover:text-[#FAFAFA] hover:bg-[#1A1A1A]/50'
                   )
                 }
               >
@@ -218,17 +218,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </nav>
 
         {/* User Profile Card */}
-        <div className="p-3 border-t border-black/[0.06] dark:border-white/[0.08]">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]">
+        <div className="p-3 border-t border-[#262626]">
+          <div className="flex items-center justify-between p-2 rounded-none bg-[#1A1A1A] border border-[#262626]">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-apple-accent/15 text-apple-accent font-bold text-xs flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-none border border-[#262626] bg-[#0A0A0A] text-[#FF3D00] font-bold text-xs flex items-center justify-center shrink-0">
                 {user?.fullName?.charAt(0) || user?.username?.charAt(0) || 'A'}
               </div>
               <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">
+                <p className="text-xs font-semibold text-[#FAFAFA] truncate">
                   {user?.fullName || user?.username || 'Administrator'}
                 </p>
-                <p className="text-[10px] text-gray-400 truncate">
+                <p className="text-[10px] text-[#737373] truncate">
                   {user?.email || 'admin'}
                 </p>
               </div>

@@ -7,104 +7,96 @@
     color-scheme: dark;
   }
   
+  * {
+    border-radius: 0 !important;
+  }
+
   body {
-    font-family: 'Host Grotesk', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
-    background-color: #0a0a0c;
-    color: #faf8f9;
-    @apply antialiased min-h-screen selection:bg-apple-accent selection:text-white;
+    font-family: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background-color: #0A0A0A;
+    color: #FAFAFA;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.011em;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Host Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-    letter-spacing: -0.022em;
-    font-weight: 500;
+    font-family: "Inter Tight", "Inter", sans-serif;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    font-weight: 700;
+  }
+
+  h1 {
+    letter-spacing: -0.06em;
+  }
+
+  /* Focus states: 2px accent outline, 2px offset */
+  *:focus-visible {
+    outline: 2px solid #FF3D00 !important;
+    outline-offset: 2px !important;
   }
 }
 
-/* Glass Panels with #121315 Surface and #222325 Hairline */
+/* Bold Typography Panels and Cards */
 .glass-panel {
-  background: #121315;
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid #222325;
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.4);
+  background: #0A0A0A;
+  border: 1px solid #262626;
+  box-shadow: none;
 }
 
 .dark .glass-panel {
-  background: #121315;
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid #222325;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+  background: #0A0A0A;
+  border: 1px solid #262626;
+  box-shadow: none;
 }
 
-/* Glass Card with Surface #121315 and Hairline #222325 */
 .glass-card {
-  background: #121315;
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
-  border: 1px solid #222325;
-  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.4);
+  background: #0F0F0F;
+  border: 1px solid #262626;
+  box-shadow: none;
 }
 
 .dark .glass-card {
-  background: #121315;
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
-  border: 1px solid #222325;
-  box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.04);
+  background: #0F0F0F;
+  border: 1px solid #262626;
+  box-shadow: none;
 }
 
-/* Frosted Modal */
 .glass-modal {
-  background: #121315;
-  backdrop-filter: blur(40px) saturate(210%);
-  -webkit-backdrop-filter: blur(40px) saturate(210%);
-  border: 1px solid #222325;
-  box-shadow: 0 24px 70px -10px rgba(0, 0, 0, 0.7);
+  background: #0F0F0F;
+  border: 1px solid #262626;
+  box-shadow: none;
 }
 
 .dark .glass-modal {
-  background: #121315;
-  backdrop-filter: blur(40px) saturate(210%);
-  -webkit-backdrop-filter: blur(40px) saturate(210%);
-  border: 1px solid #222325;
-  box-shadow: 0 24px 70px -10px rgba(0, 0, 0, 0.7);
+  background: #0F0F0F;
+  border: 1px solid #262626;
+  box-shadow: none;
 }
 
-.crimson-glow {
-  box-shadow: 0 0 25px -4px rgba(200, 48, 58, 0.35);
+/* Subtle noise grain texture (1.5% opacity) */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 /* Subtle scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #0A0A0A;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  background: #262626;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-/* Site Background Watermark */
-.site-bg-watermark {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: url('/2.jpeg');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 580px;
-  opacity: 0.03;
-  filter: grayscale(100%);
+  background: #FF3D00;
 }

@@ -1,18 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart3,
   Download,
   Calendar,
-  TrendingUp,
-  TrendingDown,
-  Warehouse,
-  Receipt,
-  IndianRupee,
   FileSpreadsheet,
   CheckCircle2,
-  Building,
   Layers,
-  Sparkles,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -22,7 +17,7 @@ import { FormField, Select } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { reportApi, godownApi } from '../services/api';
-import { Godown } from '../types';
+import { Godown, ReportSummary, GodownPnlItem } from '../types';
 import { clsx } from 'clsx';
 
 export const Reports: React.FC = () => {
@@ -30,10 +25,11 @@ export const Reports: React.FC = () => {
   const { success, error } = useToast();
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [summary, setSummary] = useState<any>(null);
-  const [pnlList, setPnlList] = useState<any[]>([]);
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
+  const [pnlList, setPnlList] = useState<GodownPnlItem[]>([]);
   const [godowns, setGodowns] = useState<Godown[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -41,33 +37,89 @@ export const Reports: React.FC = () => {
   const [selectedExportHubId, setSelectedExportHubId] = useState<string>('');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
 
-  const fetchReports = async () => {
+  // Track active fetch requests to avoid race conditions
+  const activeFetchIdRef = useRef<number>(0);
+
+  // 1. Fetch Hub facilities list once on mount (De-duplicated; not re-queried on year toggle)
+  useEffect(() => {
+    let isCancelled = false;
+
+    godownApi
+      .getAllList()
+      .then((gList: any) => {
+        if (isCancelled) return;
+        const list: Godown[] = Array.isArray(gList) ? gList : (gList as any)?.content || [];
+        setGodowns(list);
+        if (list.length > 0) {
+          setSelectedExportHubId((prev) => prev || String(list[0].id));
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.error('Failed to load hubs list:', err);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // 2. Fetch Yearly Report Data with race condition prevention and granular error feedback
+  const fetchReportsForYear = (year: number) => {
+    const fetchId = ++activeFetchIdRef.current;
     setLoading(true);
-    try {
-      const [sRes, pnlRes, gRes] = await Promise.all([
-        reportApi.getSummary(selectedYear),
-        reportApi.getGodownPnl(selectedYear),
-        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
-      ]);
+    setFetchError(null);
 
-      setSummary(sRes);
-      setPnlList(Array.isArray(pnlRes) ? pnlRes : []);
+    Promise.allSettled([
+      reportApi.getSummary(year),
+      reportApi.getGodownPnl(year),
+    ])
+      .then(([sResult, pnlResult]) => {
+        if (fetchId !== activeFetchIdRef.current) return;
 
-      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
-      setGodowns(gList);
-      if (gList.length > 0 && !selectedExportHubId) {
-        setSelectedExportHubId(String(gList[0].id));
-      }
-    } catch (err: any) {
-      console.error('Failed to load reports:', err);
-    } finally {
-      setLoading(false);
-    }
+        let hasError = false;
+
+        if (sResult.status === 'fulfilled') {
+          setSummary(sResult.value as ReportSummary);
+        } else {
+          hasError = true;
+          console.error('Failed to load summary for year', year, sResult.reason);
+        }
+
+        if (pnlResult.status === 'fulfilled') {
+          setPnlList(Array.isArray(pnlResult.value) ? pnlResult.value : []);
+        } else {
+          hasError = true;
+          console.error('Failed to load PnL list for year', year, pnlResult.reason);
+        }
+
+        if (hasError) {
+          const msg = 'Some report data could not be loaded. Please check your network and try again.';
+          setFetchError(msg);
+          error(msg);
+        }
+      })
+      .catch((err: any) => {
+        if (fetchId !== activeFetchIdRef.current) return;
+        const msg = err.message || 'Failed to load financial reports';
+        setFetchError(msg);
+        error(msg);
+      })
+      .finally(() => {
+        if (fetchId === activeFetchIdRef.current) {
+          setLoading(false);
+        }
+      });
   };
 
   useEffect(() => {
-    fetchReports();
+    fetchReportsForYear(selectedYear);
   }, [selectedYear]);
+
+  const handleRetry = () => {
+    fetchReportsForYear(selectedYear);
+  };
 
   const handleDownloadCsv = () => {
     if (exportScope === 'single' && !selectedExportHubId) {
@@ -90,43 +142,20 @@ export const Reports: React.FC = () => {
     setIsExportModalOpen(false);
   };
 
-  const totalRevenue =
-    summary?.totalRevenue ??
-    summary?.totalRentalIncome ??
-    summary?.totalRentCollected ??
-    0;
-  const totalRent =
-    summary?.totalRentOutflow ??
-    summary?.totalOperatingExpenses ??
-    summary?.totalExpenses ??
-    0;
-  const totalProfit =
-    summary?.totalProfit ??
-    summary?.netOperatingIncome ??
-    summary?.netProfit ??
-    totalRevenue - totalRent;
+  // Standardized schema metrics with clean fallback
+  const totalRevenue = summary?.totalRevenue ?? summary?.totalRentalIncome ?? 0;
+  const totalRent = summary?.totalRent ?? summary?.totalRentOutflow ?? summary?.totalExpenses ?? 0;
+  const totalProfit = summary?.totalProfit ?? (totalRevenue - totalRent);
   const totalMargin = summary?.totalMargin ?? totalProfit;
   const marginPct =
     summary?.marginPercent ??
     (totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0);
 
   // Sums across PnL list for table footer
-  const tableTotalRevenue = pnlList.reduce(
-    (acc, r) => acc + Number(r.totalRevenue ?? r.rentalIncome ?? 0),
-    0
-  );
-  const tableTotalRent = pnlList.reduce(
-    (acc, r) => acc + Number(r.totalRent ?? r.operatingExpenses ?? 0),
-    0
-  );
-  const tableTotalProfit = pnlList.reduce(
-    (acc, r) => acc + Number(r.totalProfit ?? r.netProfit ?? 0),
-    0
-  );
-  const tableTotalMargin = pnlList.reduce(
-    (acc, r) => acc + Number(r.margin ?? 0),
-    0
-  );
+  const tableTotalRevenue = pnlList.reduce((acc, r) => acc + (r.totalRevenue ?? 0), 0);
+  const tableTotalRent = pnlList.reduce((acc, r) => acc + (r.totalRent ?? 0), 0);
+  const tableTotalProfit = pnlList.reduce((acc, r) => acc + (r.totalProfit ?? 0), 0);
+  const tableTotalMargin = pnlList.reduce((acc, r) => acc + (r.margin ?? 0), 0);
 
   const selectedExportGodown = godowns.find(
     (g) => String(g.id) === String(selectedExportHubId)
@@ -171,6 +200,25 @@ export const Reports: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Error Feedback Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-2xl bg-apple-danger/10 border border-apple-danger/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-apple-danger font-medium">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{fetchError}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRetry}
+            icon={<RefreshCw className="w-3.5 h-3.5" />}
+            className="shrink-0 text-xs font-semibold"
+          >
+            Retry Loading
+          </Button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -265,7 +313,10 @@ export const Reports: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-gray-400">
-                    Computing financial summary...
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-apple-accent" />
+                      <span>Computing financial summary...</span>
+                    </div>
                   </td>
                 </tr>
               ) : pnlList.length === 0 ? (
@@ -276,16 +327,16 @@ export const Reports: React.FC = () => {
                 </tr>
               ) : (
                 <>
-                  {pnlList.map((row, idx) => {
-                    const rowRev = Number(row.totalRevenue ?? row.rentalIncome ?? 0);
-                    const rowRent = Number(row.totalRent ?? row.operatingExpenses ?? 0);
-                    const rowProfit = Number(row.totalProfit ?? row.netProfit ?? (rowRev - rowRent));
-                    const rowMargin = Number(row.margin ?? 0);
-                    const mPct = rowRev > 0 ? Math.round((rowProfit / rowRev) * 100) : 0;
+                  {pnlList.map((row) => {
+                    const rowRev = row.totalRevenue ?? 0;
+                    const rowRent = row.totalRent ?? 0;
+                    const rowProfit = row.totalProfit ?? (rowRev - rowRent);
+                    const rowMargin = row.margin ?? 0;
+                    const mPct = row.profitMargin ?? (rowRev > 0 ? Math.round((rowProfit / rowRev) * 100) : 0);
 
                     return (
                       <tr
-                        key={idx}
+                        key={row.godownId}
                         className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                       >
                         <td className="py-3.5 px-3">

@@ -1150,18 +1150,19 @@ def reports_summary_view(request):
         "year": current_year,
         "startDate": f"{current_year}-01-01",
         "endDate": f"{current_year}-12-31",
-        "totalRentalIncome": float(total_revenue_sum),
         "totalRevenue": float(total_revenue_sum),
-        "totalOperatingExpenses": float(total_rent_sum),
-        "totalExpenses": float(total_rent_sum),
-        "totalRentOutflow": float(total_rent_sum),
-        "netOperatingIncome": float(total_profit),
-        "netOperatingProfit": float(total_profit),
-        "netProfit": float(total_profit),
+        "totalRent": float(total_rent_sum),
         "totalProfit": float(total_profit),
         "totalMargin": float(total_margin),
         "marginPercent": margin_percent,
-        "monthlyBreakdown": monthly_data
+        "monthlyBreakdown": monthly_data,
+        # Standard compatibility aliases
+        "totalRentalIncome": float(total_revenue_sum),
+        "totalExpenses": float(total_rent_sum),
+        "totalRentOutflow": float(total_rent_sum),
+        "totalOperatingExpenses": float(total_rent_sum),
+        "netProfit": float(total_profit),
+        "netOperatingIncome": float(total_profit),
     })
 
 

@@ -247,3 +247,47 @@ export interface DashboardMetrics {
   totalExpensesThisMonth: number;
   netRevenueThisMonth: number;
 }
+
+export interface ReportMonthlyBreakdown {
+  month: string;
+  monthName: string;
+  revenue: number;
+  expenses: number;
+  netProfit: number;
+  totalProfit: number;
+}
+
+export interface ReportSummary {
+  year: number;
+  startDate: string;
+  endDate: string;
+  totalRevenue: number;
+  totalRent: number;
+  totalProfit: number;
+  totalMargin: number;
+  marginPercent: number;
+  monthlyBreakdown: ReportMonthlyBreakdown[];
+  totalRentalIncome?: number;
+  totalExpenses?: number;
+  totalRentOutflow?: number;
+  netProfit?: number;
+}
+
+export interface GodownPnlItem {
+  godownId: number;
+  godownName: string;
+  godownCode?: string;
+  city?: string;
+  tenantName?: string;
+  status?: string;
+  totalRevenue: number;
+  totalRent: number;
+  totalProfit: number;
+  margin: number;
+  profitMargin: number;
+  revenue?: number;
+  rentalIncome?: number;
+  expenses?: number;
+  operatingExpenses?: number;
+  netProfit?: number;
+}

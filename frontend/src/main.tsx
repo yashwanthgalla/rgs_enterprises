@@ -3,9 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
 
-if (!localStorage.getItem('theme') || localStorage.getItem('theme') === 'dark') {
-  document.documentElement.classList.add('dark');
-}
+localStorage.setItem('theme', 'light');
+document.documentElement.classList.remove('dark');
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

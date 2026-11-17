@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
   }
   
   * {
@@ -13,8 +13,8 @@
 
   body {
     font-family: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    background-color: #0A0A0A;
-    color: #FAFAFA;
+    background-color: #F8F9FA;
+    color: #111827;
     letter-spacing: -0.01em;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -23,80 +23,66 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: "Inter Tight", "Inter", sans-serif;
-    letter-spacing: -0.04em;
-    line-height: 1.1;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
     font-weight: 700;
+    color: #111827;
   }
 
-  h1 {
-    letter-spacing: -0.06em;
-  }
-
-  /* Focus states: 2px accent outline, 2px offset */
   *:focus-visible {
-    outline: 2px solid #FF3D00 !important;
+    outline: 2px solid #0071E3 !important;
     outline-offset: 2px !important;
   }
 }
 
-/* Bold Typography Panels and Cards */
+/* White Clean Panels and Cards */
 .glass-panel {
-  background: #0A0A0A;
-  border: 1px solid #262626;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .dark .glass-panel {
-  background: #0A0A0A;
-  border: 1px solid #262626;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .glass-card {
-  background: #0F0F0F;
-  border: 1px solid #262626;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .dark .glass-card {
-  background: #0F0F0F;
-  border: 1px solid #262626;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .glass-modal {
-  background: #0F0F0F;
-  border: 1px solid #262626;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
 .dark .glass-modal {
-  background: #0F0F0F;
-  border: 1px solid #262626;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
-/* Subtle noise grain texture (1.5% opacity) */
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.015;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
-
-/* Subtle scrollbar */
+/* Subtle clean scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A0A0A;
+  background: #F8F9FA;
 }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
+  background: #D1D5DB;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF3D00;
+  background: #9CA3AF;
 }

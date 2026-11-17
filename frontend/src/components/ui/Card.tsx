@@ -18,9 +18,9 @@ export const Card: React.FC<CardProps> = ({
     <div
       className={twMerge(
         clsx(
-          'glass-card rounded-none transition-colors duration-150',
-          highlighted ? 'border-2 border-[#FF3D00]' : 'border border-[#262626]',
-          hoverable && 'hover:border-[#737373] cursor-pointer',
+          'bg-white rounded-none transition-colors duration-150',
+          highlighted ? 'border-2 border-[#0071E3]' : 'border border-[#E5E7EB]',
+          hoverable && 'hover:border-[#9CA3AF] cursor-pointer',
           className
         )
       )}

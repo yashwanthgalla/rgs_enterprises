@@ -17,13 +17,13 @@ from rest_framework.response import Response
 
 from .models import (
     AppUser, Godown, RentEntry, Expense, Employee,
-    SalaryPayment, Asset, Document, AppSettings, ActivityLog,
+    SalaryPayment, Asset, AppSettings,
     HubBroadband, FinanceTotalRevenue, FinanceRent
 )
 from .serializers import (
     AppUserSerializer, GodownSerializer, RentEntrySerializer,
     ExpenseSerializer, EmployeeSerializer, SalaryPaymentSerializer,
-    AssetSerializer, DocumentSerializer, AppSettingsSerializer,
+    AssetSerializer, AppSettingsSerializer,
     HubBroadbandSerializer, FinanceTotalRevenueSerializer, FinanceRentSerializer
 )
 from .crypto import encrypt_password, decrypt_password
@@ -305,12 +305,7 @@ def dashboard_cashflow_trend_view(request):
             bill_date__startswith=month_str
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-        salary = SalaryPayment.objects.filter(
-            payment_month=month_str,
-            status='PAID'
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-
-        total_expenses = expense + salary
+        total_expenses = expense
         trends.append({
             "month": month_str,
             "monthLabel": month_label,
@@ -1049,70 +1044,30 @@ def assets_by_godown_view(request, godown_id):
 
 
 # ============================================================================
-# DOCUMENTS
+# DOCUMENTS (FILE STORAGE REMOVED / DISABLED)
 # ============================================================================
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def documents_view(request):
-    godown_id = request.GET.get('godownId')
-    qs = Document.objects.filter(is_deleted=False).select_related('godown')
-    if godown_id:
-        qs = qs.filter(godown_id=godown_id)
-    return api_success(DocumentSerializer(qs.order_by('-created_at'), many=True).data)
+    return api_success([])
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def documents_by_godown_view(request, godown_id):
-    docs = Document.objects.filter(godown_id=godown_id, is_deleted=False).select_related('godown')
-    return api_success(DocumentSerializer(docs, many=True).data)
+    return api_success([])
 
 
 @api_view(['GET', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def document_detail_view(request, pk):
-    try:
-        doc = Document.objects.get(pk=pk, is_deleted=False)
-    except Document.DoesNotExist:
-        return api_error("Document not found", status_code=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        return api_success(DocumentSerializer(doc).data)
-    elif request.method == 'DELETE':
-        doc.is_deleted = True
-        doc.save()
-        return api_success({"message": "Document deleted successfully"})
+    return api_error("File storage has been removed", status_code=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def upload_document_view(request):
-    file_obj = request.FILES.get('file')
-    if not file_obj:
-        return api_error("File is required")
-
-    godown_id = request.data.get('godownId')
-    document_type = request.data.get('documentType', 'OTHER')
-    description = request.data.get('description', '')
-
-    file_name = file_obj.name
-    file_type = file_obj.content_type or 'application/octet-stream'
-    file_size = file_obj.size
-    storage_path = f"documents/{timezone.now().strftime('%Y%m%d%H%M%S')}_{file_name}"
-    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.STORAGE_BUCKET}/{storage_path}"
-
-    doc = Document.objects.create(
-        godown_id=godown_id if godown_id else None,
-        file_name=file_name,
-        file_type=file_type,
-        file_size=file_size,
-        storage_path=storage_path,
-        public_url=public_url,
-        document_type=document_type,
-        description=description,
-        is_deleted=False
-    )
-    return api_success(DocumentSerializer(doc).data, status_code=status.HTTP_201_CREATED)
+    return api_error("File storage is not supported", status_code=status.HTTP_400_BAD_REQUEST)
 
 
 # ============================================================================

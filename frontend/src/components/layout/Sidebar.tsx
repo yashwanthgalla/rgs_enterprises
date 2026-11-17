@@ -7,7 +7,6 @@ import {
   Receipt,
   Users,
   Wrench,
-  FolderLock,
   BarChart3,
   Settings,
   LogOut,
@@ -53,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const navItems: NavItem[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { label: 'HUBS', path: '/hubs', icon: Warehouse },
+    { label: 'Hubs', path: '/hubs', icon: Warehouse },
     {
       label: 'Finance',
       path: '/finance',
@@ -74,7 +73,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     },
     { label: 'Staff Directory', path: '/staff', icon: Users },
     { label: 'Assets & Equipment', path: '/assets', icon: Wrench },
-    { label: 'Document Vault', path: '/documents', icon: FolderLock },
     { label: 'Financial Reports', path: '/reports', icon: BarChart3 },
     { label: 'Settings', path: '/settings', icon: Settings },
   ];

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     AppUser, Godown, RentEntry, Asset, Employee,
-    SalaryPayment, Expense, Document, ActivityLog, AppSettings,
+    SalaryPayment, Expense, AppSettings,
     HubBroadband, FinanceTotalRevenue, FinanceRent
 )
 from .crypto import encrypt_password, decrypt_password
@@ -263,28 +263,6 @@ class AssetSerializer(serializers.ModelSerializer):
             'id', 'godownId', 'godownName', 'godownCode', 'name', 'category',
             'serialNumber', 'quantity', 'cost', 'condition', 'purchaseDate',
             'warrantyExpiryDate', 'notes', 'isDeleted', 'createdAt', 'updatedAt'
-        ]
-
-
-class DocumentSerializer(serializers.ModelSerializer):
-    godownId = serializers.IntegerField(source='godown_id', required=False, allow_null=True)
-    godownName = serializers.CharField(source='godown.name', read_only=True)
-    fileName = serializers.CharField(source='file_name')
-    fileType = serializers.CharField(source='file_type')
-    fileSize = serializers.IntegerField(source='file_size')
-    storagePath = serializers.CharField(source='storage_path')
-    publicUrl = serializers.CharField(source='public_url')
-    documentType = serializers.CharField(source='document_type')
-    isDeleted = serializers.BooleanField(source='is_deleted', read_only=True)
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
-    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
-
-    class Meta:
-        model = Document
-        fields = [
-            'id', 'godownId', 'godownName', 'fileName', 'fileType', 'fileSize',
-            'storagePath', 'publicUrl', 'documentType', 'description',
-            'isDeleted', 'createdAt', 'updatedAt'
         ]
 
 

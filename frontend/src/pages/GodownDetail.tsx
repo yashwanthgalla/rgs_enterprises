@@ -10,7 +10,6 @@ import {
   Receipt,
   Users,
   Wrench,
-  FolderLock,
   Plus,
   Phone,
   Calendar,
@@ -42,9 +41,8 @@ import {
   expenseApi,
   assetApi,
   employeeApi,
-  documentApi,
 } from '../services/api';
-import { Godown, RentEntry, Expense, Asset, Staff, DocumentItem } from '../types';
+import { Godown, RentEntry, Expense, Asset, Staff } from '../types';
 
 export const GodownDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,7 +51,7 @@ export const GodownDetail: React.FC = () => {
   const { success, error } = useToast();
 
   const [godown, setGodown] = useState<Godown | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'rent' | 'expenses' | 'assets' | 'staff' | 'documents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'rent' | 'expenses' | 'assets' | 'staff'>('overview');
   const [loading, setLoading] = useState(true);
 
   // Tab Data States
@@ -61,7 +59,6 @@ export const GodownDetail: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
 
   // Modals
   const [isRentModalOpen, setIsRentModalOpen] = useState(false);
@@ -99,13 +96,12 @@ export const GodownDetail: React.FC = () => {
     const loadAllDetails = async () => {
       setLoading(true);
       try {
-        const [gRes, rRes, eRes, aRes, sRes, dRes] = await Promise.allSettled([
+        const [gRes, rRes, eRes, aRes, sRes] = await Promise.allSettled([
           godownApi.getById(id),
           rentApi.getByGodown(id),
           expenseApi.getByGodown(id),
           assetApi.getByGodown(id),
           employeeApi.getByGodown(id),
-          documentApi.getByGodown(id),
         ]);
 
         if (gRes.status === 'fulfilled') setGodown(gRes.value as any);
@@ -113,7 +109,6 @@ export const GodownDetail: React.FC = () => {
         if (eRes.status === 'fulfilled') setExpenses(Array.isArray(eRes.value) ? eRes.value : (eRes.value as any)?.content || []);
         if (aRes.status === 'fulfilled') setAssets(Array.isArray(aRes.value) ? aRes.value : (aRes.value as any)?.content || []);
         if (sRes.status === 'fulfilled') setStaffList(Array.isArray(sRes.value) ? sRes.value : (sRes.value as any)?.content || []);
-        if (dRes.status === 'fulfilled') setDocs(Array.isArray(dRes.value) ? dRes.value : (dRes.value as any)?.content || []);
       } catch (err: any) {
         error('Failed to load facility data: ' + err.message);
       } finally {
@@ -313,7 +308,6 @@ export const GodownDetail: React.FC = () => {
           { key: 'expenses', label: `Operating Bills (${expenses.length})`, icon: Receipt },
           { key: 'assets', label: `Equipment (${assets.length})`, icon: Wrench },
           { key: 'staff', label: `Staff (${staffList.length})`, icon: Users },
-          { key: 'documents', label: `Vault (${docs.length})`, icon: FolderLock },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -839,36 +833,6 @@ export const GodownDetail: React.FC = () => {
                   <p className="text-gray-400 mt-1">Designation: {s.role}</p>
                   <p className="text-gray-400">Phone: {s.phoneNumber}</p>
                   <p className="font-medium mt-1">Salary: {formatCurrency(s.monthlySalary)}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'documents' && (
-        <Card className="p-6">
-          <h3 className="font-semibold text-sm mb-4">Facility Documents & Vault</h3>
-          <div className="divide-y divide-black/[0.04] dark:divide-white/[0.06] text-xs">
-            {docs.length === 0 ? (
-              <div className="py-8 text-center text-gray-400">
-                No documents uploaded for this godown yet.
-              </div>
-            ) : (
-              docs.map((d) => (
-                <div key={d.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800 dark:text-gray-200">{d.title}</p>
-                    <p className="text-gray-400 text-[11px] mt-0.5">{d.documentType} • {d.fileName}</p>
-                  </div>
-                  <a
-                    href={d.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-apple-accent hover:underline font-semibold"
-                  >
-                    Download
-                  </a>
                 </div>
               ))
             )}

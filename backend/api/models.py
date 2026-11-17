@@ -15,7 +15,7 @@ class AppUser(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'app_user'
+        db_table = 'auth_users'
 
     def __str__(self):
         return f"{self.full_name} ({self.username})"
@@ -83,7 +83,7 @@ class Godown(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'godown'
+        db_table = 'hubs'
 
     def __str__(self):
         return f"{self.erp_name or self.name} ({self.code})"
@@ -124,7 +124,7 @@ class FinanceTotalRevenue(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'finance_total_revenue'
+        db_table = 'hub_yearly_revenues'
         unique_together = (('hub', 'financial_year'),)
 
     def __str__(self):
@@ -153,7 +153,7 @@ class FinanceRent(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'finance_rent'
+        db_table = 'hub_monthly_rents'
         unique_together = (('hub', 'period'),)
 
     def __str__(self):
@@ -162,7 +162,7 @@ class FinanceRent(models.Model):
 
 class RentEntry(models.Model):
     id = models.BigAutoField(primary_key=True)
-    godown = models.ForeignKey(Godown, on_delete=models.DO_NOTHING, related_name='rent_entries')
+    godown = models.ForeignKey(Godown, on_delete=models.CASCADE, related_name='rent_entries', db_column='hub_id')
     rent_month = models.CharField(max_length=7)
     due_date = models.DateField()
     due_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -178,7 +178,7 @@ class RentEntry(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'rent_entry'
+        db_table = 'hub_rent_entries'
         unique_together = (('godown', 'rent_month'),)
 
     def __str__(self):
@@ -187,7 +187,7 @@ class RentEntry(models.Model):
 
 class Asset(models.Model):
     id = models.BigAutoField(primary_key=True)
-    godown = models.ForeignKey(Godown, on_delete=models.DO_NOTHING, related_name='assets')
+    godown = models.ForeignKey(Godown, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets', db_column='hub_id')
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, blank=True, null=True)
@@ -203,7 +203,7 @@ class Asset(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'asset'
+        db_table = 'hub_assets'
 
     def __str__(self):
         return f"{self.name} ({self.category})"
@@ -211,7 +211,7 @@ class Asset(models.Model):
 
 class Employee(models.Model):
     id = models.BigAutoField(primary_key=True)
-    godown = models.ForeignKey(Godown, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='employees')
+    godown = models.ForeignKey(Godown, on_delete=models.SET_NULL, blank=True, null=True, related_name='employees', db_column='hub_id')
     full_name = models.CharField(max_length=150)
     role = models.CharField(max_length=100)
     phone = models.CharField(max_length=50, blank=True, null=True)
@@ -225,7 +225,7 @@ class Employee(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'employee'
+        db_table = 'hub_staff'
 
     def __str__(self):
         return f"{self.full_name} - {self.role}"
@@ -246,7 +246,7 @@ class SalaryPayment(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'salary_payment'
+        db_table = 'hub_staff'
         unique_together = (('employee', 'payment_month'),)
 
     def __str__(self):
@@ -255,7 +255,7 @@ class SalaryPayment(models.Model):
 
 class Expense(models.Model):
     id = models.BigAutoField(primary_key=True)
-    godown = models.ForeignKey(Godown, on_delete=models.DO_NOTHING, related_name='expenses')
+    godown = models.ForeignKey(Godown, on_delete=models.CASCADE, related_name='expenses', db_column='hub_id')
     category = models.CharField(max_length=100)
     title = models.CharField(max_length=250)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
@@ -274,51 +274,15 @@ class Expense(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'expense'
+        db_table = 'hub_bills'
 
     def __str__(self):
         return f"{self.title} - INR {self.amount}"
 
 
-class Document(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    godown = models.ForeignKey(Godown, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='documents')
-    file_name = models.CharField(max_length=255)
-    file_type = models.CharField(max_length=100)
-    file_size = models.BigIntegerField()
-    storage_path = models.CharField(max_length=500)
-    public_url = models.TextField()
-    document_type = models.CharField(max_length=100, default='OTHER')
-    description = models.TextField(blank=True, null=True)
-    is_deleted = models.BooleanField(default=False)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        managed = False
-        db_table = 'document'
-
-    def __str__(self):
-        return self.file_name
-
-
-class ActivityLog(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    entity_type = models.CharField(max_length=100)
-    entity_id = models.BigIntegerField()
-    action = models.CharField(max_length=50)
-    description = models.TextField()
-    performed_by = models.CharField(max_length=100, default='admin')
-    created_at = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        managed = False
-        db_table = 'activity_log'
-
-
 class AppSettings(models.Model):
     id = models.BigAutoField(primary_key=True)
-    company_name = models.CharField(max_length=200, default='RGS Enterprises Godown Portfolio')
+    company_name = models.CharField(max_length=200, default='RGS ENTERPRISES')
     logo_url = models.TextField(blank=True, null=True)
     currency_symbol = models.CharField(max_length=10, default='₹')
     contact_email = models.CharField(max_length=100, blank=True, null=True, default='rgsenterprise2026@gmail.com')

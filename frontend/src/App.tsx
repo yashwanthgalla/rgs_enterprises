@@ -15,7 +15,6 @@ import { Expenses } from './pages/Expenses';
 import { Finance } from './pages/Finance';
 import { StaffDirectory } from './pages/Staff';
 import { Assets } from './pages/Assets';
-import { Documents } from './pages/Documents';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 
@@ -51,7 +50,7 @@ export const App: React.FC = () => {
                   <Route path="expenses/wifi" element={<Navigate to="/information/wifi" replace />} />
                   <Route path="staff" element={<StaffDirectory />} />
                   <Route path="assets" element={<Assets />} />
-                  <Route path="documents" element={<Documents />} />
+                  <Route path="documents" element={<Navigate to="/" replace />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>

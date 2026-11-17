@@ -103,6 +103,7 @@ export interface FinanceTotalRevenue {
   rent: number;
   setupCostPerMonth: number;
   electricity: number;
+  wifi: number;
   manpower: number;
   housekeeping: number;
   wmRefreshmentPettyCash: number;
@@ -124,6 +125,7 @@ export interface FinanceRent {
   gstAmount: number;
   totalRentIncludingGst: number;
   electricityBill: number;
+  wifiBill: number;
   sorterPayments: number;
   pettyCash: number;
   total: number;

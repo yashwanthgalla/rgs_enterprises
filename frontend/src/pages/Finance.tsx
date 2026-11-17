@@ -78,6 +78,7 @@ export const Finance: React.FC = () => {
     rent: '',
     setupCostPerMonth: '',
     electricity: '',
+    wifi: '',
     manpower: '',
     housekeeping: '',
     wmRefreshmentPettyCash: '',
@@ -95,6 +96,7 @@ export const Finance: React.FC = () => {
     applyTds: false,
     applyGst: false,
     electricityBill: '',
+    wifiBill: '',
     sorterPayments: '',
     pettyCash: '',
     total: '',
@@ -165,19 +167,19 @@ export const Finance: React.FC = () => {
     const rent = parseFloat(form.rent) || 0;
     const setup = parseFloat(form.setupCostPerMonth) || 0;
     const elec = parseFloat(form.electricity) || 0;
+    const wifi = parseFloat(form.wifi) || 0;
     const manpower = parseFloat(form.manpower) || 0;
     const house = parseFloat(form.housekeeping) || 0;
     const wm = parseFloat(form.wmRefreshmentPettyCash) || 0;
-    return Number((rent + setup + elec + manpower + house + wm).toFixed(2));
+    return Number((rent + setup + elec + wifi + manpower + house + wm).toFixed(2));
   };
 
-  // Rent Live Auto Calculations
   // Rent Live Auto Calculations with Gated TDS & GST:
   // TDS Amount = applyTds ? (Rent * 10%) : 0
   // Total Rent After TDS = Rent - TDS Amount
   // GST Amount = applyGst ? (Rent * 18%) : 0
   // Total Rent Including GST = Total Rent After TDS + GST Amount
-  // Total = Total Rent Including GST + Electricity Bill + Sorter Payments + Petty Cash
+  // Total = Total Rent Including GST + Electricity Bill + WiFi Bill + Sorter Payments + Petty Cash
   const calcRentMath = (form: typeof rentForm) => {
     const rent = parseFloat(form.rent) || 0;
     const tdsAmount = form.applyTds ? Number((rent * 0.10).toFixed(2)) : 0;
@@ -185,9 +187,10 @@ export const Finance: React.FC = () => {
     const gstAmount = form.applyGst ? Number((rent * 0.18).toFixed(2)) : 0;
     const totalRentIncludingGst = Number((totalRentAfterTds + gstAmount).toFixed(2));
     const elec = parseFloat(form.electricityBill) || 0;
+    const wifi = parseFloat(form.wifiBill) || 0;
     const sorter = parseFloat(form.sorterPayments) || 0;
     const petty = parseFloat(form.pettyCash) || 0;
-    const total = Number((totalRentIncludingGst + elec + sorter + petty).toFixed(2));
+    const total = Number((totalRentIncludingGst + elec + wifi + sorter + petty).toFixed(2));
 
     return {
       rent,
@@ -196,6 +199,7 @@ export const Finance: React.FC = () => {
       gstAmount,
       totalRentIncludingGst,
       elec,
+      wifi,
       sorter,
       petty,
       total,
@@ -211,6 +215,7 @@ export const Finance: React.FC = () => {
       rent: '',
       setupCostPerMonth: '',
       electricity: '',
+      wifi: '',
       manpower: '',
       housekeeping: '',
       wmRefreshmentPettyCash: '',
@@ -227,6 +232,7 @@ export const Finance: React.FC = () => {
       rent: String(item.rent || ''),
       setupCostPerMonth: String(item.setupCostPerMonth || ''),
       electricity: String(item.electricity || ''),
+      wifi: String(item.wifi || ''),
       manpower: String(item.manpower || ''),
       housekeeping: String(item.housekeeping || ''),
       wmRefreshmentPettyCash: String(item.wmRefreshmentPettyCash || ''),
@@ -263,6 +269,7 @@ export const Finance: React.FC = () => {
         rent: Number(parseFloat(revenueForm.rent || '0').toFixed(2)),
         setupCostPerMonth: Number(parseFloat(revenueForm.setupCostPerMonth || '0').toFixed(2)),
         electricity: Number(parseFloat(revenueForm.electricity || '0').toFixed(2)),
+        wifi: Number(parseFloat(revenueForm.wifi || '0').toFixed(2)),
         manpower: Number(parseFloat(revenueForm.manpower || '0').toFixed(2)),
         housekeeping: Number(parseFloat(revenueForm.housekeeping || '0').toFixed(2)),
         wmRefreshmentPettyCash: Number(parseFloat(revenueForm.wmRefreshmentPettyCash || '0').toFixed(2)),
@@ -306,6 +313,7 @@ export const Finance: React.FC = () => {
       applyTds: false,
       applyGst: false,
       electricityBill: '',
+      wifiBill: '',
       sorterPayments: '',
       pettyCash: '',
       total: '',
@@ -331,6 +339,7 @@ export const Finance: React.FC = () => {
       applyTds,
       applyGst,
       electricityBill: String(item.electricityBill || ''),
+      wifiBill: String(item.wifiBill || ''),
       sorterPayments: String(item.sorterPayments || ''),
       pettyCash: String(item.pettyCash || ''),
       total: String(item.total ?? ''),
@@ -387,6 +396,7 @@ export const Finance: React.FC = () => {
         gstAmount: math.gstAmount,
         totalRentIncludingGst: math.totalRentIncludingGst,
         electricityBill: math.elec,
+        wifiBill: math.wifi,
         sorterPayments: math.sorter,
         pettyCash: math.petty,
         total: finalTotal,
@@ -503,6 +513,7 @@ export const Finance: React.FC = () => {
                       <th className="p-3.5 text-right">Rent</th>
                       <th className="p-3.5 text-right">Setup Cost / Mo</th>
                       <th className="p-3.5 text-right">Electricity</th>
+                      <th className="p-3.5 text-right">WiFi</th>
                       <th className="p-3.5 text-right">Manpower</th>
                       <th className="p-3.5 text-right">Housekeeping</th>
                       <th className="p-3.5 text-right">WM & Petty Cash</th>
@@ -527,6 +538,7 @@ export const Finance: React.FC = () => {
                         <td className="p-3.5 text-right">{formatCurrency(item.rent)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.setupCostPerMonth)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.electricity)}</td>
+                        <td className="p-3.5 text-right">{formatCurrency(item.wifi)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.manpower)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.housekeeping)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.wmRefreshmentPettyCash)}</td>
@@ -601,6 +613,7 @@ export const Finance: React.FC = () => {
                       <th className="p-3 text-right">GST (18%)</th>
                       <th className="p-3 text-right font-medium">Inc. GST</th>
                       <th className="p-3 text-right">Electricity</th>
+                      <th className="p-3 text-right">WiFi</th>
                       <th className="p-3 text-right">Sorter</th>
                       <th className="p-3 text-right">Petty Cash</th>
                       <th className="p-3 text-right font-bold text-apple-accent">Total</th>
@@ -643,6 +656,7 @@ export const Finance: React.FC = () => {
                           {formatCurrency(item.totalRentIncludingGst)}
                         </td>
                         <td className="p-3 text-right">{formatCurrency(item.electricityBill)}</td>
+                        <td className="p-3 text-right">{formatCurrency(item.wifiBill)}</td>
                         <td className="p-3 text-right">{formatCurrency(item.sorterPayments)}</td>
                         <td className="p-3 text-right">{formatCurrency(item.pettyCash)}</td>
                         <td className="p-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
@@ -747,6 +761,17 @@ export const Finance: React.FC = () => {
                 placeholder="0.00"
                 value={revenueForm.electricity}
                 onChange={(e) => handleRevenueFieldChange('electricity', e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="WiFi (₹)">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={revenueForm.wifi}
+                onChange={(e) => handleRevenueFieldChange('wifi', e.target.value)}
               />
             </FormField>
 
@@ -896,6 +921,17 @@ export const Finance: React.FC = () => {
                 placeholder="e.g. 12000"
                 value={rentForm.electricityBill}
                 onChange={(e) => handleRentFieldChange('electricityBill', e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="WiFi Bill (₹)">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 1500"
+                value={rentForm.wifiBill}
+                onChange={(e) => handleRentFieldChange('wifiBill', e.target.value)}
               />
             </FormField>
 

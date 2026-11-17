@@ -520,7 +520,7 @@ export const Reports: React.FC = () => {
               Standard Template Columns Exported:
             </span>
             <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed font-mono">
-              Vendor, Hub Status, State, Hub Model, Owner, ERP Name, Start Date, End Date, Tenure, Area, Rent, Setup Cost/Month, Electricity, Manpower, Housekeeping, WM Refreshment/Petty Cash, Total Revenue, Rent, TDS 10%, TDS Amount, Total Rent After TDS, GST 18%, Total Rent Including GST, Electricity Bill, Sorter Payments, Petty Cash, Total, Profit, Margin, Status
+              Vendor, Hub Status, State, Hub Model, Owner, ERP Name, Start Date, End Date, Tenure, Area, Rent, Setup Cost/Month, Electricity, WiFi, Manpower, Housekeeping, WM Refreshment/Petty Cash, Total Revenue, Rent, TDS 10%, TDS Amount, Total Rent After TDS, GST 18%, Total Rent Including GST, Electricity Bill, WiFi Bill, Sorter Payments, Petty Cash, Total, Profit, Margin, Status
             </p>
           </div>
 

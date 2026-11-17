@@ -43,6 +43,7 @@ class FinanceTotalRevenueSerializer(serializers.ModelSerializer):
     rent = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     setupCostPerMonth = serializers.DecimalField(source='setup_cost_per_month', max_digits=12, decimal_places=2, required=False, default=0)
     electricity = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    wifi = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     manpower = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     housekeeping = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     wmRefreshmentPettyCash = serializers.DecimalField(source='wm_refreshment_petty_cash', max_digits=12, decimal_places=2, required=False, default=0)
@@ -54,7 +55,7 @@ class FinanceTotalRevenueSerializer(serializers.ModelSerializer):
         model = FinanceTotalRevenue
         fields = [
             'id', 'hubId', 'hubName', 'financialYear', 'rent',
-            'setupCostPerMonth', 'electricity', 'manpower', 'housekeeping',
+            'setupCostPerMonth', 'electricity', 'wifi', 'manpower', 'housekeeping',
             'wmRefreshmentPettyCash', 'totalRevenue', 'createdAt', 'updatedAt'
         ]
 
@@ -71,6 +72,7 @@ class FinanceRentSerializer(serializers.ModelSerializer):
     gstAmount = serializers.DecimalField(source='gst_amount', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     totalRentIncludingGst = serializers.DecimalField(source='total_rent_including_gst', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     electricityBill = serializers.DecimalField(source='electricity_bill', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
+    wifiBill = serializers.DecimalField(source='wifi_bill', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     sorterPayments = serializers.DecimalField(source='sorter_payments', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     pettyCash = serializers.DecimalField(source='petty_cash', max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
@@ -84,7 +86,7 @@ class FinanceRentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'hubId', 'hubName', 'period', 'rent', 'tdsPercent', 'tdsAmount',
             'totalRentAfterTds', 'gstPercent', 'gstAmount', 'totalRentIncludingGst',
-            'electricityBill', 'sorterPayments', 'pettyCash', 'total',
+            'electricityBill', 'wifiBill', 'sorterPayments', 'pettyCash', 'total',
             'tdsApplied', 'gstApplied',
             'createdAt', 'updatedAt'
         ]

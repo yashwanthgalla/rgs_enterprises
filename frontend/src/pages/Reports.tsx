@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   BarChart3,
   Download,
@@ -142,24 +142,32 @@ export const Reports: React.FC = () => {
     setIsExportModalOpen(false);
   };
 
-  // Standardized schema metrics with clean fallback
-  const totalRevenue = summary?.totalRevenue ?? summary?.totalRentalIncome ?? 0;
-  const totalRent = summary?.totalRent ?? summary?.totalRentOutflow ?? summary?.totalExpenses ?? 0;
-  const totalProfit = summary?.totalProfit ?? (totalRevenue - totalRent);
-  const totalMargin = summary?.totalMargin ?? totalProfit;
-  const marginPct =
-    summary?.marginPercent ??
-    (totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0);
+  // Standardized schema metrics with clean fallback (memoized to prevent recalculation)
+  const { totalRevenue, totalRent, totalProfit, totalMargin, marginPct } = useMemo(() => {
+    const rev = summary?.totalRevenue ?? summary?.totalRentalIncome ?? 0;
+    const rent = summary?.totalRent ?? summary?.totalRentOutflow ?? summary?.totalExpenses ?? 0;
+    const profit = summary?.totalProfit ?? (rev - rent);
+    const margin = summary?.totalMargin ?? profit;
+    const pct = summary?.marginPercent ?? (rev > 0 ? Math.round((profit / rev) * 100) : 0);
+    return { totalRevenue: rev, totalRent: rent, totalProfit: profit, totalMargin: margin, marginPct: pct };
+  }, [summary]);
 
-  // Sums across PnL list for table footer
-  const tableTotalRevenue = pnlList.reduce((acc, r) => acc + (r.totalRevenue ?? 0), 0);
-  const tableTotalRent = pnlList.reduce((acc, r) => acc + (r.totalRent ?? 0), 0);
-  const tableTotalProfit = pnlList.reduce((acc, r) => acc + (r.totalProfit ?? 0), 0);
-  const tableTotalMargin = pnlList.reduce((acc, r) => acc + (r.margin ?? 0), 0);
+  // Sums across PnL list for table footer (memoized)
+  const { tableTotalRevenue, tableTotalRent, tableTotalProfit, tableTotalMargin } = useMemo(() => {
+    return pnlList.reduce(
+      (acc, r) => ({
+        tableTotalRevenue: acc.tableTotalRevenue + (r.totalRevenue ?? 0),
+        tableTotalRent: acc.tableTotalRent + (r.totalRent ?? 0),
+        tableTotalProfit: acc.tableTotalProfit + (r.totalProfit ?? 0),
+        tableTotalMargin: acc.tableTotalMargin + (r.margin ?? 0),
+      }),
+      { tableTotalRevenue: 0, tableTotalRent: 0, tableTotalProfit: 0, tableTotalMargin: 0 }
+    );
+  }, [pnlList]);
 
-  const selectedExportGodown = godowns.find(
-    (g) => String(g.id) === String(selectedExportHubId)
-  );
+  const selectedExportGodown = useMemo(() => {
+    return godowns.find((g) => String(g.id) === String(selectedExportHubId));
+  }, [godowns, selectedExportHubId]);
 
   return (
     <div className="space-y-6 animate-fadeIn">

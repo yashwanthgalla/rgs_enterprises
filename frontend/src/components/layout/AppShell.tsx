@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '../../context/AuthContext';
-import { FirstLoginModal } from '../common/FirstLoginModal';
+
+// Lazy-load FirstLoginModal so users only load it when required
+const FirstLoginModal = lazy(() =>
+  import('../common/FirstLoginModal').then((m) => ({ default: m.FirstLoginModal }))
+);
 
 export const AppShell: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -41,7 +45,9 @@ export const AppShell: React.FC = () => {
       </div>
 
       {/* Mandatory Password/Profile Change Modal on First Login */}
-      <FirstLoginModal />
+      <Suspense fallback={null}>
+        <FirstLoginModal />
+      </Suspense>
     </div>
   );
 };

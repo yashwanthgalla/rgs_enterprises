@@ -28,6 +28,65 @@ export const api = axios.create({
   timeout: 30000,
 });
 
+// In-Memory Request Cache & In-Flight Promise Deduplication Layer
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const apiCache = new Map<string, CacheEntry>();
+const inFlightRequests = new Map<string, Promise<any>>();
+const DEFAULT_TTL_MS = 25000; // 25s TTL for smooth instant page navigation
+
+export const clearApiCache = (pattern?: string | RegExp) => {
+  if (!pattern) {
+    apiCache.clear();
+    return;
+  }
+  for (const key of apiCache.keys()) {
+    if (typeof pattern === 'string' ? key.includes(pattern) : pattern.test(key)) {
+      apiCache.delete(key);
+    }
+  }
+};
+
+// Cached & Deduplicated GET Request Dispatcher
+export const cachedGet = async <T = any>(
+  url: string,
+  config?: any,
+  ttlMs = DEFAULT_TTL_MS
+): Promise<T> => {
+  const skipCache = Boolean(config?.skipCache);
+  const cacheKey = `${url}?${JSON.stringify(config?.params || {})}`;
+
+  // 1. Serve from TTL cache if valid and not skipping
+  if (!skipCache) {
+    const entry = apiCache.get(cacheKey);
+    if (entry && Date.now() - entry.timestamp < ttlMs) {
+      return entry.data as T;
+    }
+  }
+
+  // 2. Return identical pending in-flight promise to prevent duplicate wire calls
+  if (inFlightRequests.has(cacheKey)) {
+    return inFlightRequests.get(cacheKey) as Promise<T>;
+  }
+
+  // 3. Dispatch fresh request and share promise
+  const promise = api.get(url, config)
+    .then((res) => {
+      const unwrapped = unwrap<T>(res);
+      apiCache.set(cacheKey, { data: unwrapped, timestamp: Date.now() });
+      return unwrapped;
+    })
+    .finally(() => {
+      inFlightRequests.delete(cacheKey);
+    });
+
+  inFlightRequests.set(cacheKey, promise);
+  return promise;
+};
+
 // Interceptor to inject JWT Bearer Token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -40,13 +99,33 @@ api.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 );
 
-// Interceptor to handle unauthenticated 401s and extract server error messages
+// Interceptor to handle unauthenticated 401s, invalidate caches on mutations, and format errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Invalidate relevant cache keys upon any successful data mutation
+    const method = response.config.method?.toUpperCase();
+    if (method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const url = response.config.url || '';
+      if (url.includes('/godowns')) clearApiCache('godown');
+      if (url.includes('/finance')) clearApiCache('finance');
+      if (url.includes('/rent')) clearApiCache('rent');
+      if (url.includes('/expenses')) clearApiCache('expense');
+      if (url.includes('/employees') || url.includes('/staff')) clearApiCache('employee');
+      if (url.includes('/assets')) clearApiCache('asset');
+      if (url.includes('/reports')) clearApiCache('report');
+      if (url.includes('/dashboard')) clearApiCache('dashboard');
+      // Cross-cutting mutations clear financial stats and reports
+      clearApiCache('stats');
+      clearApiCache('summary');
+      clearApiCache('cashflow');
+    }
+    return response;
+  },
   (error: AxiosError<any>) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      apiCache.clear();
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
@@ -149,11 +228,11 @@ export const normalizeSettings = (s: any): AppSettings => {
   };
 };
 
-// API Services
+// API Services with Intelligent Caching & Request Deduplication
 export const authApi = {
   login: (data: { username: string; password: string }) =>
     api.post('/auth/login', data).then(unwrap),
-  me: () => api.get('/auth/me').then(unwrap),
+  me: () => cachedGet('/auth/me', {}, 60000), // 1 min TTL for auth/me
   updateProfile: (data: {
     username?: string;
     newUsername?: string;
@@ -167,27 +246,27 @@ export const authApi = {
 };
 
 export const dashboardApi = {
-  getStats: () => api.get('/dashboard/stats').then(unwrap),
-  getReminders: () => api.get('/dashboard/reminders').then(unwrap),
-  getCashflowTrend: (months = 6) =>
-    api.get(`/dashboard/cashflow-trend?months=${months}`).then(unwrap),
+  getStats: (skipCache = false) => cachedGet('/dashboard/stats', { skipCache }, 15000),
+  getReminders: (skipCache = false) => cachedGet('/dashboard/reminders', { skipCache }, 20000),
+  getCashflowTrend: (months = 6, skipCache = false) =>
+    cachedGet(`/dashboard/cashflow-trend?months=${months}`, { skipCache }, 30000),
 };
 
 export const godownApi = {
-  getAll: (page = 0, size = 50) =>
-    api.get(`/godowns?page=${page}&size=${size}`).then(unwrap).then((res: any) => {
+  getAll: (page = 0, size = 50, skipCache = false) =>
+    cachedGet(`/godowns?page=${page}&size=${size}`, { skipCache }, 20000).then((res: any) => {
       if (res?.content) {
         return { ...res, content: res.content.map(normalizeGodown) };
       }
       return normalizeList(res, normalizeGodown);
     }),
-  getAllList: () =>
-    api.get('/godowns/all').then(unwrap).then((res: any) => normalizeList(res, normalizeGodown)),
-  getCities: () => api.get('/godowns/cities').then(unwrap),
-  getById: (id: number | string) =>
-    api.get(`/godowns/${id}`).then(unwrap).then(normalizeGodown),
-  getSummary: (id: number | string) =>
-    api.get(`/godowns/${id}/summary`).then(unwrap),
+  getAllList: (skipCache = false) =>
+    cachedGet('/godowns/all', { skipCache }, 30000).then((res: any) => normalizeList(res, normalizeGodown)),
+  getCities: (skipCache = false) => cachedGet('/godowns/cities', { skipCache }, 60000),
+  getById: (id: number | string, skipCache = false) =>
+    cachedGet(`/godowns/${id}`, { skipCache }, 20000).then(normalizeGodown),
+  getSummary: (id: number | string, skipCache = false) =>
+    cachedGet(`/godowns/${id}/summary`, { skipCache }, 20000),
   create: (data: any) => {
     const payload = {
       name: data.name || data.erpName,
@@ -293,8 +372,8 @@ export const godownApi = {
 };
 
 export const financeApi = {
-  getTotalRevenues: (params?: { hubId?: number | string; financialYear?: string }) =>
-    api.get('/finance/total-revenue', { params }).then(unwrap),
+  getTotalRevenues: (params?: { hubId?: number | string; financialYear?: string }, skipCache = false) =>
+    cachedGet('/finance/total-revenue', { params, skipCache }, 20000),
   createTotalRevenue: (data: any) =>
     api.post('/finance/total-revenue', data).then(unwrap),
   updateTotalRevenue: (id: number | string, data: any) =>
@@ -302,8 +381,8 @@ export const financeApi = {
   deleteTotalRevenue: (id: number | string) =>
     api.delete(`/finance/total-revenue/${id}`).then(unwrap),
 
-  getRents: (params?: { hubId?: number | string; period?: string }) =>
-    api.get('/finance/rent', { params }).then(unwrap),
+  getRents: (params?: { hubId?: number | string; period?: string }, skipCache = false) =>
+    cachedGet('/finance/rent', { params, skipCache }, 20000),
   createRent: (data: any) =>
     api.post('/finance/rent', data).then(unwrap),
   updateRent: (id: number | string, data: any) =>
@@ -313,70 +392,59 @@ export const financeApi = {
 };
 
 export const rentApi = {
-  getAll: (params?: { page?: number; size?: number; status?: string; month?: string; godownId?: number }) =>
-    api.get('/rent-entries', { params }).then(unwrap).then((res: any) => {
+  getAll: (params?: { page?: number; size?: number; status?: string; month?: string; godownId?: number }, skipCache = false) =>
+    cachedGet('/rent-entries', { params, skipCache }, 15000).then((res: any) => {
       if (res?.content) {
         return { ...res, content: res.content.map(normalizeRentEntry) };
       }
       return normalizeList(res, normalizeRentEntry);
     }),
-  getByGodown: (godownId: number | string) =>
-    api.get(`/rent-entries/godown/${godownId}`).then(unwrap).then((res: any) => normalizeList(res, normalizeRentEntry)),
-  getById: (id: number | string) =>
-    api.get(`/rent-entries/${id}`).then(unwrap).then(normalizeRentEntry),
+  getByGodown: (godownId: number | string, skipCache = false) =>
+    cachedGet(`/rent-entries/godown/${godownId}`, { skipCache }, 20000).then((res: any) => normalizeList(res, normalizeRentEntry)),
+  getById: (id: number | string, skipCache = false) =>
+    cachedGet(`/rent-entries/${id}`, { skipCache }, 20000).then(normalizeRentEntry),
+  recordPayment: (id: number | string, data?: any) => {
+    const payload = {
+      paidAmount: Number(data?.paidAmount || data?.amountPaid || 0),
+      paidDate: data?.paidDate || data?.paymentDate || new Date().toISOString().slice(0, 10),
+      paymentMethod: data?.paymentMethod || 'BANK_TRANSFER',
+      referenceNumber: data?.referenceNumber || data?.transactionRef || null,
+      notes: data?.notes || null,
+    };
+    return api.post(`/rent-entries/${id}/pay`, payload).then(unwrap).then(normalizeRentEntry);
+  },
   create: (data: any) => {
     const payload = {
       godownId: Number(data.godownId),
       rentMonth: data.rentMonth || data.month,
-      dueDate: data.dueDate,
       dueAmount: Number(data.dueAmount ?? data.amountDue ?? 0),
-      paidAmount: Number(data.paidAmount ?? data.amountPaid ?? 0),
+      dueDate: data.dueDate,
       status: data.status || 'DUE',
-      paymentMethod: data.paymentMethod || null,
-      transactionRef: data.transactionRef || data.referenceNumber || null,
       notes: data.notes || null,
     };
     return api.post('/rent-entries', payload).then(unwrap).then(normalizeRentEntry);
   },
-  recordPayment: (id: number | string, data: {
-    amountPaid?: number;
-    paidAmount?: number;
-    paymentMethod: string;
-    referenceNumber?: string;
-    transactionRef?: string;
-    notes?: string;
-    paymentDate?: string;
-  }) => {
-    const payload = {
-      paidAmount: Number(data.paidAmount ?? data.amountPaid ?? 0),
-      paymentDate: data.paymentDate || new Date().toISOString().slice(0, 10),
-      paymentMethod: data.paymentMethod || 'UPI',
-      transactionRef: data.transactionRef || data.referenceNumber || null,
-      notes: data.notes || null,
-    };
-    return api.post(`/rent-entries/${id}/pay`, payload).then(unwrap).then(normalizeRentEntry);
-  },
+  delete: (id: number | string) => api.delete(`/rent-entries/${id}`).then(unwrap),
 };
 
 export const expenseApi = {
-  getAll: (params?: { page?: number; size?: number; status?: string; category?: string; godownId?: number }) =>
-    api.get('/expenses', { params }).then(unwrap).then((res: any) => {
+  getAll: (params?: { page?: number; size?: number; category?: string; month?: string; godownId?: number }, skipCache = false) =>
+    cachedGet('/expenses', { params, skipCache }, 15000).then((res: any) => {
       if (res?.content) {
         return { ...res, content: res.content.map(normalizeExpense) };
       }
       return normalizeList(res, normalizeExpense);
     }),
-  getByGodown: (godownId: number | string) =>
-    api.get(`/expenses/godown/${godownId}`).then(unwrap).then((res: any) => normalizeList(res, normalizeExpense)),
-  getById: (id: number | string) =>
-    api.get(`/expenses/${id}`).then(unwrap).then(normalizeExpense),
+  getByGodown: (godownId: number | string, skipCache = false) =>
+    cachedGet(`/expenses/godown/${godownId}`, { skipCache }, 20000).then((res: any) => normalizeList(res, normalizeExpense)),
+  getById: (id: number | string, skipCache = false) =>
+    cachedGet(`/expenses/${id}`, { skipCache }, 20000).then(normalizeExpense),
   create: (data: any) => {
     const payload = {
-      godownId: data.godownId ? Number(data.godownId) : 1,
+      godownId: data.godownId ? Number(data.godownId) : null,
       category: data.category || 'ELECTRICITY',
-      title: data.title,
-      amount: Number(data.amount),
-      responsibility: data.responsibility || data.billResponsibility || 'COMPANY',
+      billResponsibility: data.billResponsibility || 'COMPANY',
+      amount: Number(data.amount || 0),
       status: data.status || 'PENDING',
       billDate: data.billDate || data.expenseDate || new Date().toISOString().slice(0, 10),
       dueDate: data.dueDate || null,
@@ -397,17 +465,17 @@ export const expenseApi = {
 };
 
 export const employeeApi = {
-  getAll: (params?: { page?: number; size?: number; status?: string; godownId?: number }) =>
-    api.get('/employees', { params }).then(unwrap).then((res: any) => {
+  getAll: (params?: { page?: number; size?: number; status?: string; godownId?: number }, skipCache = false) =>
+    cachedGet('/employees', { params, skipCache }, 20000).then((res: any) => {
       if (res?.content) {
         return { ...res, content: res.content.map(normalizeStaff) };
       }
       return normalizeList(res, normalizeStaff);
     }),
-  getByGodown: (godownId: number | string) =>
-    api.get(`/employees/godown/${godownId}`).then(unwrap).then((res: any) => normalizeList(res, normalizeStaff)),
-  getById: (id: number | string) =>
-    api.get(`/employees/${id}`).then(unwrap).then(normalizeStaff),
+  getByGodown: (godownId: number | string, skipCache = false) =>
+    cachedGet(`/employees/godown/${godownId}`, { skipCache }, 20000).then((res: any) => normalizeList(res, normalizeStaff)),
+  getById: (id: number | string, skipCache = false) =>
+    cachedGet(`/employees/${id}`, { skipCache }, 20000).then(normalizeStaff),
   create: (data: any) => {
     const payload = {
       godownId: data.godownId ? Number(data.godownId) : null,
@@ -425,10 +493,10 @@ export const employeeApi = {
 };
 
 export const salaryApi = {
-  getAll: (params?: { page?: number; size?: number; employeeId?: number; month?: string }) =>
-    api.get('/salary-payments', { params }).then(unwrap),
-  getByEmployee: (employeeId: number | string) =>
-    api.get(`/salary-payments/employee/${employeeId}`).then(unwrap),
+  getAll: (params?: { page?: number; size?: number; employeeId?: number; month?: string }, skipCache = false) =>
+    cachedGet('/salary-payments', { params, skipCache }, 15000),
+  getByEmployee: (employeeId: number | string, skipCache = false) =>
+    cachedGet(`/salary-payments/employee/${employeeId}`, { skipCache }, 20000),
   create: (data: any) => {
     const payload = {
       employeeId: Number(data.employeeId),
@@ -444,17 +512,17 @@ export const salaryApi = {
 };
 
 export const assetApi = {
-  getAll: (params?: { page?: number; size?: number; status?: string; godownId?: number }) =>
-    api.get('/assets', { params }).then(unwrap).then((res: any) => {
+  getAll: (params?: { page?: number; size?: number; status?: string; godownId?: number }, skipCache = false) =>
+    cachedGet('/assets', { params, skipCache }, 20000).then((res: any) => {
       if (res?.content) {
         return { ...res, content: res.content.map(normalizeAsset) };
       }
       return normalizeList(res, normalizeAsset);
     }),
-  getByGodown: (godownId: number | string) =>
-    api.get(`/assets/godown/${godownId}`).then(unwrap).then((res: any) => normalizeList(res, normalizeAsset)),
-  getById: (id: number | string) =>
-    api.get(`/assets/${id}`).then(unwrap).then(normalizeAsset),
+  getByGodown: (godownId: number | string, skipCache = false) =>
+    cachedGet(`/assets/godown/${godownId}`, { skipCache }, 20000).then((res: any) => normalizeList(res, normalizeAsset)),
+  getById: (id: number | string, skipCache = false) =>
+    cachedGet(`/assets/${id}`, { skipCache }, 20000).then(normalizeAsset),
   create: (data: any) => {
     const payload = {
       godownId: data.godownId ? Number(data.godownId) : null,
@@ -474,11 +542,11 @@ export const assetApi = {
 };
 
 export const documentApi = {
-  getAll: (params?: { page?: number; size?: number; godownId?: number }) =>
-    api.get('/documents', { params }).then(unwrap),
-  getByGodown: (godownId: number | string) =>
-    api.get(`/documents/godown/${godownId}`).then(unwrap),
-  getById: (id: number | string) => api.get(`/documents/${id}`).then(unwrap),
+  getAll: (params?: { page?: number; size?: number; godownId?: number }, skipCache = false) =>
+    cachedGet('/documents', { params, skipCache }, 20000),
+  getByGodown: (godownId: number | string, skipCache = false) =>
+    cachedGet(`/documents/godown/${godownId}`, { skipCache }, 20000),
+  getById: (id: number | string, skipCache = false) => cachedGet(`/documents/${id}`, { skipCache }, 20000),
   upload: (formData: FormData) =>
     api.post('/documents/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -488,10 +556,10 @@ export const documentApi = {
 };
 
 export const reportApi = {
-  getSummary: (year?: number) =>
-    api.get('/reports/summary', { params: { year } }).then(unwrap),
-  getGodownPnl: (year?: number) =>
-    api.get('/reports/godown-pnl', { params: { year } }).then(unwrap),
+  getSummary: (year?: number, skipCache = false) =>
+    cachedGet('/reports/summary', { params: { year }, skipCache }, 30000),
+  getGodownPnl: (year?: number, skipCache = false) =>
+    cachedGet('/reports/godown-pnl', { params: { year }, skipCache }, 30000),
   exportCsvUrl: (params?: { year?: number; type?: 'total' | 'single'; hubId?: number | string } | number) => {
     if (typeof params === 'number') {
       return `${API_BASE_URL}/reports/export-csv?year=${params}`;
@@ -506,7 +574,7 @@ export const reportApi = {
 };
 
 export const settingsApi = {
-  get: () => api.get('/settings').then(unwrap).then(normalizeSettings),
+  get: (skipCache = false) => cachedGet('/settings', { skipCache }, 60000).then(normalizeSettings),
   update: (data: any) => {
     const payload = {
       companyName: data.companyName,

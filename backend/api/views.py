@@ -195,22 +195,39 @@ def dashboard_stats_view(request):
     total_revenue_sum = Decimal('0')
     total_rent_sum = Decimal('0')
 
+    # Optimized Bulk Fetch: eliminate N+1 queries across godowns
+    hub_ids = [h.id for h in godowns]
+
+    # Pre-fetch latest revenue records for all hubs
+    rev_records = FinanceTotalRevenue.objects.filter(hub_id__in=hub_ids).order_by('financial_year', 'id')
+    latest_rev_by_hub = {}
+    for r in rev_records:
+        latest_rev_by_hub[r.hub_id] = r.total_revenue
+
+    # Pre-fetch current month rent records
+    rent_curr = FinanceRent.objects.filter(hub_id__in=hub_ids, period=current_month_str)
+    curr_rent_by_hub = {r.hub_id: r.total for r in rent_curr}
+
+    # Pre-fetch latest rent records as fallback
+    rent_latest = FinanceRent.objects.filter(hub_id__in=hub_ids).order_by('period', 'id')
+    latest_rent_by_hub = {}
+    for r in rent_latest:
+        latest_rent_by_hub[r.hub_id] = r.total
+
     for hub in godowns:
-        # Hub's Total Revenue: check FinanceTotalRevenue for this hub, else fallback to hub.monthly_rent
-        hub_rev_rec = FinanceTotalRevenue.objects.filter(hub=hub).order_by('-financial_year', '-id').first()
-        if hub_rev_rec and hub_rev_rec.total_revenue is not None:
-            hub_revenue = Decimal(str(hub_rev_rec.total_revenue))
+        hub_rev_val = latest_rev_by_hub.get(hub.id)
+        if hub_rev_val is not None:
+            hub_revenue = Decimal(str(hub_rev_val))
         else:
             hub_revenue = Decimal(str(hub.monthly_rent or '0'))
         total_revenue_sum += hub_revenue
 
-        # Hub's Rent Total: check FinanceRent for current month or latest period, else fallback to hub.monthly_rent
-        hub_rent_rec = FinanceRent.objects.filter(hub=hub, period=current_month_str).first()
-        if not hub_rent_rec:
-            hub_rent_rec = FinanceRent.objects.filter(hub=hub).order_by('-period', '-id').first()
+        hub_rent_val = curr_rent_by_hub.get(hub.id)
+        if hub_rent_val is None:
+            hub_rent_val = latest_rent_by_hub.get(hub.id)
 
-        if hub_rent_rec and hub_rent_rec.total is not None:
-            hub_rent = Decimal(str(hub_rent_rec.total))
+        if hub_rent_val is not None:
+            hub_rent = Decimal(str(hub_rent_val))
         else:
             hub_rent = Decimal(str(hub.monthly_rent or '0'))
         total_rent_sum += hub_rent
@@ -1089,6 +1106,7 @@ def reports_summary_view(request):
     year_str = f"{current_year:04d}"
 
     godowns = Godown.objects.filter(is_deleted=False)
+    hub_ids = [h.id for h in godowns]
     
     total_revenue_sum = Decimal('0')
     total_rent_sum = Decimal('0')
@@ -1096,32 +1114,53 @@ def reports_summary_view(request):
 
     now_month_str = timezone.now().strftime('%Y-%m')
 
+    # Bulk pre-fetch revenue for all hubs
+    all_revs = FinanceTotalRevenue.objects.filter(hub_id__in=hub_ids).order_by('financial_year', 'id')
+    latest_rev_by_hub = {}
+    for r in all_revs:
+        latest_rev_by_hub[r.hub_id] = {
+            'total_revenue': r.total_revenue,
+            'setup_cost': r.setup_cost_per_month or Decimal('0')
+        }
+
+    # Bulk pre-fetch rent records for now_month
+    now_rents = FinanceRent.objects.filter(hub_id__in=hub_ids, period=now_month_str)
+    now_rent_by_hub = {r.hub_id: r.total for r in now_rents}
+
+    # Bulk pre-fetch latest rent records as fallback
+    latest_rents = FinanceRent.objects.filter(hub_id__in=hub_ids).order_by('period', 'id')
+    latest_rent_by_hub = {}
+    for r in latest_rents:
+        latest_rent_by_hub[r.hub_id] = r.total
+
     for hub in godowns:
-        # Hub Total Revenue
-        hub_rev_rec = FinanceTotalRevenue.objects.filter(hub=hub).order_by('-financial_year', '-id').first()
-        if hub_rev_rec and hub_rev_rec.total_revenue is not None:
-            hub_revenue = Decimal(str(hub_rev_rec.total_revenue))
-            setup_cost = Decimal(str(hub_rev_rec.setup_cost_per_month or 0))
+        rev_info = latest_rev_by_hub.get(hub.id)
+        if rev_info and rev_info['total_revenue'] is not None:
+            hub_revenue = Decimal(str(rev_info['total_revenue']))
+            setup_cost = Decimal(str(rev_info['setup_cost']))
         else:
             hub_revenue = Decimal(str(hub.monthly_rent or '0'))
             setup_cost = Decimal('0')
         total_revenue_sum += hub_revenue
         total_setup_cost_sum += setup_cost
 
-        # Hub Rent Outflow
-        hub_rent_rec = FinanceRent.objects.filter(hub=hub, period=now_month_str).first()
-        if not hub_rent_rec:
-            hub_rent_rec = FinanceRent.objects.filter(hub=hub).order_by('-period', '-id').first()
-
-        if hub_rent_rec and hub_rent_rec.total is not None:
-            hub_rent = Decimal(str(hub_rent_rec.total))
+        hub_rent = now_rent_by_hub.get(hub.id)
+        if hub_rent is None:
+            hub_rent = latest_rent_by_hub.get(hub.id)
+        if hub_rent is not None:
+            hub_rent_val = Decimal(str(hub_rent))
         else:
-            hub_rent = Decimal(str(hub.monthly_rent or '0'))
-        total_rent_sum += hub_rent
+            hub_rent_val = Decimal(str(hub.monthly_rent or '0'))
+        total_rent_sum += hub_rent_val
 
     total_profit = total_revenue_sum - total_rent_sum
     total_margin = total_profit - total_setup_cost_sum
     margin_percent = round(float((total_profit / total_revenue_sum * 100) if total_revenue_sum > 0 else Decimal('0')), 1)
+
+    # Bulk pre-fetch monthly rent records for the entire target year (1 query instead of 12 * N queries)
+    year_prefix = f"{current_year:04d}-"
+    year_rents = FinanceRent.objects.filter(hub_id__in=hub_ids, period__startswith=year_prefix)
+    rent_by_hub_month = {(r.hub_id, r.period): r.total for r in year_rents}
 
     # Monthly breakdown for the year
     monthly_data = []
@@ -1132,15 +1171,15 @@ def reports_summary_view(request):
         m_rev = Decimal('0')
         m_rent = Decimal('0')
         for hub in godowns:
-            f_rev = FinanceTotalRevenue.objects.filter(hub=hub).order_by('-financial_year', '-id').first()
-            if f_rev and f_rev.total_revenue is not None:
-                m_rev += Decimal(str(f_rev.total_revenue))
+            rev_info = latest_rev_by_hub.get(hub.id)
+            if rev_info and rev_info['total_revenue'] is not None:
+                m_rev += Decimal(str(rev_info['total_revenue']))
             else:
                 m_rev += Decimal(str(hub.monthly_rent or '0'))
 
-            f_rent = FinanceRent.objects.filter(hub=hub, period=month_str).first()
-            if f_rent and f_rent.total is not None:
-                m_rent += Decimal(str(f_rent.total))
+            f_rent_val = rent_by_hub_month.get((hub.id, month_str))
+            if f_rent_val is not None:
+                m_rent += Decimal(str(f_rent_val))
             elif datetime.date(current_year, m, 1) <= timezone.now().date():
                 m_rent += Decimal(str(hub.monthly_rent or '0'))
 
@@ -1182,24 +1221,41 @@ def reports_godown_pnl_view(request):
     year_str = f"{current_year:04d}"
 
     godowns = Godown.objects.filter(is_deleted=False).order_by('name')
+    hub_ids = [g.id for g in godowns]
     pnl_list = []
     now_month_str = timezone.now().strftime('%Y-%m')
 
+    # Bulk prefetch revenues
+    all_revs = FinanceTotalRevenue.objects.filter(hub_id__in=hub_ids).order_by('financial_year', 'id')
+    latest_rev_by_hub = {}
+    for r in all_revs:
+        latest_rev_by_hub[r.hub_id] = {
+            'total_revenue': r.total_revenue,
+            'setup_cost': r.setup_cost_per_month or Decimal('0')
+        }
+
+    # Bulk prefetch rents for current month and fallback
+    now_rents = FinanceRent.objects.filter(hub_id__in=hub_ids, period=now_month_str)
+    now_rent_by_hub = {r.hub_id: r.total for r in now_rents}
+    latest_rents = FinanceRent.objects.filter(hub_id__in=hub_ids).order_by('period', 'id')
+    latest_rent_by_hub = {}
+    for r in latest_rents:
+        latest_rent_by_hub[r.hub_id] = r.total
+
     for godown in godowns:
-        f_rev = FinanceTotalRevenue.objects.filter(hub=godown).order_by('-financial_year', '-id').first()
-        if f_rev and f_rev.total_revenue is not None:
-            hub_rev = Decimal(str(f_rev.total_revenue))
-            setup_cost = Decimal(str(f_rev.setup_cost_per_month or 0))
+        rev_info = latest_rev_by_hub.get(godown.id)
+        if rev_info and rev_info['total_revenue'] is not None:
+            hub_rev = Decimal(str(rev_info['total_revenue']))
+            setup_cost = Decimal(str(rev_info['setup_cost']))
         else:
             hub_rev = Decimal(str(godown.monthly_rent or '0'))
             setup_cost = Decimal('0')
 
-        f_rent = FinanceRent.objects.filter(hub=godown, period=now_month_str).first()
-        if not f_rent:
-            f_rent = FinanceRent.objects.filter(hub=godown).order_by('-period', '-id').first()
-
-        if f_rent and f_rent.total is not None:
-            hub_rent = Decimal(str(f_rent.total))
+        rent_val = now_rent_by_hub.get(godown.id)
+        if rent_val is None:
+            rent_val = latest_rent_by_hub.get(godown.id)
+        if rent_val is not None:
+            hub_rent = Decimal(str(rent_val))
         else:
             hub_rent = Decimal(str(godown.monthly_rent or '0'))
 

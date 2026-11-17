@@ -18,6 +18,7 @@ import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { CardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { dashboardApi, godownApi } from '../services/api';
@@ -107,40 +108,51 @@ export const Dashboard: React.FC = () => {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Hubs"
-          value={stats?.totalGodowns ?? godowns.length ?? 0}
-          subtitle={`${stats?.totalCapacitySqFt?.toLocaleString('en-IN') || 0} sq.ft total`}
-          icon={Warehouse}
-          color="blue"
-          onClick={() => navigate('/hubs')}
-        />
+        {loading && !stats ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              title="Total Hubs"
+              value={stats?.totalGodowns ?? godowns.length ?? 0}
+              subtitle={`${stats?.totalCapacitySqFt?.toLocaleString('en-IN') || 0} sq.ft total`}
+              icon={Warehouse}
+              color="blue"
+              onClick={() => navigate('/hubs')}
+            />
 
-        <StatCard
-          title="Total Revenue / Month"
-          value={formatCurrency(stats?.monthlyTotalRevenue || 0)}
-          subtitle="Monthly portfolio revenue"
-          icon={TrendingUp}
-          color="green"
-          onClick={() => navigate('/finance/revenue')}
-        />
+            <StatCard
+              title="Total Revenue / Month"
+              value={formatCurrency(stats?.monthlyTotalRevenue || 0)}
+              subtitle="Monthly portfolio revenue"
+              icon={TrendingUp}
+              color="green"
+              onClick={() => navigate('/finance/revenue')}
+            />
 
-        <StatCard
-          title="Profit / Month"
-          value={formatCurrency(stats?.monthlyProfit ?? ((stats?.monthlyTotalRevenue ?? 0) - (stats?.monthlyRentTotal ?? 0)))}
-          icon={TrendingUp}
-          color="purple"
-          onClick={() => navigate('/finance')}
-        />
+            <StatCard
+              title="Profit / Month"
+              value={formatCurrency(stats?.monthlyProfit ?? ((stats?.monthlyTotalRevenue ?? 0) - (stats?.monthlyRentTotal ?? 0)))}
+              icon={TrendingUp}
+              color="purple"
+              onClick={() => navigate('/finance')}
+            />
 
-        <StatCard
-          title="Pending Rent"
-          value={formatCurrency(stats?.pendingRent || 0)}
-          subtitle={`Bills: ${formatCurrency(stats?.totalExpensesThisMonth || 0)}`}
-          icon={AlertTriangle}
-          color="amber"
-          onClick={() => navigate('/finance/rent')}
-        />
+            <StatCard
+              title="Pending Rent"
+              value={formatCurrency(stats?.pendingRent || 0)}
+              subtitle={`Bills: ${formatCurrency(stats?.totalExpensesThisMonth || 0)}`}
+              icon={AlertTriangle}
+              color="amber"
+              onClick={() => navigate('/finance/rent')}
+            />
+          </>
+        )}
       </div>
 
       {/* Split Section: Quick Reminders & Warehouse Snapshot */}
@@ -222,7 +234,10 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto mt-2">
-              <table className="w-full text-left text-xs">
+              {loading && godowns.length === 0 ? (
+                <TableSkeleton rows={4} cols={6} />
+              ) : (
+                <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold">
                     <th className="py-3 px-2">Hub</th>
@@ -275,6 +290,7 @@ export const Dashboard: React.FC = () => {
                   )}
                 </tbody>
               </table>
+              )}
             </div>
           </div>
 

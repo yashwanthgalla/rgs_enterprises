@@ -16,6 +16,9 @@ import {
   X,
   Calendar,
   CheckCircle,
+  Search,
+  Filter,
+  RotateCcw,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -66,6 +69,7 @@ export const Expenses: React.FC = () => {
   const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
   const [submittingBill, setSubmittingBill] = useState(false);
   const [billFormData, setBillFormData] = useState({
+    godownId: '',
     amount: '',
     billDate: new Date().toISOString().slice(0, 10),
     dueDate: '',
@@ -73,6 +77,16 @@ export const Expenses: React.FC = () => {
     status: 'PAID',
     notes: '',
   });
+
+  // Electricity Search & Filter State
+  const [elecSearchQuery, setElecSearchQuery] = useState('');
+  const [elecHubFilter, setElecHubFilter] = useState('ALL');
+  const [elecStatusFilter, setElecStatusFilter] = useState('ALL');
+
+  // WiFi Search & Filter State
+  const [wifiSearchQuery, setWifiSearchQuery] = useState('');
+  const [wifiHubFilter, setWifiHubFilter] = useState('ALL');
+  const [wifiStatusFilter, setWifiStatusFilter] = useState('ALL');
 
   // WiFi Edit / View State
   const [isWifiEditing, setIsWifiEditing] = useState(false);
@@ -96,20 +110,18 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchGodowns();
-  }, []);
-
-  const selectedGodown = godowns.find((g) => String(g.id) === String(selectedHubId)) || godowns[0];
-
-  // Fetch electricity bills for this hub
-  const fetchHubElectricityBills = async (hubId: string | number) => {
-    if (!hubId) return;
+  // Fetch all electricity bills
+  const fetchAllElectricityBills = async () => {
     setLoadingBills(true);
     try {
-      const res = await expenseApi.getByGodown(hubId).catch(() => []);
+      const res = await expenseApi.getAll().catch(() => []);
       const allExpenses: Expense[] = Array.isArray(res) ? res : (res as any)?.content || [];
-      const elecOnly = allExpenses.filter((e) => e.category === 'ELECTRICITY');
+      const elecOnly = allExpenses.filter(
+        (e) =>
+          (e.category || '').toUpperCase() === 'ELECTRICITY' ||
+          (e.title || '').toLowerCase().includes('electricity') ||
+          (e.title || '').toLowerCase().includes('power')
+      );
       setElectricityBills(elecOnly);
     } catch {
       setElectricityBills([]);
@@ -118,15 +130,21 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  // Fetch wifi bills for this hub
-  const fetchHubWifiBills = async (hubId: string | number) => {
-    if (!hubId) return;
+  // Fetch all wifi bills
+  const fetchAllWifiBills = async () => {
     setLoadingWifiBills(true);
     try {
-      const res = await expenseApi.getByGodown(hubId).catch(() => []);
+      const res = await expenseApi.getAll().catch(() => []);
       const allExpenses: Expense[] = Array.isArray(res) ? res : (res as any)?.content || [];
       const wifiOnly = allExpenses.filter(
-        (e) => e.category === 'WIFI' || e.category === 'INTERNET' || e.category === 'BROADBAND'
+        (e) =>
+          (e.category || '').toUpperCase() === 'WIFI' ||
+          (e.category || '').toUpperCase() === 'INTERNET' ||
+          (e.category || '').toUpperCase() === 'BROADBAND' ||
+          (e.title || '').toLowerCase().includes('wifi') ||
+          (e.title || '').toLowerCase().includes('broadband') ||
+          (e.title || '').toLowerCase().includes('internet') ||
+          (e.title || '').toLowerCase().includes('fibernet')
       );
       setWifiBills(wifiOnly);
     } catch {
@@ -135,6 +153,14 @@ export const Expenses: React.FC = () => {
       setLoadingWifiBills(false);
     }
   };
+
+  useEffect(() => {
+    fetchGodowns();
+    fetchAllElectricityBills();
+    fetchAllWifiBills();
+  }, []);
+
+  const selectedGodown = godowns.find((g) => String(g.id) === String(selectedHubId)) || godowns[0];
 
   useEffect(() => {
     if (selectedGodown) {
@@ -149,10 +175,6 @@ export const Expenses: React.FC = () => {
       } else {
         setIsElectricityEditing(true);
       }
-
-      // Fetch electricity and wifi bills for information
-      fetchHubElectricityBills(selectedGodown.id);
-      fetchHubWifiBills(selectedGodown.id);
 
       // Setup WiFi
       const existingBbs = Array.isArray(selectedGodown.broadbandDetails)
@@ -207,14 +229,17 @@ export const Expenses: React.FC = () => {
   // Add Bill for Electricity (information only)
   const handleOpenAddBillModal = () => {
     setBillCategory('ELECTRICITY');
-    const defaultTitle = `${selectedGodown?.electricityProvider || 'Power'} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
+    const defaultHub = elecHubFilter !== 'ALL' ? elecHubFilter : (selectedHubId || String(godowns[0]?.id || ''));
+    const hubObj = godowns.find((g) => String(g.id) === String(defaultHub)) || selectedGodown;
+    const defaultTitle = `${hubObj?.electricityProvider || 'Power'} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
     setBillFormData({
+      godownId: String(defaultHub),
       amount: '',
       billDate: new Date().toISOString().slice(0, 10),
       dueDate: '',
       title: defaultTitle,
       status: 'PAID',
-      notes: selectedGodown?.electricityServiceNumber ? `USC: ${selectedGodown.electricityServiceNumber}` : '',
+      notes: hubObj?.electricityServiceNumber ? `USC: ${hubObj.electricityServiceNumber}` : '',
     });
     setIsAddBillModalOpen(true);
   };
@@ -222,11 +247,13 @@ export const Expenses: React.FC = () => {
   // Add Bill for WiFi / Broadband (information only)
   const handleOpenAddWifiBillModal = (specificLine?: BroadbandConnection) => {
     setBillCategory('WIFI');
+    const defaultHub = wifiHubFilter !== 'ALL' ? wifiHubFilter : (selectedHubId || String(godowns[0]?.id || ''));
     const targetLine = specificLine || broadbandList[0];
     const provider = targetLine?.networkProvider || 'Broadband / WiFi';
     const defaultTitle = `${provider} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
     const lineNotes = targetLine?.accountNumber ? `Account No: ${targetLine.accountNumber}` : '';
     setBillFormData({
+      godownId: String(defaultHub),
       amount: '',
       billDate: new Date().toISOString().slice(0, 10),
       dueDate: '',
@@ -244,10 +271,12 @@ export const Expenses: React.FC = () => {
       return;
     }
 
+    const targetGodownId = billFormData.godownId || selectedHubId || (godowns[0]?.id ? String(godowns[0].id) : '1');
+
     setSubmittingBill(true);
     try {
       await expenseApi.create({
-        godownId: Number(selectedHubId),
+        godownId: Number(targetGodownId),
         category: billCategory,
         title: billFormData.title || (billCategory === 'WIFI' ? 'WiFi Bill' : 'Electricity Bill'),
         amount: Number(billFormData.amount),
@@ -260,9 +289,9 @@ export const Expenses: React.FC = () => {
       success(`${billCategory === 'WIFI' ? 'WiFi' : 'Electricity'} bill saved for information.`);
       setIsAddBillModalOpen(false);
       if (billCategory === 'WIFI') {
-        fetchHubWifiBills(selectedHubId);
+        fetchAllWifiBills();
       } else {
-        fetchHubElectricityBills(selectedHubId);
+        fetchAllElectricityBills();
       }
     } catch (err: any) {
       error('Failed to save bill: ' + (err.message || 'Error'));
@@ -292,6 +321,60 @@ export const Expenses: React.FC = () => {
       error('Failed to delete: ' + err.message);
     }
   };
+
+  // Filtered Electricity Bills
+  const filteredElectricityBills = electricityBills.filter((bill) => {
+    if (elecHubFilter !== 'ALL' && String(bill.godownId) !== String(elecHubFilter)) {
+      return false;
+    }
+    if (elecStatusFilter !== 'ALL' && bill.status !== elecStatusFilter) {
+      return false;
+    }
+    if (elecSearchQuery.trim()) {
+      const q = elecSearchQuery.toLowerCase().trim();
+      const matchTitle = (bill.title || '').toLowerCase().includes(q);
+      const matchNotes = (bill.notes || '').toLowerCase().includes(q);
+      const matchAmount = String(bill.amount || '').includes(q);
+      const matchDate = (bill.expenseDate || '').toLowerCase().includes(q);
+      const hubName =
+        godowns.find((g) => g.id === bill.godownId)?.erpName ||
+        godowns.find((g) => g.id === bill.godownId)?.name ||
+        bill.godownName ||
+        '';
+      const matchHub = hubName.toLowerCase().includes(q);
+      return matchTitle || matchNotes || matchAmount || matchDate || matchHub;
+    }
+    return true;
+  });
+
+  const totalElecAmount = filteredElectricityBills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
+
+  // Filtered WiFi Bills
+  const filteredWifiBills = wifiBills.filter((bill) => {
+    if (wifiHubFilter !== 'ALL' && String(bill.godownId) !== String(wifiHubFilter)) {
+      return false;
+    }
+    if (wifiStatusFilter !== 'ALL' && bill.status !== wifiStatusFilter) {
+      return false;
+    }
+    if (wifiSearchQuery.trim()) {
+      const q = wifiSearchQuery.toLowerCase().trim();
+      const matchTitle = (bill.title || '').toLowerCase().includes(q);
+      const matchNotes = (bill.notes || '').toLowerCase().includes(q);
+      const matchAmount = String(bill.amount || '').includes(q);
+      const matchDate = (bill.expenseDate || '').toLowerCase().includes(q);
+      const hubName =
+        godowns.find((g) => g.id === bill.godownId)?.erpName ||
+        godowns.find((g) => g.id === bill.godownId)?.name ||
+        bill.godownName ||
+        '';
+      const matchHub = hubName.toLowerCase().includes(q);
+      return matchTitle || matchNotes || matchAmount || matchDate || matchHub;
+    }
+    return true;
+  });
+
+  const totalWifiAmount = filteredWifiBills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
 
   // Save WiFi Details
   const handleSaveWifi = async (e: React.FormEvent) => {
@@ -416,217 +499,95 @@ export const Expenses: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'electricity' && (
         <div className="space-y-6">
-          {/* Hub Selector Banner */}
-          <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
-                <Zap className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  Electricity Information by Hub
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Select a hub to view or edit electricity details. Once saved, details display cleanly as a card.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-bold text-gray-600 dark:text-gray-400 shrink-0">
-                Select Hub:
-              </label>
-              <Select
-                value={selectedHubId}
-                onChange={(e) => setSelectedHubId(e.target.value)}
-                className="w-full sm:w-64 font-semibold text-xs"
-              >
-                {godowns.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                  </option>
-                ))}
-              </Select>
-              {selectedHubId && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/hubs/${selectedHubId}`)}
-                  icon={<ExternalLink className="w-3.5 h-3.5" />}
-                  title="View Hub Profile"
-                >
-                  View Hub
-                </Button>
-              )}
-            </div>
-          </Card>
-
-          {/* Electricity Card View OR Edit Form */}
+          {/* Electricity Connection Details: Display Card OR Edit Form */}
           {!isElectricityEditing && hasSavedElectricity ? (
-            /* SAVED DISPLAY CARD WITH SMALL + ADD BILL BUTTON */
-            <div className="space-y-6">
-              <Card className="p-6 overflow-hidden relative">
-                {/* Card Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
-                      <Zap className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                          {selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Electricity Connection
-                        </h4>
-                        {selectedGodown?.code && (
-                          <Badge variant="accent" size="sm">
-                            {selectedGodown.code}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[11px] text-gray-500 font-semibold">Select Hub:</span>
-                        <Select
-                          value={selectedHubId}
-                          onChange={(e) => setSelectedHubId(e.target.value)}
-                          className="font-bold text-xs py-1 px-2.5 h-7.5 min-w-[220px]"
-                        >
-                          {godowns.map((g) => (
-                            <option key={g.id} value={g.id}>
-                              {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
+            /* SAVED DISPLAY CARD */
+            <Card className="p-6 overflow-hidden relative">
+              {/* Card Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
+                    <Zap className="w-5 h-5" />
                   </div>
-
-                  {/* Actions on Card: Small Add Bill button & Edit button */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={handleOpenAddBillModal}
-                      icon={<Plus className="w-3.5 h-3.5" />}
-                      className="rounded-xl shadow-apple-sm text-xs font-semibold px-3 py-1.5"
-                    >
-                      + Add Bill
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsElectricityEditing(true)}
-                      icon={<Pencil className="w-3.5 h-3.5" />}
-                      className="text-xs font-semibold"
-                    >
-                      Edit Details
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Display Values Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Electricity Service Provider
-                    </span>
-                    <p className="text-base font-bold text-gray-900 dark:text-gray-100">
-                      {selectedGodown?.electricityProvider || 'Not Configured'}
-                    </p>
-                    <span className="text-[11px] text-gray-400 mt-1 block">
-                      Active Utility DISCOM / Provider
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                      Electricity Service / USC Number
-                    </span>
-                    <p className="text-base font-mono font-bold text-gray-900 dark:text-gray-100">
-                      {selectedGodown?.electricityServiceNumber || 'Not Configured'}
-                    </p>
-                    <span className="text-[11px] text-gray-400 mt-1 block">
-                      Consumer ID / Service Connection Number
-                    </span>
-                  </div>
-                </div>
-
-                {/* Logged Bills for Information */}
-                <div className="mt-6 pt-5 border-t border-black/[0.06] dark:border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-3">
+                  <div>
                     <div className="flex items-center gap-2">
-                      <Receipt className="w-4 h-4 text-amber-500" />
-                      <h5 className="font-bold text-xs text-gray-900 dark:text-gray-100">
-                        Saved Electricity Bills ({electricityBills.length})
-                      </h5>
-                      <span className="text-[10px] text-gray-400">(Saved for information only)</span>
+                      <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                        {selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Electricity Connection
+                      </h4>
+                      {selectedGodown?.code && (
+                        <Badge variant="accent" size="sm">
+                          {selectedGodown.code}
+                        </Badge>
+                      )}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenAddBillModal}
-                      className="text-xs text-apple-accent hover:underline font-semibold flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Bill</span>
-                    </button>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[11px] text-gray-500 font-semibold">Select Hub:</span>
+                      <Select
+                        value={selectedHubId}
+                        onChange={(e) => setSelectedHubId(e.target.value)}
+                        className="font-bold text-xs py-1 px-2.5 h-7.5 min-w-[220px]"
+                      >
+                        {godowns.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                   </div>
-
-                  {loadingBills ? (
-                    <div className="py-6 text-center text-xs text-gray-400">Loading bill records...</div>
-                  ) : electricityBills.length === 0 ? (
-                    <div className="py-6 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400">
-                      No bills recorded yet. Click &quot;+ Add Bill&quot; on the card to save a bill for information.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
-                            <th className="py-2.5 px-3">Date</th>
-                            <th className="py-2.5 px-3">Title / Ref</th>
-                            <th className="py-2.5 px-3">Amount</th>
-                            <th className="py-2.5 px-3">Status</th>
-                            <th className="py-2.5 px-3 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                          {electricityBills.map((bill) => (
-                            <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
-                              <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
-                                {bill.expenseDate}
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
-                                {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
-                              </td>
-                              <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
-                                {formatCurrency(bill.amount)}
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
-                                  {bill.status}
-                                </Badge>
-                              </td>
-                              <td className="py-2.5 px-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteBill(bill.id)}
-                                  className="p-1 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                                  title="Delete bill record"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
                 </div>
-              </Card>
-            </div>
+
+                {/* Actions on Card: Add Bill button & Edit button */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={handleOpenAddBillModal}
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    className="rounded-xl shadow-apple-sm text-xs font-semibold px-3 py-1.5"
+                  >
+                    Add Bill
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsElectricityEditing(true)}
+                    icon={<Pencil className="w-3.5 h-3.5" />}
+                    className="text-xs font-semibold"
+                  >
+                    Edit Details
+                  </Button>
+                </div>
+              </div>
+
+              {/* Display Values Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                    Electricity Service Provider
+                  </span>
+                  <p className="text-base font-bold text-gray-900 dark:text-gray-100">
+                    {selectedGodown?.electricityProvider || 'Not Configured'}
+                  </p>
+                  <span className="text-[11px] text-gray-400 mt-1 block">
+                    Active Utility DISCOM / Provider
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                    Electricity Service / USC Number
+                  </span>
+                  <p className="text-base font-mono font-bold text-gray-900 dark:text-gray-100">
+                    {selectedGodown?.electricityServiceNumber || 'Not Configured'}
+                  </p>
+                  <span className="text-[11px] text-gray-400 mt-1 block">
+                    Consumer ID / Service Connection Number
+                  </span>
+                </div>
+              </div>
+            </Card>
           ) : (
             /* EDIT FORM VIEW */
             <Card className="p-6">
@@ -722,6 +683,198 @@ export const Expenses: React.FC = () => {
               </form>
             </Card>
           )}
+
+          {/* ========================================================================= */}
+          {/* SAVED ELECTRICITY BILLS WITH SEARCH & FILTER                              */}
+          {/* ========================================================================= */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                      Electricity Bills History
+                    </h4>
+                    <Badge variant="neutral" size="sm">
+                      {filteredElectricityBills.length} {filteredElectricityBills.length === 1 ? 'bill' : 'bills'}
+                    </Badge>
+                    {filteredElectricityBills.length > 0 && (
+                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                        Total: {formatCurrency(totalElecAmount)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    Search, filter, and track electricity bills across all hub facilities.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleOpenAddBillModal}
+                icon={<Plus className="w-3.5 h-3.5" />}
+                className="shrink-0 rounded-xl"
+              >
+                Add Bill
+              </Button>
+            </div>
+
+            {/* Search and Filter Toolbar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Search bills by title, reference, provider, amount..."
+                  value={elecSearchQuery}
+                  onChange={(e) => setElecSearchQuery(e.target.value)}
+                  className="pl-9 pr-8 text-xs h-9"
+                />
+                {elecSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setElecSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <Select
+                  value={elecHubFilter}
+                  onChange={(e) => setElecHubFilter(e.target.value)}
+                  className="text-xs h-9 font-semibold min-w-[170px]"
+                >
+                  <option value="ALL">All Hub Facilities</option>
+                  {godowns.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <Select
+                value={elecStatusFilter}
+                onChange={(e) => setElecStatusFilter(e.target.value)}
+                className="text-xs h-9 font-semibold w-32"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PAID">Paid</option>
+                <option value="PENDING">Pending</option>
+              </Select>
+
+              {(elecSearchQuery || elecHubFilter !== 'ALL' || elecStatusFilter !== 'ALL') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setElecSearchQuery('');
+                    setElecHubFilter('ALL');
+                    setElecStatusFilter('ALL');
+                  }}
+                  icon={<RotateCcw className="w-3 h-3" />}
+                  className="h-9 px-2 text-xs text-gray-500 hover:text-gray-800 shrink-0"
+                  title="Reset Filters"
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
+
+            {/* Table */}
+            {loadingBills ? (
+              <div className="py-8 text-center text-xs text-gray-400">Loading electricity bill records...</div>
+            ) : filteredElectricityBills.length === 0 ? (
+              <div className="py-8 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400 space-y-2">
+                <p>
+                  {elecSearchQuery || elecHubFilter !== 'ALL' || elecStatusFilter !== 'ALL'
+                    ? 'No electricity bills match the selected filters.'
+                    : 'No electricity bills recorded yet.'}
+                </p>
+                {elecSearchQuery || elecHubFilter !== 'ALL' || elecStatusFilter !== 'ALL' ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setElecSearchQuery('');
+                      setElecHubFilter('ALL');
+                      setElecStatusFilter('ALL');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={handleOpenAddBillModal}>
+                    Record First Bill
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
+                      <th className="py-2.5 px-3">Hub Facility</th>
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Title / Ref</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
+                    {filteredElectricityBills.map((bill) => {
+                      const hubName =
+                        godowns.find((g) => g.id === bill.godownId)?.erpName ||
+                        godowns.find((g) => g.id === bill.godownId)?.name ||
+                        bill.godownName ||
+                        `Hub #${bill.godownId}`;
+                      return (
+                        <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-gray-800 dark:text-gray-200">{hubName}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
+                            {bill.expenseDate}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
+                            {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
+                            {formatCurrency(bill.amount)}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
+                              {bill.status}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBill(bill.id)}
+                              className="p-1 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                              title="Delete bill record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -730,51 +883,6 @@ export const Expenses: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'wifi' && (
         <div className="space-y-6">
-          {/* Hub Selector Banner */}
-          <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-500">
-                <Wifi className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  WiFi & Broadband Information by Hub
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Configure network providers, accounts, and plan details. Saved connections are automatically synced to the Hub section.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-bold text-gray-600 dark:text-gray-400 shrink-0">
-                Select Hub:
-              </label>
-              <Select
-                value={selectedHubId}
-                onChange={(e) => setSelectedHubId(e.target.value)}
-                className="w-full sm:w-64 font-semibold text-xs"
-              >
-                {godowns.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                  </option>
-                ))}
-              </Select>
-              {selectedHubId && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/hubs/${selectedHubId}`)}
-                  icon={<ExternalLink className="w-3.5 h-3.5" />}
-                  title="View Hub Profile"
-                >
-                  View Hub
-                </Button>
-              )}
-            </div>
-          </Card>
-
           {/* Broadband Multi-Connection Manager */}
           {!isWifiEditing && broadbandList.length > 0 ? (
             /* SAVED DISPLAY CARD VIEW */
@@ -813,7 +921,7 @@ export const Expenses: React.FC = () => {
                     icon={<Plus className="w-3.5 h-3.5" />}
                     className="rounded-xl shadow-apple-sm text-xs font-semibold px-3 py-1.5"
                   >
-                    + Add Bill
+                    Add Bill
                   </Button>
 
                   <Button
@@ -877,81 +985,6 @@ export const Expenses: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
-
-              {/* Logged WiFi Bills for Information */}
-              <div className="mt-6 pt-5 border-t border-black/[0.06] dark:border-white/[0.08]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Receipt className="w-4 h-4 text-cyan-500" />
-                    <h5 className="font-bold text-xs text-gray-900 dark:text-gray-100">
-                      Saved WiFi Bills ({wifiBills.length})
-                    </h5>
-                    <span className="text-[10px] text-gray-400">(Saved for information only)</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleOpenAddWifiBillModal()}
-                    className="text-xs text-apple-accent hover:underline font-semibold flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Bill</span>
-                  </button>
-                </div>
-
-                {loadingWifiBills ? (
-                  <div className="py-6 text-center text-xs text-gray-400">Loading bill records...</div>
-                ) : wifiBills.length === 0 ? (
-                  <div className="py-6 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400">
-                    No WiFi bills recorded yet. Click &quot;+ Add Bill&quot; on the card to save a bill for information.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
-                          <th className="py-2.5 px-3">Date</th>
-                          <th className="py-2.5 px-3">Title / Provider</th>
-                          <th className="py-2.5 px-3">Amount</th>
-                          <th className="py-2.5 px-3">Status</th>
-                          <th className="py-2.5 px-3 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                        {wifiBills.map((bill) => (
-                          <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
-                            <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
-                              {bill.expenseDate}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
-                              {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
-                            </td>
-                            <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
-                              {formatCurrency(bill.amount)}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
-                                {bill.status}
-                              </Badge>
-                            </td>
-                            <td className="py-2.5 px-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteWifiBill(bill.id)}
-                                className="p-1 rounded-md text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                                title="Delete Bill Record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </div>
             </Card>
           ) : (
@@ -1142,6 +1175,198 @@ export const Expenses: React.FC = () => {
               </Card>
             </form>
           )}
+
+          {/* ========================================================================= */}
+          {/* SAVED WIFI BILLS WITH SEARCH & FILTER                                     */}
+          {/* ========================================================================= */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-500">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                      WiFi & Broadband Bills History
+                    </h4>
+                    <Badge variant="neutral" size="sm">
+                      {filteredWifiBills.length} {filteredWifiBills.length === 1 ? 'bill' : 'bills'}
+                    </Badge>
+                    {filteredWifiBills.length > 0 && (
+                      <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">
+                        Total: {formatCurrency(totalWifiAmount)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    Search, filter, and track internet & broadband bills across all hub facilities.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleOpenAddWifiBillModal()}
+                icon={<Plus className="w-3.5 h-3.5" />}
+                className="shrink-0 rounded-xl"
+              >
+                Add Bill
+              </Button>
+            </div>
+
+            {/* Search and Filter Toolbar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Search bills by title, reference, provider, amount..."
+                  value={wifiSearchQuery}
+                  onChange={(e) => setWifiSearchQuery(e.target.value)}
+                  className="pl-9 pr-8 text-xs h-9"
+                />
+                {wifiSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setWifiSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <Select
+                  value={wifiHubFilter}
+                  onChange={(e) => setWifiHubFilter(e.target.value)}
+                  className="text-xs h-9 font-semibold min-w-[170px]"
+                >
+                  <option value="ALL">All Hub Facilities</option>
+                  {godowns.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <Select
+                value={wifiStatusFilter}
+                onChange={(e) => setWifiStatusFilter(e.target.value)}
+                className="text-xs h-9 font-semibold w-32"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PAID">Paid</option>
+                <option value="PENDING">Pending</option>
+              </Select>
+
+              {(wifiSearchQuery || wifiHubFilter !== 'ALL' || wifiStatusFilter !== 'ALL') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setWifiSearchQuery('');
+                    setWifiHubFilter('ALL');
+                    setWifiStatusFilter('ALL');
+                  }}
+                  icon={<RotateCcw className="w-3 h-3" />}
+                  className="h-9 px-2 text-xs text-gray-500 hover:text-gray-800 shrink-0"
+                  title="Reset Filters"
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
+
+            {/* Table */}
+            {loadingWifiBills ? (
+              <div className="py-8 text-center text-xs text-gray-400">Loading WiFi bill records...</div>
+            ) : filteredWifiBills.length === 0 ? (
+              <div className="py-8 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400 space-y-2">
+                <p>
+                  {wifiSearchQuery || wifiHubFilter !== 'ALL' || wifiStatusFilter !== 'ALL'
+                    ? 'No WiFi bills match the selected filters.'
+                    : 'No WiFi bills recorded yet.'}
+                </p>
+                {wifiSearchQuery || wifiHubFilter !== 'ALL' || wifiStatusFilter !== 'ALL' ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setWifiSearchQuery('');
+                      setWifiHubFilter('ALL');
+                      setWifiStatusFilter('ALL');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => handleOpenAddWifiBillModal()}>
+                    Record First Bill
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
+                      <th className="py-2.5 px-3">Hub Facility</th>
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Title / Provider</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
+                    {filteredWifiBills.map((bill) => {
+                      const hubName =
+                        godowns.find((g) => g.id === bill.godownId)?.erpName ||
+                        godowns.find((g) => g.id === bill.godownId)?.name ||
+                        bill.godownName ||
+                        `Hub #${bill.godownId}`;
+                      return (
+                        <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-gray-800 dark:text-gray-200">{hubName}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
+                            {bill.expenseDate}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
+                            {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
+                            {formatCurrency(bill.amount)}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
+                              {bill.status}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteWifiBill(bill.id)}
+                              className="p-1 rounded-md text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                              title="Delete Bill Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -1152,9 +1377,23 @@ export const Expenses: React.FC = () => {
         isOpen={isAddBillModalOpen}
         onClose={() => setIsAddBillModalOpen(false)}
         title={`Add ${billCategory === 'WIFI' ? 'WiFi / Broadband' : 'Electricity'} Bill (Information Only)`}
-        description={`Record a bill for ${selectedGodown?.erpName || selectedGodown?.name || 'this Hub'}. Stored solely for your information.`}
+        description="Record a bill for information tracking."
       >
         <form onSubmit={handleSaveBill} className="space-y-4">
+          <FormField label="Hub Facility" required>
+            <Select
+              value={billFormData.godownId}
+              onChange={(e) => setBillFormData({ ...billFormData, godownId: e.target.value })}
+              required
+            >
+              {godowns.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
           <FormField label="Bill Title / Description" required>
             <Input
               placeholder={

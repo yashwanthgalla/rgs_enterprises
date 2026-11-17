@@ -12,9 +12,7 @@ import {
   Radio,
   Info,
   Pencil,
-  Receipt,
   X,
-  Calendar,
   CheckCircle,
   Search,
   Filter,
@@ -23,19 +21,16 @@ import {
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Modal } from '../components/ui/Modal';
 import { FormField, Input, Select } from '../components/ui/Input';
 import { useToast } from '../context/ToastContext';
-import { useSettings } from '../context/SettingsContext';
-import { godownApi, expenseApi } from '../services/api';
-import { Godown, BroadbandConnection, Expense } from '../types';
+import { godownApi } from '../services/api';
+import { Godown, BroadbandConnection } from '../types';
 import { clsx } from 'clsx';
 
 export const Expenses: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { success, error } = useToast();
-  const { formatCurrency } = useSettings();
 
   const [godowns, setGodowns] = useState<Godown[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,49 +44,27 @@ export const Expenses: React.FC = () => {
     navigate(`/information/${tab}`);
   };
 
-  // Selected Hub for Electricity and WiFi sub-tabs
+  // Selected Hub for editing / viewing active details
   const [selectedHubId, setSelectedHubId] = useState<string>('');
 
-  // Electricity Edit / View State
+  // Electricity State
   const [isElectricityEditing, setIsElectricityEditing] = useState(false);
   const [electricityProvider, setElectricityProvider] = useState('');
   const [electricityServiceNumber, setElectricityServiceNumber] = useState('');
   const [savingElectricity, setSavingElectricity] = useState(false);
 
-  // Bills for selected Hub (for information only)
-  const [billCategory, setBillCategory] = useState<'ELECTRICITY' | 'WIFI'>('ELECTRICITY');
-  const [electricityBills, setElectricityBills] = useState<Expense[]>([]);
-  const [wifiBills, setWifiBills] = useState<Expense[]>([]);
-  const [loadingBills, setLoadingBills] = useState(false);
-  const [loadingWifiBills, setLoadingWifiBills] = useState(false);
-
-  // Add Bill Modal State
-  const [isAddBillModalOpen, setIsAddBillModalOpen] = useState(false);
-  const [submittingBill, setSubmittingBill] = useState(false);
-  const [billFormData, setBillFormData] = useState({
-    godownId: '',
-    amount: '',
-    billDate: new Date().toISOString().slice(0, 10),
-    dueDate: '',
-    title: '',
-    status: 'PAID',
-    notes: '',
-  });
-
   // Electricity Search & Filter State
   const [elecSearchQuery, setElecSearchQuery] = useState('');
-  const [elecHubFilter, setElecHubFilter] = useState('ALL');
-  const [elecStatusFilter, setElecStatusFilter] = useState('ALL');
+  const [elecStatusFilter, setElecStatusFilter] = useState<'ALL' | 'CONFIGURED' | 'PENDING'>('ALL');
 
-  // WiFi Search & Filter State
-  const [wifiSearchQuery, setWifiSearchQuery] = useState('');
-  const [wifiHubFilter, setWifiHubFilter] = useState('ALL');
-  const [wifiStatusFilter, setWifiStatusFilter] = useState('ALL');
-
-  // WiFi Edit / View State
+  // WiFi State
   const [isWifiEditing, setIsWifiEditing] = useState(false);
   const [broadbandList, setBroadbandList] = useState<BroadbandConnection[]>([]);
   const [savingWifi, setSavingWifi] = useState(false);
+
+  // WiFi Search & Filter State
+  const [wifiSearchQuery, setWifiSearchQuery] = useState('');
+  const [wifiStatusFilter, setWifiStatusFilter] = useState<'ALL' | 'CONFIGURED' | 'PENDING'>('ALL');
 
   const fetchGodowns = async () => {
     setLoading(true);
@@ -110,54 +83,8 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  // Fetch all electricity bills
-  const fetchAllElectricityBills = async () => {
-    setLoadingBills(true);
-    try {
-      const res = await expenseApi.getAll().catch(() => []);
-      const allExpenses: Expense[] = Array.isArray(res) ? res : (res as any)?.content || [];
-      const elecOnly = allExpenses.filter(
-        (e) =>
-          (e.category || '').toUpperCase() === 'ELECTRICITY' ||
-          (e.title || '').toLowerCase().includes('electricity') ||
-          (e.title || '').toLowerCase().includes('power')
-      );
-      setElectricityBills(elecOnly);
-    } catch {
-      setElectricityBills([]);
-    } finally {
-      setLoadingBills(false);
-    }
-  };
-
-  // Fetch all wifi bills
-  const fetchAllWifiBills = async () => {
-    setLoadingWifiBills(true);
-    try {
-      const res = await expenseApi.getAll().catch(() => []);
-      const allExpenses: Expense[] = Array.isArray(res) ? res : (res as any)?.content || [];
-      const wifiOnly = allExpenses.filter(
-        (e) =>
-          (e.category || '').toUpperCase() === 'WIFI' ||
-          (e.category || '').toUpperCase() === 'INTERNET' ||
-          (e.category || '').toUpperCase() === 'BROADBAND' ||
-          (e.title || '').toLowerCase().includes('wifi') ||
-          (e.title || '').toLowerCase().includes('broadband') ||
-          (e.title || '').toLowerCase().includes('internet') ||
-          (e.title || '').toLowerCase().includes('fibernet')
-      );
-      setWifiBills(wifiOnly);
-    } catch {
-      setWifiBills([]);
-    } finally {
-      setLoadingWifiBills(false);
-    }
-  };
-
   useEffect(() => {
     fetchGodowns();
-    fetchAllElectricityBills();
-    fetchAllWifiBills();
   }, []);
 
   const selectedGodown = godowns.find((g) => String(g.id) === String(selectedHubId)) || godowns[0];
@@ -169,7 +96,6 @@ export const Expenses: React.FC = () => {
       setElectricityProvider(provider);
       setElectricityServiceNumber(serviceNo);
 
-      // If details are already saved, default to display card mode
       if (provider || serviceNo) {
         setIsElectricityEditing(false);
       } else {
@@ -199,7 +125,7 @@ export const Expenses: React.FC = () => {
     }
   }, [selectedHubId, selectedGodown?.id]);
 
-  // Save Electricity Details -> auto-updates Hub section and switches to Card view
+  // Save Electricity Details
   const handleSaveElectricity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedHubId) {
@@ -213,168 +139,17 @@ export const Expenses: React.FC = () => {
         electricityServiceNumber: electricityServiceNumber.trim(),
       });
 
-      // Update local state
       setGodowns((prev) =>
         prev.map((g) => (String(g.id) === String(selectedHubId) ? { ...g, ...updatedGodown } : g))
       );
       success('Electricity details saved and updated to the Hub section!');
-      setIsElectricityEditing(false); // Switch to display card view
+      setIsElectricityEditing(false);
     } catch (err: any) {
       error('Failed to update electricity details: ' + (err.message || 'Error'));
     } finally {
       setSavingElectricity(false);
     }
   };
-
-  // Add Bill for Electricity (information only)
-  const handleOpenAddBillModal = () => {
-    setBillCategory('ELECTRICITY');
-    const defaultHub = elecHubFilter !== 'ALL' ? elecHubFilter : (selectedHubId || String(godowns[0]?.id || ''));
-    const hubObj = godowns.find((g) => String(g.id) === String(defaultHub)) || selectedGodown;
-    const defaultTitle = `${hubObj?.electricityProvider || 'Power'} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
-    setBillFormData({
-      godownId: String(defaultHub),
-      amount: '',
-      billDate: new Date().toISOString().slice(0, 10),
-      dueDate: '',
-      title: defaultTitle,
-      status: 'PAID',
-      notes: hubObj?.electricityServiceNumber ? `USC: ${hubObj.electricityServiceNumber}` : '',
-    });
-    setIsAddBillModalOpen(true);
-  };
-
-  // Add Bill for WiFi / Broadband (information only)
-  const handleOpenAddWifiBillModal = (specificLine?: BroadbandConnection) => {
-    setBillCategory('WIFI');
-    const defaultHub = wifiHubFilter !== 'ALL' ? wifiHubFilter : (selectedHubId || String(godowns[0]?.id || ''));
-    const targetLine = specificLine || broadbandList[0];
-    const provider = targetLine?.networkProvider || 'Broadband / WiFi';
-    const defaultTitle = `${provider} Bill - ${new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}`;
-    const lineNotes = targetLine?.accountNumber ? `Account No: ${targetLine.accountNumber}` : '';
-    setBillFormData({
-      godownId: String(defaultHub),
-      amount: '',
-      billDate: new Date().toISOString().slice(0, 10),
-      dueDate: '',
-      title: defaultTitle,
-      status: 'PAID',
-      notes: lineNotes,
-    });
-    setIsAddBillModalOpen(true);
-  };
-
-  const handleSaveBill = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!billFormData.amount) {
-      error('Please enter the bill amount');
-      return;
-    }
-
-    const targetGodownId = billFormData.godownId || selectedHubId || (godowns[0]?.id ? String(godowns[0].id) : '1');
-
-    setSubmittingBill(true);
-    try {
-      await expenseApi.create({
-        godownId: Number(targetGodownId),
-        category: billCategory,
-        title: billFormData.title || (billCategory === 'WIFI' ? 'WiFi Bill' : 'Electricity Bill'),
-        amount: Number(billFormData.amount),
-        billDate: billFormData.billDate,
-        dueDate: billFormData.dueDate || null,
-        status: billFormData.status,
-        notes: billFormData.notes || null,
-      });
-
-      success(`${billCategory === 'WIFI' ? 'WiFi' : 'Electricity'} bill saved for information.`);
-      setIsAddBillModalOpen(false);
-      if (billCategory === 'WIFI') {
-        fetchAllWifiBills();
-      } else {
-        fetchAllElectricityBills();
-      }
-    } catch (err: any) {
-      error('Failed to save bill: ' + (err.message || 'Error'));
-    } finally {
-      setSubmittingBill(false);
-    }
-  };
-
-  const handleDeleteBill = async (billId: number) => {
-    if (!window.confirm('Delete this bill record?')) return;
-    try {
-      await expenseApi.delete(billId);
-      setElectricityBills((prev) => prev.filter((b) => b.id !== billId));
-      success('Bill record removed.');
-    } catch (err: any) {
-      error('Failed to delete: ' + err.message);
-    }
-  };
-
-  const handleDeleteWifiBill = async (billId: number) => {
-    if (!window.confirm('Delete this WiFi bill record?')) return;
-    try {
-      await expenseApi.delete(billId);
-      setWifiBills((prev) => prev.filter((b) => b.id !== billId));
-      success('WiFi bill record removed.');
-    } catch (err: any) {
-      error('Failed to delete: ' + err.message);
-    }
-  };
-
-  // Filtered Electricity Bills
-  const filteredElectricityBills = electricityBills.filter((bill) => {
-    if (elecHubFilter !== 'ALL' && String(bill.godownId) !== String(elecHubFilter)) {
-      return false;
-    }
-    if (elecStatusFilter !== 'ALL' && bill.status !== elecStatusFilter) {
-      return false;
-    }
-    if (elecSearchQuery.trim()) {
-      const q = elecSearchQuery.toLowerCase().trim();
-      const matchTitle = (bill.title || '').toLowerCase().includes(q);
-      const matchNotes = (bill.notes || '').toLowerCase().includes(q);
-      const matchAmount = String(bill.amount || '').includes(q);
-      const matchDate = (bill.expenseDate || '').toLowerCase().includes(q);
-      const hubName =
-        godowns.find((g) => g.id === bill.godownId)?.erpName ||
-        godowns.find((g) => g.id === bill.godownId)?.name ||
-        bill.godownName ||
-        '';
-      const matchHub = hubName.toLowerCase().includes(q);
-      return matchTitle || matchNotes || matchAmount || matchDate || matchHub;
-    }
-    return true;
-  });
-
-  const totalElecAmount = filteredElectricityBills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
-
-  // Filtered WiFi Bills
-  const filteredWifiBills = wifiBills.filter((bill) => {
-    if (wifiHubFilter !== 'ALL' && String(bill.godownId) !== String(wifiHubFilter)) {
-      return false;
-    }
-    if (wifiStatusFilter !== 'ALL' && bill.status !== wifiStatusFilter) {
-      return false;
-    }
-    if (wifiSearchQuery.trim()) {
-      const q = wifiSearchQuery.toLowerCase().trim();
-      const matchTitle = (bill.title || '').toLowerCase().includes(q);
-      const matchNotes = (bill.notes || '').toLowerCase().includes(q);
-      const matchAmount = String(bill.amount || '').includes(q);
-      const matchDate = (bill.expenseDate || '').toLowerCase().includes(q);
-      const hubName =
-        godowns.find((g) => g.id === bill.godownId)?.erpName ||
-        godowns.find((g) => g.id === bill.godownId)?.name ||
-        bill.godownName ||
-        '';
-      const matchHub = hubName.toLowerCase().includes(q);
-      return matchTitle || matchNotes || matchAmount || matchDate || matchHub;
-    }
-    return true;
-  });
-
-  const totalWifiAmount = filteredWifiBills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
 
   // Save WiFi Details
   const handleSaveWifi = async (e: React.FormEvent) => {
@@ -400,7 +175,6 @@ export const Expenses: React.FC = () => {
             bb.accountNumber ||
             bb.registeredMobileNumber ||
             bb.userId ||
-            bb.currentPlanEndDate ||
             bb.serviceContactNumber
         );
 
@@ -411,8 +185,9 @@ export const Expenses: React.FC = () => {
       setGodowns((prev) =>
         prev.map((g) => (String(g.id) === String(selectedHubId) ? { ...g, ...updatedGodown } : g))
       );
-      success('WiFi & broadband connections saved and updated to the Hub section!');
-      setIsWifiEditing(false); // Switch to display card view
+      setBroadbandList(cleanBbs);
+      success('WiFi & broadband connections saved and synced to the Hub profile!');
+      setIsWifiEditing(false);
     } catch (err: any) {
       error('Failed to update WiFi details: ' + (err.message || 'Error'));
     } finally {
@@ -421,6 +196,7 @@ export const Expenses: React.FC = () => {
   };
 
   const handleAddBroadbandLine = () => {
+    setIsWifiEditing(true);
     setBroadbandList((prev) => [
       ...prev,
       {
@@ -435,16 +211,67 @@ export const Expenses: React.FC = () => {
   };
 
   const handleRemoveBroadbandLine = (index: number) => {
-    setBroadbandList((prev) => prev.filter((_, i) => i !== index));
+    setBroadbandList((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleUpdateBroadbandLine = (index: number, field: keyof BroadbandConnection, value: string) => {
-    setBroadbandList((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
+  const handleUpdateBroadbandLine = (
+    index: number,
+    field: keyof BroadbandConnection,
+    value: string
+  ) => {
+    setBroadbandList((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+    );
   };
+
+  // Filtered Hubs for Electricity
+  const filteredElecHubs = godowns.filter((g) => {
+    const isConfigured = Boolean((g.electricityProvider || '').trim() || (g.electricityServiceNumber || '').trim());
+    if (elecStatusFilter === 'CONFIGURED' && !isConfigured) return false;
+    if (elecStatusFilter === 'PENDING' && isConfigured) return false;
+
+    if (elecSearchQuery.trim()) {
+      const q = elecSearchQuery.toLowerCase().trim();
+      const matchName = (g.erpName || g.name || '').toLowerCase().includes(q);
+      const matchCode = (g.code || '').toLowerCase().includes(q);
+      const matchCity = (g.city || g.location || '').toLowerCase().includes(q);
+      const matchProvider = (g.electricityProvider || '').toLowerCase().includes(q);
+      const matchService = (g.electricityServiceNumber || '').toLowerCase().includes(q);
+      return matchName || matchCode || matchCity || matchProvider || matchService;
+    }
+    return true;
+  });
+
+  const configuredElecCount = godowns.filter((g) =>
+    Boolean((g.electricityProvider || '').trim() || (g.electricityServiceNumber || '').trim())
+  ).length;
+
+  // Filtered Hubs for WiFi
+  const filteredWifiHubs = godowns.filter((g) => {
+    const bbs = Array.isArray(g.broadbandDetails) ? g.broadbandDetails : [];
+    const hasLines = bbs.length > 0;
+    if (wifiStatusFilter === 'CONFIGURED' && !hasLines) return false;
+    if (wifiStatusFilter === 'PENDING' && hasLines) return false;
+
+    if (wifiSearchQuery.trim()) {
+      const q = wifiSearchQuery.toLowerCase().trim();
+      const matchName = (g.erpName || g.name || '').toLowerCase().includes(q);
+      const matchCode = (g.code || '').toLowerCase().includes(q);
+      const matchCity = (g.city || g.location || '').toLowerCase().includes(q);
+      const matchLines = bbs.some((b) =>
+        (b.networkProvider || '').toLowerCase().includes(q) ||
+        (b.accountNumber || '').toLowerCase().includes(q) ||
+        (b.userId || '').toLowerCase().includes(q) ||
+        (b.registeredMobileNumber || b.registeredMobile || '').toLowerCase().includes(q)
+      );
+      return matchName || matchCode || matchCity || matchLines;
+    }
+    return true;
+  });
+
+  const configuredWifiCount = godowns.filter(
+    (g) => Array.isArray(g.broadbandDetails) && g.broadbandDetails.length > 0
+  ).length;
 
   const hasSavedElectricity = Boolean(selectedGodown?.electricityProvider || selectedGodown?.electricityServiceNumber);
 
@@ -458,7 +285,7 @@ export const Expenses: React.FC = () => {
             <span>Information</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Manage facility electricity connections and WiFi networks with automatic synchronization to the Hub profile
+            Search, filter, and configure facility electricity connections and WiFi networks across all hubs
           </p>
         </div>
       </div>
@@ -499,237 +326,44 @@ export const Expenses: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'electricity' && (
         <div className="space-y-6">
-          {/* Electricity Connection Details: Display Card OR Edit Form */}
-          {!isElectricityEditing && hasSavedElectricity ? (
-            /* SAVED DISPLAY CARD */
-            <Card className="p-6 overflow-hidden relative">
-              {/* Card Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
-                    <Zap className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                        {selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Electricity Connection
-                      </h4>
-                      {selectedGodown?.code && (
-                        <Badge variant="accent" size="sm">
-                          {selectedGodown.code}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[11px] text-gray-500 font-semibold">Select Hub:</span>
-                      <Select
-                        value={selectedHubId}
-                        onChange={(e) => setSelectedHubId(e.target.value)}
-                        className="font-bold text-xs py-1 px-2.5 h-7.5 min-w-[220px]"
-                      >
-                        {godowns.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions on Card: Add Bill button & Edit button */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={handleOpenAddBillModal}
-                    icon={<Plus className="w-3.5 h-3.5" />}
-                    className="rounded-xl shadow-apple-sm text-xs font-semibold px-3 py-1.5"
-                  >
-                    Add Bill
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIsElectricityEditing(true)}
-                    icon={<Pencil className="w-3.5 h-3.5" />}
-                    className="text-xs font-semibold"
-                  >
-                    Edit Details
-                  </Button>
-                </div>
-              </div>
-
-              {/* Display Values Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                    Electricity Service Provider
-                  </span>
-                  <p className="text-base font-bold text-gray-900 dark:text-gray-100">
-                    {selectedGodown?.electricityProvider || 'Not Configured'}
-                  </p>
-                  <span className="text-[11px] text-gray-400 mt-1 block">
-                    Active Utility DISCOM / Provider
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
-                    Electricity Service / USC Number
-                  </span>
-                  <p className="text-base font-mono font-bold text-gray-900 dark:text-gray-100">
-                    {selectedGodown?.electricityServiceNumber || 'Not Configured'}
-                  </p>
-                  <span className="text-[11px] text-gray-400 mt-1 block">
-                    Consumer ID / Service Connection Number
-                  </span>
-                </div>
-              </div>
-            </Card>
-          ) : (
-            /* EDIT FORM VIEW */
-            <Card className="p-6">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                <div className="space-y-1.5">
-                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-amber-500" />
-                    <span>{selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Electricity Connection</span>
-                  </h4>
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 shrink-0">
-                      Select Hub:
-                    </label>
-                    <Select
-                      value={selectedHubId}
-                      onChange={(e) => setSelectedHubId(e.target.value)}
-                      className="font-bold text-xs py-1 px-3 h-8 min-w-[240px] max-w-xs"
-                    >
-                      {godowns.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                        </option>
-                      ))}
-                    </Select>
-                    <span className="text-[11px] text-gray-400">
-                      Editing parameters for <strong className="text-gray-700 dark:text-gray-300 font-semibold">{selectedGodown?.erpName || selectedGodown?.name}</strong>
-                    </span>
-                  </div>
-                </div>
-
-                {hasSavedElectricity && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setIsElectricityEditing(false)}
-                    icon={<X className="w-3.5 h-3.5" />}
-                    className="shrink-0"
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </div>
-
-              <form onSubmit={handleSaveElectricity} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    label="Electricity Service Provider"
-                    hint="e.g. TSSPDCL, APCPDCL, APSPDCL, BESCOM, Tata Power"
-                  >
-                    <Input
-                      placeholder="e.g. APSPDCL"
-                      value={electricityProvider}
-                      onChange={(e) => setElectricityProvider(e.target.value)}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Electricity Service / USC Number"
-                    hint="Account / Meter / Consumer ID"
-                  >
-                    <Input
-                      placeholder="e.g. 2310252123522"
-                      value={electricityServiceNumber}
-                      onChange={(e) => setElectricityServiceNumber(e.target.value)}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="pt-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
-                  <span className="text-[11px] text-gray-400">
-                    Changes will automatically reflect in the Hub overview and display as a summary card.
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {hasSavedElectricity && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsElectricityEditing(false)}
-                      >
-                        Cancel
-                      </Button>
-                    )}
-                    <Button
-                      type="submit"
-                      loading={savingElectricity}
-                      icon={<Save className="w-4 h-4" />}
-                      className="rounded-xl shadow-apple-sm"
-                    >
-                      Save Electricity Details
-                    </Button>
-                  </div>
-                </div>
-              </form>
-            </Card>
-          )}
-
-          {/* ========================================================================= */}
-          {/* SAVED ELECTRICITY BILLS WITH SEARCH & FILTER                              */}
-          {/* ========================================================================= */}
-          <Card className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
-                  <Receipt className="w-5 h-5" />
+          {/* Search and Filter Toolbar for Electricity */}
+          <Card className="p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                  <Zap className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                      Electricity Bills History
-                    </h4>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <span>Search & Filter Electricity Hubs</span>
                     <Badge variant="neutral" size="sm">
-                      {filteredElectricityBills.length} {filteredElectricityBills.length === 1 ? 'bill' : 'bills'}
+                      {filteredElecHubs.length} of {godowns.length} Hubs
                     </Badge>
-                    {filteredElectricityBills.length > 0 && (
-                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                        Total: {formatCurrency(totalElecAmount)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    Search, filter, and track electricity bills across all hub facilities.
+                  </h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Search and filter facilities by name, code, power provider, or service / USC connection number.
                   </p>
                 </div>
               </div>
 
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleOpenAddBillModal}
-                icon={<Plus className="w-3.5 h-3.5" />}
-                className="shrink-0 rounded-xl"
-              >
-                Add Bill
-              </Button>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  {configuredElecCount} Configured
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Info className="w-3.5 h-3.5" />
+                  {godowns.length - configuredElecCount} Pending
+                </span>
+              </div>
             </div>
 
-            {/* Search and Filter Toolbar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
+              {/* Search text input */}
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
-                  placeholder="Search bills by title, reference, provider, amount..."
+                  placeholder="Search by hub name, code, city, provider, service number..."
                   value={elecSearchQuery}
                   onChange={(e) => setElecSearchQuery(e.target.value)}
                   className="pl-9 pr-8 text-xs h-9"
@@ -745,39 +379,47 @@ export const Expenses: React.FC = () => {
                 )}
               </div>
 
+              {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <Select
-                  value={elecHubFilter}
-                  onChange={(e) => setElecHubFilter(e.target.value)}
+                  value={elecStatusFilter}
+                  onChange={(e) => setElecStatusFilter(e.target.value as any)}
                   className="text-xs h-9 font-semibold min-w-[170px]"
                 >
-                  <option value="ALL">All Hub Facilities</option>
-                  {godowns.map((g) => (
+                  <option value="ALL">All Statuses ({godowns.length})</option>
+                  <option value="CONFIGURED">Configured ({configuredElecCount})</option>
+                  <option value="PENDING">Pending Setup ({godowns.length - configuredElecCount})</option>
+                </Select>
+              </div>
+
+              {/* Hub Dropdown Selector */}
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedHubId}
+                  onChange={(e) => setSelectedHubId(e.target.value)}
+                  className="text-xs h-9 font-semibold min-w-[210px]"
+                >
+                  {filteredElecHubs.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
                     </option>
                   ))}
+                  {filteredElecHubs.length === 0 && (
+                    <option value="" disabled>
+                      No matching hubs
+                    </option>
+                  )}
                 </Select>
               </div>
 
-              <Select
-                value={elecStatusFilter}
-                onChange={(e) => setElecStatusFilter(e.target.value)}
-                className="text-xs h-9 font-semibold w-32"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="PAID">Paid</option>
-                <option value="PENDING">Pending</option>
-              </Select>
-
-              {(elecSearchQuery || elecHubFilter !== 'ALL' || elecStatusFilter !== 'ALL') && (
+              {/* Reset Filter Button */}
+              {(elecSearchQuery || elecStatusFilter !== 'ALL') && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setElecSearchQuery('');
-                    setElecHubFilter('ALL');
                     setElecStatusFilter('ALL');
                   }}
                   icon={<RotateCcw className="w-3 h-3" />}
@@ -788,34 +430,212 @@ export const Expenses: React.FC = () => {
                 </Button>
               )}
             </div>
+          </Card>
 
-            {/* Table */}
-            {loadingBills ? (
-              <div className="py-8 text-center text-xs text-gray-400">Loading electricity bill records...</div>
-            ) : filteredElectricityBills.length === 0 ? (
+          {/* Active Hub Electricity Connection Card */}
+          {selectedGodown ? (
+            <div>
+              {!isElectricityEditing && hasSavedElectricity ? (
+                /* SAVED DISPLAY CARD */
+                <Card className="p-6 overflow-hidden relative">
+                  {/* Card Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                            {selectedGodown.erpName || selectedGodown.name} — Electricity Connection
+                          </h4>
+                          {selectedGodown.code && (
+                            <Badge variant="accent" size="sm">
+                              {selectedGodown.code}
+                            </Badge>
+                          )}
+                          <Badge variant="success" size="sm">
+                            Configured
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Facility Location: <span className="font-medium text-gray-700 dark:text-gray-300">{selectedGodown.city || selectedGodown.location || 'N/A'}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/hubs/${selectedGodown.id}`)}
+                        icon={<ExternalLink className="w-3.5 h-3.5" />}
+                        className="text-xs font-semibold"
+                      >
+                        View Hub
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => setIsElectricityEditing(true)}
+                        icon={<Pencil className="w-3.5 h-3.5" />}
+                        className="text-xs font-semibold rounded-xl shadow-apple-sm"
+                      >
+                        Edit Details
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Display Values Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Electricity Service Provider
+                      </span>
+                      <p className="text-base font-bold text-gray-900 dark:text-gray-100">
+                        {selectedGodown.electricityProvider || 'Not Configured'}
+                      </p>
+                      <span className="text-[11px] text-gray-400 mt-1 block">
+                        Active Utility DISCOM / Power Company
+                      </span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08]">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+                        Electricity Service / USC Number
+                      </span>
+                      <p className="text-base font-mono font-bold text-gray-900 dark:text-gray-100">
+                        {selectedGodown.electricityServiceNumber || 'Not Configured'}
+                      </p>
+                      <span className="text-[11px] text-gray-400 mt-1 block">
+                        Consumer ID / Meter / Service Connection Number
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                /* EDIT FORM VIEW */
+                <Card className="p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                          <span>{selectedGodown.erpName || selectedGodown.name} — Configure Electricity</span>
+                          {selectedGodown.code && <Badge variant="accent" size="sm">{selectedGodown.code}</Badge>}
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Configure power provider and consumer identification for this hub facility.
+                        </p>
+                      </div>
+                    </div>
+
+                    {hasSavedElectricity && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsElectricityEditing(false)}
+                        icon={<X className="w-3.5 h-3.5" />}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveElectricity} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        label="Electricity Service Provider"
+                        hint="e.g. TSSPDCL, APCPDCL, APSPDCL, BESCOM, Tata Power"
+                      >
+                        <Input
+                          placeholder="e.g. APSPDCL"
+                          value={electricityProvider}
+                          onChange={(e) => setElectricityProvider(e.target.value)}
+                        />
+                      </FormField>
+
+                      <FormField
+                        label="Electricity Service / USC Number"
+                        hint="Account / Meter / Consumer ID"
+                      >
+                        <Input
+                          placeholder="e.g. 2310252123522"
+                          value={electricityServiceNumber}
+                          onChange={(e) => setElectricityServiceNumber(e.target.value)}
+                        />
+                      </FormField>
+                    </div>
+
+                    <div className="pt-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
+                      <span className="text-[11px] text-gray-400">
+                        Saved electricity details automatically sync to the Hub profile and reports.
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {hasSavedElectricity && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsElectricityEditing(false)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        <Button
+                          type="submit"
+                          loading={savingElectricity}
+                          icon={<Save className="w-4 h-4" />}
+                          className="rounded-xl shadow-apple-sm"
+                        >
+                          Save Electricity Details
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                </Card>
+              )}
+            </div>
+          ) : null}
+
+          {/* All Hubs Electricity Overview Table */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                  <Building className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <span>Facilities Electricity Overview</span>
+                    <Badge variant="neutral" size="sm">
+                      {filteredElecHubs.length} {filteredElecHubs.length === 1 ? 'Hub' : 'Hubs'}
+                    </Badge>
+                  </h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    Click any facility to view or edit its electricity configuration.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="py-8 text-center text-xs text-gray-400">Loading facilities...</div>
+            ) : filteredElecHubs.length === 0 ? (
               <div className="py-8 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400 space-y-2">
-                <p>
-                  {elecSearchQuery || elecHubFilter !== 'ALL' || elecStatusFilter !== 'ALL'
-                    ? 'No electricity bills match the selected filters.'
-                    : 'No electricity bills recorded yet.'}
-                </p>
-                {elecSearchQuery || elecHubFilter !== 'ALL' || elecStatusFilter !== 'ALL' ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setElecSearchQuery('');
-                      setElecHubFilter('ALL');
-                      setElecStatusFilter('ALL');
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={handleOpenAddBillModal}>
-                    Record First Bill
-                  </Button>
-                )}
+                <p>No facilities match your search query &quot;{elecSearchQuery}&quot;.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setElecSearchQuery('');
+                    setElecStatusFilter('ALL');
+                  }}
+                >
+                  Clear Filters
+                </Button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -823,49 +643,66 @@ export const Expenses: React.FC = () => {
                   <thead>
                     <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
                       <th className="py-2.5 px-3">Hub Facility</th>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Title / Ref</th>
-                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">City / Location</th>
+                      <th className="py-2.5 px-3">Electricity Provider</th>
+                      <th className="py-2.5 px-3">Service / USC Number</th>
                       <th className="py-2.5 px-3">Status</th>
                       <th className="py-2.5 px-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                    {filteredElectricityBills.map((bill) => {
-                      const hubName =
-                        godowns.find((g) => g.id === bill.godownId)?.erpName ||
-                        godowns.find((g) => g.id === bill.godownId)?.name ||
-                        bill.godownName ||
-                        `Hub #${bill.godownId}`;
+                    {filteredElecHubs.map((g) => {
+                      const isConfig = Boolean((g.electricityProvider || '').trim() || (g.electricityServiceNumber || '').trim());
+                      const isSelected = String(g.id) === String(selectedHubId);
                       return (
-                        <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                        <tr
+                          key={g.id}
+                          className={clsx(
+                            'transition-colors cursor-pointer',
+                            isSelected
+                              ? 'bg-amber-500/5 dark:bg-amber-500/10'
+                              : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                          )}
+                          onClick={() => setSelectedHubId(String(g.id))}
+                        >
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-gray-800 dark:text-gray-200">{hubName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-900 dark:text-gray-100">
+                                {g.erpName || g.name}
+                              </span>
+                              {g.code && <Badge variant="accent" size="sm">{g.code}</Badge>}
+                              {isSelected && (
+                                <Badge variant="neutral" size="sm">Active</Badge>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
-                            {bill.expenseDate}
+                            {g.city || g.location || '—'}
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
+                            {g.electricityProvider || <span className="text-gray-400 font-normal italic">Not set</span>}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-medium text-gray-700 dark:text-gray-300">
+                            {g.electricityServiceNumber || <span className="text-gray-400 font-normal italic">—</span>}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
-                            {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
-                          </td>
-                          <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
-                            {formatCurrency(bill.amount)}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
-                              {bill.status}
+                            <Badge variant={isConfig ? 'success' : 'warning'} size="sm">
+                              {isConfig ? 'Configured' : 'Pending'}
                             </Badge>
                           </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteBill(bill.id)}
-                              className="p-1 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                              title="Delete bill record"
+                          <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant={isSelected ? 'primary' : 'outline'}
+                              size="sm"
+                              onClick={() => {
+                                setSelectedHubId(String(g.id));
+                                setIsElectricityEditing(true);
+                              }}
+                              icon={<Pencil className="w-3 h-3" />}
+                              className="text-[11px] h-7 px-2.5"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              Edit
+                            </Button>
                           </td>
                         </tr>
                       );
@@ -883,345 +720,44 @@ export const Expenses: React.FC = () => {
       {/* ========================================================================= */}
       {activeTab === 'wifi' && (
         <div className="space-y-6">
-          {/* Broadband Multi-Connection Manager */}
-          {!isWifiEditing && broadbandList.length > 0 ? (
-            /* SAVED DISPLAY CARD VIEW */
-            <Card className="p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-500">
-                    <Wifi className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                      {selectedGodown ? (selectedGodown.erpName || selectedGodown.name) : 'Hub'} — Broadband Connections ({broadbandList.length})
-                    </h4>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[11px] text-gray-500 font-semibold">Select Hub:</span>
-                      <Select
-                        value={selectedHubId}
-                        onChange={(e) => setSelectedHubId(e.target.value)}
-                        className="font-bold text-xs py-1 px-2.5 h-7.5 min-w-[220px]"
-                      >
-                        {godowns.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => handleOpenAddWifiBillModal()}
-                    icon={<Plus className="w-3.5 h-3.5" />}
-                    className="rounded-xl shadow-apple-sm text-xs font-semibold px-3 py-1.5"
-                  >
-                    Add Bill
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIsWifiEditing(true)}
-                    icon={<Pencil className="w-3.5 h-3.5" />}
-                    className="text-xs font-semibold"
-                  >
-                    Edit Details
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {broadbandList.map((bb, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] space-y-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-2">
-                      <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                        <Radio className="w-3.5 h-3.5 text-cyan-500" />
-                        {bb.networkProvider || `Connection #${idx + 1}`}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAddWifiBillModal(bb)}
-                          className="text-[11px] font-semibold text-apple-accent hover:underline flex items-center gap-0.5"
-                          title="Add bill for this connection"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Add Bill</span>
-                        </button>
-                        <Badge variant="accent" size="sm">Line #{idx + 1}</Badge>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 pt-1 text-[11px]">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Account No:</span>
-                        <span className="font-mono font-medium">{bb.accountNumber || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Registered Mobile:</span>
-                        <span className="font-medium">{bb.registeredMobileNumber || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">User ID:</span>
-                        <span className="font-mono">{bb.userId || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Plan End Date:</span>
-                        <span className="font-medium text-apple-accent">{bb.currentPlanEndDate || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Service Contact:</span>
-                        <span className="font-medium">{bb.serviceContactNumber || 'N/A'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : (
-            /* EDIT FORM VIEW */
-            <form onSubmit={handleSaveWifi} className="space-y-6">
-              <Card className="p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
-                  <div className="space-y-1.5">
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                      <Wifi className="w-4 h-4 text-cyan-500" />
-                      <span>Configure Broadband Connections ({broadbandList.length})</span>
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <label className="text-xs font-bold text-gray-600 dark:text-gray-400 shrink-0">
-                        Select Hub:
-                      </label>
-                      <Select
-                        value={selectedHubId}
-                        onChange={(e) => setSelectedHubId(e.target.value)}
-                        className="font-bold text-xs py-1 px-3 h-8 min-w-[240px] max-w-xs"
-                      >
-                        {godowns.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                          </option>
-                        ))}
-                      </Select>
-                      <span className="text-[11px] text-gray-400">
-                        Configuring lines for <strong className="text-gray-700 dark:text-gray-300 font-semibold">{selectedGodown?.erpName || selectedGodown?.name}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddBroadbandLine}
-                      icon={<PlusCircle className="w-3.5 h-3.5" />}
-                    >
-                      Add Connection
-                    </Button>
-
-                    {broadbandList.length > 0 && selectedGodown?.broadbandDetails && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsWifiEditing(false)}
-                      >
-                        Cancel
-                      </Button>
-                    )}
-
-                    <Button
-                      type="submit"
-                      loading={savingWifi}
-                      icon={<Save className="w-3.5 h-3.5" />}
-                      className="rounded-xl shadow-apple-sm"
-                    >
-                      Save WiFi Details
-                    </Button>
-                  </div>
-                </div>
-
-                {broadbandList.length === 0 ? (
-                  <div className="py-12 text-center border-2 border-dashed border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
-                    <Radio className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                      No WiFi or broadband connections configured for this hub yet.
-                    </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5 mb-4">
-                      Add network provider credentials, account numbers, and plan expiry dates.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      onClick={handleAddBroadbandLine}
-                      icon={<Plus className="w-3.5 h-3.5" />}
-                    >
-                      Add First Broadband Connection
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {broadbandList.map((bb, idx) => (
-                      <div
-                        key={idx}
-                        className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] relative group"
-                      >
-                        <div className="flex items-center justify-between mb-3 border-b border-black/[0.04] dark:border-white/[0.04] pb-2">
-                          <span className="font-bold text-xs text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                            <Radio className="w-3.5 h-3.5 text-cyan-500" />
-                            <span>Connection #{idx + 1}</span>
-                            {bb.networkProvider && (
-                              <Badge variant="accent" size="sm">
-                                {bb.networkProvider}
-                              </Badge>
-                            )}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBroadbandLine(idx)}
-                            className="text-xs text-apple-danger hover:underline font-semibold flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          <FormField label="Network Provider">
-                            <Input
-                              placeholder="e.g. ACT Fibernet, Airtel, Jio"
-                              value={bb.networkProvider}
-                              onChange={(e) => handleUpdateBroadbandLine(idx, 'networkProvider', e.target.value)}
-                            />
-                          </FormField>
-
-                          <FormField label="Account Number / Consumer ID">
-                            <Input
-                              placeholder="e.g. 104928374"
-                              value={bb.accountNumber}
-                              onChange={(e) => handleUpdateBroadbandLine(idx, 'accountNumber', e.target.value)}
-                            />
-                          </FormField>
-
-                          <FormField label="Registered Mobile Number">
-                            <Input
-                              placeholder="e.g. 9876543210"
-                              value={bb.registeredMobileNumber}
-                              onChange={(e) => handleUpdateBroadbandLine(idx, 'registeredMobileNumber', e.target.value)}
-                            />
-                          </FormField>
-
-                          <FormField label="User ID / Login ID">
-                            <Input
-                              placeholder="e.g. act_kondapalli_01"
-                              value={bb.userId}
-                              onChange={(e) => handleUpdateBroadbandLine(idx, 'userId', e.target.value)}
-                            />
-                          </FormField>
-
-                          <FormField label="Current Plan End Date">
-                            <Input
-                              type="date"
-                              value={bb.currentPlanEndDate || ''}
-                              onChange={(e) => handleUpdateBroadbandLine(idx, 'currentPlanEndDate', e.target.value)}
-                            />
-                          </FormField>
-
-                          <FormField label="Service / Support Contact">
-                            <Input
-                              placeholder="e.g. 1800-XXX-XXXX"
-                              value={bb.serviceContactNumber}
-                              onChange={(e) => handleUpdateBroadbandLine(idx, 'serviceContactNumber', e.target.value)}
-                            />
-                          </FormField>
-                        </div>
-                      </div>
-                    ))}
-
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAddBroadbandLine}
-                        icon={<PlusCircle className="w-3.5 h-3.5" />}
-                      >
-                        Add Another Connection
-                      </Button>
-
-                      <Button
-                        type="submit"
-                        loading={savingWifi}
-                        icon={<Save className="w-4 h-4" />}
-                        className="rounded-xl shadow-apple-sm"
-                      >
-                        Save WiFi Details
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </form>
-          )}
-
-          {/* ========================================================================= */}
-          {/* SAVED WIFI BILLS WITH SEARCH & FILTER                                     */}
-          {/* ========================================================================= */}
-          <Card className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-500">
-                  <Receipt className="w-5 h-5" />
+          {/* Search and Filter Toolbar for WiFi */}
+          <Card className="p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
+                  <Wifi className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                      WiFi & Broadband Bills History
-                    </h4>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <span>Search & Filter WiFi & Broadband Hubs</span>
                     <Badge variant="neutral" size="sm">
-                      {filteredWifiBills.length} {filteredWifiBills.length === 1 ? 'bill' : 'bills'}
+                      {filteredWifiHubs.length} of {godowns.length} Hubs
                     </Badge>
-                    {filteredWifiBills.length > 0 && (
-                      <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">
-                        Total: {formatCurrency(totalWifiAmount)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    Search, filter, and track internet & broadband bills across all hub facilities.
+                  </h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Search and filter facilities by name, code, ISP network provider, account number, or user ID.
                   </p>
                 </div>
               </div>
 
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleOpenAddWifiBillModal()}
-                icon={<Plus className="w-3.5 h-3.5" />}
-                className="shrink-0 rounded-xl"
-              >
-                Add Bill
-              </Button>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  {configuredWifiCount} With WiFi
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Info className="w-3.5 h-3.5" />
+                  {godowns.length - configuredWifiCount} No Connections
+                </span>
+              </div>
             </div>
 
-            {/* Search and Filter Toolbar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
+              {/* Search text input */}
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <Input
-                  placeholder="Search bills by title, reference, provider, amount..."
+                  placeholder="Search by hub name, code, provider (Airtel, ACT, Jio), account no..."
                   value={wifiSearchQuery}
                   onChange={(e) => setWifiSearchQuery(e.target.value)}
                   className="pl-9 pr-8 text-xs h-9"
@@ -1237,39 +773,47 @@ export const Expenses: React.FC = () => {
                 )}
               </div>
 
+              {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <Select
-                  value={wifiHubFilter}
-                  onChange={(e) => setWifiHubFilter(e.target.value)}
+                  value={wifiStatusFilter}
+                  onChange={(e) => setWifiStatusFilter(e.target.value as any)}
                   className="text-xs h-9 font-semibold min-w-[170px]"
                 >
-                  <option value="ALL">All Hub Facilities</option>
-                  {godowns.map((g) => (
+                  <option value="ALL">All Statuses ({godowns.length})</option>
+                  <option value="CONFIGURED">With WiFi ({configuredWifiCount})</option>
+                  <option value="PENDING">No Connections ({godowns.length - configuredWifiCount})</option>
+                </Select>
+              </div>
+
+              {/* Hub Dropdown Selector */}
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedHubId}
+                  onChange={(e) => setSelectedHubId(e.target.value)}
+                  className="text-xs h-9 font-semibold min-w-[210px]"
+                >
+                  {filteredWifiHubs.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
                     </option>
                   ))}
+                  {filteredWifiHubs.length === 0 && (
+                    <option value="" disabled>
+                      No matching hubs
+                    </option>
+                  )}
                 </Select>
               </div>
 
-              <Select
-                value={wifiStatusFilter}
-                onChange={(e) => setWifiStatusFilter(e.target.value)}
-                className="text-xs h-9 font-semibold w-32"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="PAID">Paid</option>
-                <option value="PENDING">Pending</option>
-              </Select>
-
-              {(wifiSearchQuery || wifiHubFilter !== 'ALL' || wifiStatusFilter !== 'ALL') && (
+              {/* Reset Filter Button */}
+              {(wifiSearchQuery || wifiStatusFilter !== 'ALL') && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setWifiSearchQuery('');
-                    setWifiHubFilter('ALL');
                     setWifiStatusFilter('ALL');
                   }}
                   icon={<RotateCcw className="w-3 h-3" />}
@@ -1280,34 +824,324 @@ export const Expenses: React.FC = () => {
                 </Button>
               )}
             </div>
+          </Card>
 
-            {/* Table */}
-            {loadingWifiBills ? (
-              <div className="py-8 text-center text-xs text-gray-400">Loading WiFi bill records...</div>
-            ) : filteredWifiBills.length === 0 ? (
+          {/* Active Hub Broadband Connections Card */}
+          {selectedGodown ? (
+            <div>
+              {!isWifiEditing && broadbandList.length > 0 ? (
+                /* SAVED DISPLAY CARD VIEW */
+                <Card className="p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-500">
+                        <Wifi className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                            {selectedGodown.erpName || selectedGodown.name} — Broadband Connections
+                          </h4>
+                          {selectedGodown.code && (
+                            <Badge variant="accent" size="sm">
+                              {selectedGodown.code}
+                            </Badge>
+                          )}
+                          <Badge variant="neutral" size="sm">
+                            {broadbandList.length} {broadbandList.length === 1 ? 'Connection' : 'Connections'}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Facility Location: <span className="font-medium text-gray-700 dark:text-gray-300">{selectedGodown.city || selectedGodown.location || 'N/A'}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/hubs/${selectedGodown.id}`)}
+                        icon={<ExternalLink className="w-3.5 h-3.5" />}
+                        className="text-xs font-semibold"
+                      >
+                        View Hub
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddBroadbandLine}
+                        icon={<PlusCircle className="w-3.5 h-3.5" />}
+                        className="text-xs font-semibold"
+                      >
+                        Add Connection
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => setIsWifiEditing(true)}
+                        icon={<Pencil className="w-3.5 h-3.5" />}
+                        className="text-xs font-semibold rounded-xl shadow-apple-sm"
+                      >
+                        Edit Details
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {broadbandList.map((bb, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] space-y-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.08] pb-2">
+                          <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                            <Radio className="w-3.5 h-3.5 text-cyan-500" />
+                            {bb.networkProvider || `Connection #${idx + 1}`}
+                          </span>
+                          <Badge variant="accent" size="sm">Line #{idx + 1}</Badge>
+                        </div>
+
+                        <div className="space-y-1.5 pt-1 text-[11px]">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Account No:</span>
+                            <span className="font-mono font-medium">{bb.accountNumber || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Registered Mobile:</span>
+                            <span className="font-medium">{bb.registeredMobileNumber || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">User ID:</span>
+                            <span className="font-mono">{bb.userId || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Plan End Date:</span>
+                            <span className="font-medium text-apple-accent">{bb.currentPlanEndDate || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Service Contact:</span>
+                            <span className="font-medium">{bb.serviceContactNumber || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : (
+                /* EDIT FORM VIEW */
+                <form onSubmit={handleSaveWifi} className="space-y-6">
+                  <Card className="p-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-5">
+                      <div className="space-y-1.5">
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                          <Wifi className="w-4 h-4 text-cyan-500" />
+                          <span>Configure Broadband Connections ({broadbandList.length}) for {selectedGodown.erpName || selectedGodown.name}</span>
+                        </h4>
+                        <p className="text-[11px] text-gray-500">
+                          Add and configure ISP credentials, account numbers, and plan expiry dates for this facility.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddBroadbandLine}
+                          icon={<PlusCircle className="w-3.5 h-3.5" />}
+                        >
+                          Add Connection
+                        </Button>
+
+                        {broadbandList.length > 0 && selectedGodown.broadbandDetails && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsWifiEditing(false)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+
+                        <Button
+                          type="submit"
+                          loading={savingWifi}
+                          icon={<Save className="w-3.5 h-3.5" />}
+                          className="rounded-xl shadow-apple-sm"
+                        >
+                          Save WiFi Details
+                        </Button>
+                      </div>
+                    </div>
+
+                    {broadbandList.length === 0 ? (
+                      <div className="py-12 text-center border-2 border-dashed border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
+                        <Radio className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          No WiFi or broadband connections configured for this hub yet.
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 mb-4">
+                          Add network provider credentials, account numbers, and plan expiry dates.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={handleAddBroadbandLine}
+                          icon={<Plus className="w-3.5 h-3.5" />}
+                        >
+                          Add First Broadband Connection
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {broadbandList.map((bb, idx) => (
+                          <div
+                            key={idx}
+                            className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] relative group"
+                          >
+                            <div className="flex items-center justify-between mb-3 border-b border-black/[0.04] dark:border-white/[0.04] pb-2">
+                              <span className="font-bold text-xs text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                                <Radio className="w-3.5 h-3.5 text-cyan-500" />
+                                <span>Connection #{idx + 1}</span>
+                                {bb.networkProvider && (
+                                  <Badge variant="accent" size="sm">
+                                    {bb.networkProvider}
+                                  </Badge>
+                                )}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBroadbandLine(idx)}
+                                className="text-xs text-apple-danger hover:underline font-semibold flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <FormField label="Network Provider">
+                                <Input
+                                  placeholder="e.g. ACT Fibernet, Airtel, Jio"
+                                  value={bb.networkProvider}
+                                  onChange={(e) => handleUpdateBroadbandLine(idx, 'networkProvider', e.target.value)}
+                                />
+                              </FormField>
+
+                              <FormField label="Account Number / Consumer ID">
+                                <Input
+                                  placeholder="e.g. 104928374"
+                                  value={bb.accountNumber}
+                                  onChange={(e) => handleUpdateBroadbandLine(idx, 'accountNumber', e.target.value)}
+                                />
+                              </FormField>
+
+                              <FormField label="Registered Mobile Number">
+                                <Input
+                                  placeholder="e.g. 9876543210"
+                                  value={bb.registeredMobileNumber}
+                                  onChange={(e) => handleUpdateBroadbandLine(idx, 'registeredMobileNumber', e.target.value)}
+                                />
+                              </FormField>
+
+                              <FormField label="User ID / Login ID">
+                                <Input
+                                  placeholder="e.g. act_kondapalli_01"
+                                  value={bb.userId}
+                                  onChange={(e) => handleUpdateBroadbandLine(idx, 'userId', e.target.value)}
+                                />
+                              </FormField>
+
+                              <FormField label="Current Plan End Date">
+                                <Input
+                                  type="date"
+                                  value={bb.currentPlanEndDate || ''}
+                                  onChange={(e) => handleUpdateBroadbandLine(idx, 'currentPlanEndDate', e.target.value)}
+                                />
+                              </FormField>
+
+                              <FormField label="Service / Support Contact">
+                                <Input
+                                  placeholder="e.g. 1800-XXX-XXXX"
+                                  value={bb.serviceContactNumber}
+                                  onChange={(e) => handleUpdateBroadbandLine(idx, 'serviceContactNumber', e.target.value)}
+                                />
+                              </FormField>
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAddBroadbandLine}
+                            icon={<PlusCircle className="w-3.5 h-3.5" />}
+                          >
+                            Add Another Connection
+                          </Button>
+
+                          <Button
+                            type="submit"
+                            loading={savingWifi}
+                            icon={<Save className="w-4 h-4" />}
+                            className="rounded-xl shadow-apple-sm"
+                          >
+                            Save WiFi Details
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </form>
+              )}
+            </div>
+          ) : null}
+
+          {/* All Hubs WiFi Overview Table */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.06] dark:border-white/[0.08] pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
+                  <Building className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <span>Facilities WiFi & Broadband Overview</span>
+                    <Badge variant="neutral" size="sm">
+                      {filteredWifiHubs.length} {filteredWifiHubs.length === 1 ? 'Hub' : 'Hubs'}
+                    </Badge>
+                  </h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    Click any facility to view or configure its broadband network connections.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="py-8 text-center text-xs text-gray-400">Loading facilities...</div>
+            ) : filteredWifiHubs.length === 0 ? (
               <div className="py-8 text-center border-2 border-dashed border-black/[0.06] dark:border-white/[0.08] rounded-xl text-xs text-gray-400 space-y-2">
-                <p>
-                  {wifiSearchQuery || wifiHubFilter !== 'ALL' || wifiStatusFilter !== 'ALL'
-                    ? 'No WiFi bills match the selected filters.'
-                    : 'No WiFi bills recorded yet.'}
-                </p>
-                {wifiSearchQuery || wifiHubFilter !== 'ALL' || wifiStatusFilter !== 'ALL' ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setWifiSearchQuery('');
-                      setWifiHubFilter('ALL');
-                      setWifiStatusFilter('ALL');
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => handleOpenAddWifiBillModal()}>
-                    Record First Bill
-                  </Button>
-                )}
+                <p>No facilities match your search query &quot;{wifiSearchQuery}&quot;.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setWifiSearchQuery('');
+                    setWifiStatusFilter('ALL');
+                  }}
+                >
+                  Clear Filters
+                </Button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1315,49 +1149,76 @@ export const Expenses: React.FC = () => {
                   <thead>
                     <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase tracking-wider font-semibold text-[10px]">
                       <th className="py-2.5 px-3">Hub Facility</th>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Title / Provider</th>
-                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">City / Location</th>
+                      <th className="py-2.5 px-3">Broadband Lines</th>
+                      <th className="py-2.5 px-3">Active Providers</th>
+                      <th className="py-2.5 px-3">Account / Consumer IDs</th>
                       <th className="py-2.5 px-3">Status</th>
                       <th className="py-2.5 px-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                    {filteredWifiBills.map((bill) => {
-                      const hubName =
-                        godowns.find((g) => g.id === bill.godownId)?.erpName ||
-                        godowns.find((g) => g.id === bill.godownId)?.name ||
-                        bill.godownName ||
-                        `Hub #${bill.godownId}`;
+                    {filteredWifiHubs.map((g) => {
+                      const bbs = Array.isArray(g.broadbandDetails) ? g.broadbandDetails : [];
+                      const hasLines = bbs.length > 0;
+                      const providers = Array.from(new Set(bbs.map((b) => b.networkProvider).filter(Boolean))).join(', ');
+                      const accountNos = bbs.map((b) => b.accountNumber).filter(Boolean).join(', ');
+                      const isSelected = String(g.id) === String(selectedHubId);
+
                       return (
-                        <tr key={bill.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                        <tr
+                          key={g.id}
+                          className={clsx(
+                            'transition-colors cursor-pointer',
+                            isSelected
+                              ? 'bg-cyan-500/5 dark:bg-cyan-500/10'
+                              : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                          )}
+                          onClick={() => setSelectedHubId(String(g.id))}
+                        >
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-gray-800 dark:text-gray-200">{hubName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-900 dark:text-gray-100">
+                                {g.erpName || g.name}
+                              </span>
+                              {g.code && <Badge variant="accent" size="sm">{g.code}</Badge>}
+                              {isSelected && (
+                                <Badge variant="neutral" size="sm">Active</Badge>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 font-medium text-gray-600 dark:text-gray-400">
-                            {bill.expenseDate}
+                            {g.city || g.location || '—'}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-gray-900 dark:text-gray-100">{bill.title}</span>
-                            {bill.notes && <p className="text-[10px] text-gray-400 truncate max-w-xs">{bill.notes}</p>}
-                          </td>
-                          <td className="py-2.5 px-3 font-bold text-gray-900 dark:text-gray-100">
-                            {formatCurrency(bill.amount)}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <Badge variant={bill.status === 'PAID' ? 'success' : 'warning'} size="sm">
-                              {bill.status}
+                            <Badge variant={hasLines ? 'accent' : 'neutral'} size="sm">
+                              {bbs.length} {bbs.length === 1 ? 'Line' : 'Lines'}
                             </Badge>
                           </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteWifiBill(bill.id)}
-                              className="p-1 rounded-md text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                              title="Delete Bill Record"
+                          <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
+                            {providers || <span className="text-gray-400 font-normal italic">None</span>}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-medium text-gray-700 dark:text-gray-300">
+                            {accountNos || <span className="text-gray-400 font-normal italic">—</span>}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <Badge variant={hasLines ? 'success' : 'warning'} size="sm">
+                              {hasLines ? 'Active Lines' : 'No Lines'}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant={isSelected ? 'primary' : 'outline'}
+                              size="sm"
+                              onClick={() => {
+                                setSelectedHubId(String(g.id));
+                                setIsWifiEditing(true);
+                              }}
+                              icon={<Pencil className="w-3 h-3" />}
+                              className="text-[11px] h-7 px-2.5"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              Configure
+                            </Button>
                           </td>
                         </tr>
                       );
@@ -1369,107 +1230,6 @@ export const Expenses: React.FC = () => {
           </Card>
         </div>
       )}
-
-      {/* ========================================================================= */}
-      {/* ADD BILL MODAL (FOR INFORMATION ONLY)                                     */}
-      {/* ========================================================================= */}
-      <Modal
-        isOpen={isAddBillModalOpen}
-        onClose={() => setIsAddBillModalOpen(false)}
-        title={`Add ${billCategory === 'WIFI' ? 'WiFi / Broadband' : 'Electricity'} Bill (Information Only)`}
-        description="Record a bill for information tracking."
-      >
-        <form onSubmit={handleSaveBill} className="space-y-4">
-          <FormField label="Hub Facility" required>
-            <Select
-              value={billFormData.godownId}
-              onChange={(e) => setBillFormData({ ...billFormData, godownId: e.target.value })}
-              required
-            >
-              {godowns.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-
-          <FormField label="Bill Title / Description" required>
-            <Input
-              placeholder={
-                billCategory === 'WIFI'
-                  ? 'e.g. Airtel Fibernet Bill - Nov 2026'
-                  : 'e.g. APSPDCL Power Bill - Nov 2026'
-              }
-              value={billFormData.title}
-              onChange={(e) => setBillFormData({ ...billFormData, title: e.target.value })}
-              required
-            />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Amount (₹)" required>
-              <Input
-                type="number"
-                placeholder="e.g. 1500"
-                value={billFormData.amount}
-                onChange={(e) => setBillFormData({ ...billFormData, amount: e.target.value })}
-                required
-              />
-            </FormField>
-
-            <FormField label="Status">
-              <Select
-                value={billFormData.status}
-                onChange={(e) => setBillFormData({ ...billFormData, status: e.target.value })}
-              >
-                <option value="PAID">PAID</option>
-                <option value="PENDING">PENDING</option>
-              </Select>
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Bill Date" required>
-              <Input
-                type="date"
-                value={billFormData.billDate}
-                onChange={(e) => setBillFormData({ ...billFormData, billDate: e.target.value })}
-                required
-              />
-            </FormField>
-
-            <FormField label="Due Date">
-              <Input
-                type="date"
-                value={billFormData.dueDate}
-                onChange={(e) => setBillFormData({ ...billFormData, dueDate: e.target.value })}
-              />
-            </FormField>
-          </div>
-
-          <FormField label="Notes / Reference Details">
-            <Input
-              placeholder={
-                billCategory === 'WIFI'
-                  ? 'e.g. Account No: 10429482, paid online'
-                  : 'e.g. Meter reading: 4520 units, paid online'
-              }
-              value={billFormData.notes}
-              onChange={(e) => setBillFormData({ ...billFormData, notes: e.target.value })}
-            />
-          </FormField>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
-            <Button type="button" variant="outline" onClick={() => setIsAddBillModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={submittingBill}>
-              Save Bill Record
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };

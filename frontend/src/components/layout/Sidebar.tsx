@@ -45,9 +45,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
-    '/finance': true,
-    '/information': true,
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    if (location.pathname.startsWith('/finance')) initial['/finance'] = true;
+    if (location.pathname.startsWith('/information')) initial['/information'] = true;
+    return initial;
   });
 
   const navItems: NavItem[] = [

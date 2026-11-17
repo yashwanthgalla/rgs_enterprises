@@ -47,10 +47,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        {/* Admin status pill */}
+        {/* User status pill */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-apple-accent/10 border border-apple-accent/20 text-xs font-medium text-apple-accent">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Admin Mode:</span>
           <span className="font-semibold">{user?.fullName || user?.username}</span>
         </div>
       </div>

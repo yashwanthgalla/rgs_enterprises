@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileMenu}
-          className="p-2 rounded-none text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] lg:hidden"
+          className="p-2 rounded-xl text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] transition-colors lg:hidden"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -39,14 +39,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
         {/* Dark mode toggle */}
         <button
           onClick={toggleDarkMode}
-          className="p-2 rounded-none text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] transition-colors"
+          className="p-2 rounded-xl text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] transition-colors"
           title="Toggle appearance"
         >
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
         {/* User status pill */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-none bg-[#0071E3]/10 border border-[#0071E3]/20 text-xs font-mono tracking-wide text-[#0071E3]">
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0071E3]/10 border border-[#0071E3]/20 text-xs font-medium text-[#0071E3]">
           <ShieldCheck className="w-3.5 h-3.5 text-[#0071E3]" />
           <span className="font-semibold">{user?.fullName || user?.username}</span>
         </div>

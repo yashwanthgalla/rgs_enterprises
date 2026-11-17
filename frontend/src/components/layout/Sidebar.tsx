@@ -104,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       >
         {/* Brand Header */}
         <div className="p-5 pb-4 flex items-center gap-3 border-b border-[#E5E7EB]">
-          <div className="w-10 h-10 rounded-none overflow-hidden border border-[#E5E7EB] shrink-0 bg-white">
+          <div className="w-10 h-10 rounded-2xl overflow-hidden border border-[#E5E7EB] shadow-apple-sm shrink-0 bg-white">
             <img
               src="/2.jpeg"
               alt="RGS Enterprises Logo"
@@ -135,10 +135,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     type="button"
                     onClick={() => handleToggle(item.path, defaultChildPath)}
                     className={clsx(
-                      'w-full flex items-center justify-between px-3.5 py-2.5 rounded-none text-xs font-semibold tracking-wide transition-colors duration-150 select-none cursor-pointer border-l-2',
+                      'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150 select-none cursor-pointer',
                       isGroupActive
-                        ? 'border-[#0071E3] bg-[#0071E3]/10 text-[#0071E3]'
-                        : 'border-transparent text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
+                        ? 'bg-[#0071E3]/10 text-[#0071E3]'
+                        : 'text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -175,10 +175,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             to={sub.path}
                             onClick={onClose}
                             className={clsx(
-                              'flex items-center gap-2.5 px-3 py-2 rounded-none text-[11px] font-semibold tracking-wide transition-colors duration-150 border-l-2',
+                              'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-150',
                               isSubActive
-                                ? 'border-[#0071E3] bg-[#0071E3]/10 text-[#0071E3]'
-                                : 'border-transparent text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6]'
+                                ? 'bg-[#0071E3] text-white shadow-apple-sm'
+                                : 'text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6]'
                             )}
                           >
                             <SubIcon className="w-3.5 h-3.5 shrink-0" />
@@ -201,10 +201,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 end={item.path === '/'}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 px-3.5 py-2.5 rounded-none text-xs font-semibold tracking-wide transition-colors duration-150 border-l-2',
+                    'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150',
                     isActive
-                      ? 'border-[#0071E3] bg-[#0071E3]/10 text-[#0071E3]'
-                      : 'border-transparent text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
+                      ? 'bg-[#0071E3] text-white shadow-apple-sm'
+                      : 'text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
                   )
                 }
               >
@@ -217,9 +217,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* User Profile Card */}
         <div className="p-3 border-t border-[#E5E7EB]">
-          <div className="flex items-center justify-between p-2 rounded-none bg-[#F9FAFB] border border-[#E5E7EB]">
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-none border border-[#E5E7EB] bg-[#0071E3]/10 text-[#0071E3] font-bold text-xs flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full border border-[#E5E7EB] bg-[#0071E3]/15 text-[#0071E3] font-bold text-xs flex items-center justify-center shrink-0">
                 {user?.fullName?.charAt(0) || user?.username?.charAt(0) || 'A'}
               </div>
               <div className="overflow-hidden">
@@ -235,7 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             <button
               onClick={logout}
               title="Sign Out"
-              className="p-1.5 rounded-none text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2] transition-colors"
+              className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2] transition-colors"
             >
               <LogOut className="w-4 h-4" />
             </button>

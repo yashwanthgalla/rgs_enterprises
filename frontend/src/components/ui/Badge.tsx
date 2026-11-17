@@ -24,15 +24,15 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   const sizes = {
-    sm: 'text-[10px] px-2 py-0.5',
-    md: 'text-xs px-2.5 py-1',
+    sm: 'text-[10px] px-2.5 py-0.5',
+    md: 'text-xs px-3 py-1',
   };
 
   return (
     <span
       className={twMerge(
         clsx(
-          'inline-flex items-center font-mono uppercase tracking-[0.05em] font-semibold rounded-none border select-none',
+          'inline-flex items-center font-medium rounded-full border select-none',
           variants[variant],
           sizes[size],
           className

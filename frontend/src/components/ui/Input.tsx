@@ -48,7 +48,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'w-full px-3.5 py-2.5 rounded-none text-xs bg-white border border-[#D1D5DB] text-[#111827] placeholder:text-[#9CA3AF] outline-none transition-colors duration-150 focus:border-[#0071E3] focus:ring-1 focus:ring-[#0071E3] disabled:opacity-50 disabled:cursor-not-allowed',
+            'w-full px-3.5 py-2.5 rounded-xl text-xs bg-white border border-[#D1D5DB] text-[#111827] placeholder:text-[#9CA3AF] outline-none transition-all duration-150 focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/20 disabled:opacity-50 disabled:cursor-not-allowed',
             error && 'border-[#DC2626] focus:border-[#DC2626]',
             className
           )
@@ -71,7 +71,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'w-full p-3.5 rounded-none text-xs bg-white border border-[#D1D5DB] text-[#111827] placeholder:text-[#9CA3AF] outline-none transition-colors duration-150 focus:border-[#0071E3] focus:ring-1 focus:ring-[#0071E3] disabled:opacity-50 disabled:cursor-not-allowed',
+            'w-full p-3.5 rounded-xl text-xs bg-white border border-[#D1D5DB] text-[#111827] placeholder:text-[#9CA3AF] outline-none transition-all duration-150 focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/20 disabled:opacity-50 disabled:cursor-not-allowed',
             error && 'border-[#DC2626] focus:border-[#DC2626]',
             className
           )
@@ -94,7 +94,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            'w-full px-3.5 py-2.5 rounded-none text-xs bg-white border border-[#D1D5DB] text-[#111827] outline-none transition-colors duration-150 focus:border-[#0071E3] focus:ring-1 focus:ring-[#0071E3] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
+            'w-full px-3.5 py-2.5 rounded-xl text-xs bg-white border border-[#D1D5DB] text-[#111827] outline-none transition-all duration-150 focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
             error && 'border-[#DC2626] focus:border-[#DC2626]',
             className
           )

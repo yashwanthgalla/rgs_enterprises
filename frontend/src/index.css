@@ -6,10 +6,6 @@
   :root {
     color-scheme: light;
   }
-  
-  * {
-    border-radius: 0 !important;
-  }
 
   body {
     font-family: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -39,36 +35,42 @@
 .glass-panel {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .dark .glass-panel {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .glass-card {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 1rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .dark .glass-card {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 1rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
 .glass-modal {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 1.5rem;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
 .dark .glass-modal {
   background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 1.5rem;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
@@ -82,6 +84,7 @@
 }
 ::-webkit-scrollbar-thumb {
   background: #D1D5DB;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #9CA3AF;

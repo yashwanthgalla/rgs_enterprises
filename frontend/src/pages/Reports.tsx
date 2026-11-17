@@ -139,7 +139,7 @@ export const Reports: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
             <BarChart3 className="w-6 h-6 text-apple-accent" />
-            <span>Financial & Tax Reports</span>
+            <span>Reports</span>
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Standard enterprise profit & loss statements, revenue ledgers, and template CSV exports

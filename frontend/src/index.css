@@ -8,15 +8,15 @@
   }
   
   body {
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    @apply bg-apple-bg text-[#1D1D1F] dark:bg-apple-darkBg dark:text-[#F5F5F7] antialiased min-h-screen selection:bg-apple-accent selection:text-white;
+    font-family: 'Host Grotesk', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    @apply bg-apple-bg text-[#1D1D1F] dark:bg-apple-darkBg dark:text-[#faf8f9] antialiased min-h-screen selection:bg-apple-accent selection:text-white;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.011em;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Host Grotesk', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
     letter-spacing: -0.022em;
   }
 }
@@ -31,10 +31,10 @@
 }
 
 .dark .glass-panel {
-  background: rgba(24, 24, 27, 0.72);
+  background: #121315;
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #222325;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
 }
 
@@ -48,11 +48,11 @@
 }
 
 .dark .glass-card {
-  background: rgba(28, 28, 30, 0.72);
+  background: #121315;
   backdrop-filter: blur(30px) saturate(200%);
   -webkit-backdrop-filter: blur(30px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid #222325;
+  box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Frosted Modal */
@@ -65,11 +65,15 @@
 }
 
 .dark .glass-modal {
-  background: rgba(24, 24, 27, 0.85);
+  background: #121315;
   backdrop-filter: blur(40px) saturate(210%);
   -webkit-backdrop-filter: blur(40px) saturate(210%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 24px 70px -10px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid #222325;
+  box-shadow: 0 24px 70px -10px rgba(0, 0, 0, 0.6);
+}
+
+.crimson-glow {
+  box-shadow: 0 0 25px -4px rgba(200, 48, 58, 0.35);
 }
 
 /* Subtle scrollbar */

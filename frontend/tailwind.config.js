@@ -10,15 +10,17 @@ export default {
       colors: {
         apple: {
           bg: '#F5F5F7',
-          darkBg: '#000000',
+          darkBg: '#0a0a0c',
           surface: '#FFFFFF',
-          darkSurface: '#1C1C1E',
+          darkSurface: '#121315',
           card: 'rgba(255, 255, 255, 0.82)',
-          darkCard: 'rgba(28, 28, 30, 0.82)',
+          darkCard: '#121315',
           border: 'rgba(0, 0, 0, 0.08)',
-          darkBorder: 'rgba(255, 255, 255, 0.12)',
+          darkBorder: '#222325',
           accent: '#0071E3',
           accentHover: '#0077ED',
+          brand: '#c8303a',
+          brandHover: '#b2252e',
           secondary: '#86868B',
           success: '#34C759',
           warning: '#FF9500',
@@ -28,6 +30,7 @@ export default {
       },
       fontFamily: {
         sans: [
+          '"Host Grotesk"',
           '-apple-system',
           'BlinkMacSystemFont',
           '"SF Pro Display"',

@@ -380,6 +380,12 @@ def godowns_view(request):
             data['city'] = 'Hyderabad'
         if not data.get('state'):
             data['state'] = 'Telangana'
+        
+        # Autogenerate googleLocation from location/address if not explicitly provided
+        loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''
+        if not data.get('googleLocation') and not data.get('google_location') and str(loc).strip():
+            import urllib.parse
+            data['googleLocation'] = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(str(loc).strip())}"
 
         raw_cctv_pwd = data.get('cctvPassword')
         broadband_list = data.get('broadbandDetails', [])
@@ -459,6 +465,12 @@ def godown_detail_view(request, pk):
         if 'locationAddress' in data and not data.get('address'):
             data['address'] = data['locationAddress']
             
+        # Autogenerate googleLocation from location/address if not provided
+        loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''
+        if not data.get('googleLocation') and not data.get('google_location') and str(loc).strip():
+            import urllib.parse
+            data['googleLocation'] = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(str(loc).strip())}"
+
         raw_cctv_pwd = data.get('cctvPassword')
         broadband_list = data.get('broadbandDetails')
 

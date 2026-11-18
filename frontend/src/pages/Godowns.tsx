@@ -65,6 +65,12 @@ const calculateMonths = (startDate: string, endDate: string): number => {
   return Math.max(0, total);
 };
 
+export const generateGoogleMapsUrl = (address: string): string => {
+  const clean = address.trim();
+  if (!clean) return '';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clean)}`;
+};
+
 export const Godowns: React.FC = () => {
   const navigate = useNavigate();
   const { formatCurrency } = useSettings();
@@ -80,6 +86,7 @@ export const Godowns: React.FC = () => {
   const [editingGodown, setEditingGodown] = useState<Godown | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isCustomGoogleLocation, setIsCustomGoogleLocation] = useState(false);
 
   // Add / Edit Form State matching all 10 sections
   const [formData, setFormData] = useState({
@@ -153,6 +160,7 @@ export const Godowns: React.FC = () => {
   const openCreateModal = () => {
     setEditingGodown(null);
     setShowPassword(false);
+    setIsCustomGoogleLocation(false);
     setFormData({
       name: '',
       code: '',
@@ -193,6 +201,9 @@ export const Godowns: React.FC = () => {
     e.stopPropagation();
     setEditingGodown(g);
     setShowPassword(false);
+    const existingLoc = g.address || g.locationAddress || g.location || '';
+    const autoGen = generateGoogleMapsUrl(existingLoc);
+    setIsCustomGoogleLocation(Boolean(g.googleLocation && g.googleLocation !== autoGen));
     const duration = g.leaseDurationMonths || calculateMonths(g.leaseStartDate || '', g.leaseEndDate || '');
     setFormData({
       name: g.erpName || g.name || '',
@@ -283,6 +294,30 @@ export const Godowns: React.FC = () => {
     }));
   };
 
+  // Location Address & Google Location Autogeneration Handlers
+  const handleLocationChange = (val: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      location: val,
+      googleLocation: isCustomGoogleLocation
+        ? prev.googleLocation
+        : generateGoogleMapsUrl(val),
+    }));
+  };
+
+  const handleGoogleLocationChange = (val: string) => {
+    setIsCustomGoogleLocation(true);
+    setFormData((prev) => ({ ...prev, googleLocation: val }));
+  };
+
+  const handleRegenerateGoogleLocation = () => {
+    setIsCustomGoogleLocation(false);
+    setFormData((prev) => ({
+      ...prev,
+      googleLocation: generateGoogleMapsUrl(prev.location),
+    }));
+  };
+
   const validatePhone = (phone: string): boolean => {
     if (!phone) return true; // optional unless required
     const cleaned = phone.replace(/[^0-9]/g, '');
@@ -313,12 +348,14 @@ export const Godowns: React.FC = () => {
       error('Current Tenant is mandatory.');
       return;
     }
-    if (!formData.googleLocation.trim()) {
-      error('Google Location (Google Maps link) is required.');
-      return;
-    }
     if (!formData.location.trim()) {
       error('Location Address is required.');
+      return;
+    }
+    const finalGoogleLocation =
+      formData.googleLocation.trim() || generateGoogleMapsUrl(formData.location.trim());
+    if (!finalGoogleLocation) {
+      error('Google Location (Google Maps link) is required.');
       return;
     }
     if (formData.operationsPocMobile && !validatePhone(formData.operationsPocMobile)) {
@@ -367,7 +404,7 @@ export const Godowns: React.FC = () => {
         hubModel: formData.hubModel,
         hubPocName: formData.hubPocName.trim(),
         hubPocContact: formData.hubPocContact.trim(),
-        googleLocation: formData.googleLocation.trim(),
+        googleLocation: finalGoogleLocation,
 
         // 2. Lease Information
         leaseStartDate: formData.leaseStartDate || null,
@@ -767,23 +804,61 @@ export const Godowns: React.FC = () => {
               </FormField>
             </div>
 
-            <FormField label="Google Location (Google Maps Link)" required>
-              <Input
-                placeholder="https://maps.google.com/?q=..."
-                value={formData.googleLocation}
-                onChange={(e) => setFormData({ ...formData, googleLocation: e.target.value })}
-                required
-              />
-            </FormField>
-
-            <FormField label="Location Address" required>
+            <FormField
+              label="Location Address"
+              required
+              hint="Enter the facility address, area, or landmark (used to autogenerate Google Location)"
+            >
               <Textarea
                 placeholder="Complete address including Plot / Survey No, Landmark, City, State..."
                 rows={2}
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                onChange={(e) => handleLocationChange(e.target.value)}
                 required
               />
+            </FormField>
+
+            <FormField
+              label="Google Location (Google Maps Link)"
+              required
+              hint={
+                isCustomGoogleLocation
+                  ? 'Custom Google Maps link. Click Auto-generate to re-link with the address above.'
+                  : 'Automatically generated from Location Address.'
+              }
+            >
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="https://www.google.com/maps/search/?api=1&query=..."
+                    value={formData.googleLocation}
+                    onChange={(e) => handleGoogleLocationChange(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerateGoogleLocation}
+                  disabled={!formData.location.trim()}
+                  title="Re-generate Google Maps link from Location Address"
+                  className="shrink-0 text-xs font-semibold"
+                >
+                  Auto-generate
+                </Button>
+                {formData.googleLocation && (
+                  <a
+                    href={formData.googleLocation}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-[#0071E3] shrink-0 flex items-center justify-center transition-colors"
+                    title="Open Google Location preview in new tab"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
             </FormField>
           </div>
 

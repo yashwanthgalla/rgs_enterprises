@@ -16,6 +16,7 @@ const Finance = lazy(() => import('./pages/Finance').then((m) => ({ default: m.F
 const Expenses = lazy(() => import('./pages/Expenses').then((m) => ({ default: m.Expenses })));
 const StaffDirectory = lazy(() => import('./pages/Staff').then((m) => ({ default: m.StaffDirectory })));
 const Assets = lazy(() => import('./pages/Assets').then((m) => ({ default: m.Assets })));
+const Visualance = lazy(() => import('./pages/Visualance').then((m) => ({ default: m.Visualance })));
 const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.Reports })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 
@@ -52,6 +53,10 @@ export const App: React.FC = () => {
                     <Route path="expenses/wifi" element={<Navigate to="/information/wifi" replace />} />
                     <Route path="staff" element={<StaffDirectory />} />
                     <Route path="assets" element={<Assets />} />
+                    <Route path="visualance" element={<Visualance />} />
+                    <Route path="surveillance" element={<Navigate to="/visualance" replace />} />
+                    <Route path="cctv" element={<Navigate to="/visualance" replace />} />
+                    <Route path="information/visualance" element={<Navigate to="/visualance" replace />} />
                     <Route path="documents" element={<Navigate to="/" replace />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="settings" element={<Settings />} />

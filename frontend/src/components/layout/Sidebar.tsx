@@ -16,6 +16,7 @@ import {
   Wifi,
   Info,
   Landmark,
+  Video,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -80,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         { label: 'WiFi Information', path: '/information/wifi', icon: Wifi },
       ],
     },
+    { label: 'Visualance', path: '/visualance', icon: Video },
     { label: 'Staff Directory', path: '/staff', icon: Users },
     { label: 'Assets & Equipment', path: '/assets', icon: Wrench },
     { label: 'Reports', path: '/reports', icon: BarChart3 },

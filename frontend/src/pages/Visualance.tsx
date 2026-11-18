@@ -26,13 +26,17 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { FormField, Input } from '../components/ui/Input';
 import { CardSkeleton } from '../components/ui/Skeleton';
+import { AdminPasswordModal } from '../components/common/AdminPasswordModal';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { godownApi } from '../services/api';
 import { Godown } from '../types';
 
 export const Visualance: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { success, error } = useToast();
+  const isAdmin = user?.role === 'ADMIN';
 
   const [godowns, setGodowns] = useState<Godown[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +45,13 @@ export const Visualance: React.FC = () => {
 
   // Track visible passwords by hub ID
   const [visiblePasswords, setVisiblePasswords] = useState<Record<number, boolean>>({});
+  // Track revealed decrypted passwords: { [hubId: number]: string }
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<number, string>>({});
   // Track copied states: { [key: string]: boolean } (e.g. 'pwd-12', 'url-12')
   const [copiedKeys, setCopiedKeys] = useState<Record<string, boolean>>({});
+
+  // Admin Verification Modal State
+  const [verifyingHub, setVerifyingHub] = useState<{ hub: Godown; action: 'view' | 'copy' } | null>(null);
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -82,8 +91,42 @@ export const Visualance: React.FC = () => {
     }, 2000);
   };
 
-  const togglePasswordVisibility = (hubId: number) => {
-    setVisiblePasswords((prev) => ({ ...prev, [hubId]: !prev[hubId] }));
+  const handlePasswordAction = (hub: Godown, action: 'view' | 'copy') => {
+    if (!isAdmin) {
+      error('Access restricted: Only Administrators can view or copy CCTV credentials.');
+      return;
+    }
+
+    // If already verified and revealed in this session
+    if (revealedPasswords[hub.id] !== undefined) {
+      if (action === 'view') {
+        setVisiblePasswords((prev) => ({ ...prev, [hub.id]: !prev[hub.id] }));
+      } else {
+        handleCopy(revealedPasswords[hub.id], `pwd-${hub.id}`, 'CCTV Password');
+      }
+      return;
+    }
+
+    // Require administrator password verification
+    setVerifyingHub({ hub, action });
+  };
+
+  const handleAdminVerify = async (adminPassword: string): Promise<boolean> => {
+    if (!verifyingHub) return false;
+    try {
+      const res: any = await godownApi.revealCctvPassword(verifyingHub.hub.id, adminPassword);
+      const plainPassword = res?.cctvPassword || '';
+      setRevealedPasswords((prev) => ({ ...prev, [verifyingHub.hub.id]: plainPassword }));
+
+      if (verifyingHub.action === 'view') {
+        setVisiblePasswords((prev) => ({ ...prev, [verifyingHub.hub.id]: true }));
+      } else {
+        handleCopy(plainPassword, `pwd-${verifyingHub.hub.id}`, 'CCTV Password');
+      }
+      return true;
+    } catch (err: any) {
+      throw new Error(err.message || 'Incorrect administrator password.');
+    }
   };
 
   const openEditModal = (hub: Godown) => {
@@ -481,15 +524,22 @@ export const Visualance: React.FC = () => {
 
                     {/* Password */}
                     <div className="p-3 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7280] block mb-1 flex items-center gap-1">
-                        <Lock className="w-3 h-3" />
-                        <span>Password</span>
-                      </span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B7280] flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          <span>Password</span>
+                        </span>
+                        {!isAdmin && (
+                          <span className="text-[9px] px-1.5 py-0.5 font-semibold text-amber-700 bg-amber-100 rounded">
+                            Admin Only
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-mono font-semibold text-[#111827] truncate">
-                          {hub.cctvPassword ? (
+                          {hub.cctvPassword || (hub as any).hasCctvPassword ? (
                             isPasswordVisible ? (
-                              hub.cctvPassword
+                              revealedPasswords[hub.id] || hub.cctvPassword || '••••••••••••'
                             ) : (
                               '••••••••••••'
                             )
@@ -497,25 +547,37 @@ export const Visualance: React.FC = () => {
                             <span className="text-gray-400 font-sans italic">Not set</span>
                           )}
                         </span>
-                        {hub.cctvPassword && (
+                        {(hub.cctvPassword || (hub as any).hasCctvPassword) && (
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              onClick={() => togglePasswordVisibility(hub.id)}
+                              onClick={() => handlePasswordAction(hub, 'view')}
                               className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                              title={isPasswordVisible ? 'Hide Password' : 'Show Password'}
+                              title={
+                                !isAdmin
+                                  ? 'Protected: Only Administrators can view passwords'
+                                  : isPasswordVisible
+                                  ? 'Hide Password'
+                                  : 'Verify Admin Password to View'
+                              }
                             >
-                              {isPasswordVisible ? (
-                                <EyeOff className="w-3.5 h-3.5" />
+                              {!isAdmin ? (
+                                <Lock className="w-3.5 h-3.5 text-gray-400" />
+                              ) : isPasswordVisible ? (
+                                <EyeOff className="w-3.5 h-3.5 text-[#0071E3]" />
                               ) : (
                                 <Eye className="w-3.5 h-3.5" />
                               )}
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleCopy(hub.cctvPassword || '', pwdCopyKey, 'Password')}
+                              onClick={() => handlePasswordAction(hub, 'copy')}
                               className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                              title="Copy Password"
+                              title={
+                                !isAdmin
+                                  ? 'Protected: Only Administrators can copy passwords'
+                                  : 'Verify Admin Password to Copy'
+                              }
                             >
                               {copiedKeys[pwdCopyKey] ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -632,6 +694,16 @@ export const Visualance: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Admin Verification Modal for Viewing / Copying CCTV Passwords */}
+      <AdminPasswordModal
+        isOpen={Boolean(verifyingHub)}
+        onClose={() => setVerifyingHub(null)}
+        onConfirm={handleAdminVerify}
+        title="Administrator Verification Required"
+        description={`Enter your administrator account password to access protected CCTV credentials for ${verifyingHub?.hub.erpName || verifyingHub?.hub.name || 'this facility'}.`}
+        actionLabel={verifyingHub?.action === 'copy' ? 'Verify & Copy' : 'Verify & Reveal'}
+      />
     </div>
   );
 };

@@ -31,6 +31,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { FormField, Input, Select, Textarea } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { godownApi } from '../services/api';
 import { Godown, BroadbandConnection } from '../types';
@@ -73,6 +74,8 @@ export const generateGoogleMapsUrl = (address: string): string => {
 
 export const Godowns: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'VIEWER';
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
@@ -511,13 +514,15 @@ export const Godowns: React.FC = () => {
           </p>
         </div>
 
-        <Button
-          onClick={openCreateModal}
-          icon={<Plus className="w-4 h-4" />}
-          className="rounded-xl shadow-apple-sm"
-        >
-          Add Hub
-        </Button>
+        {!isViewer && (
+          <Button
+            onClick={openCreateModal}
+            icon={<Plus className="w-4 h-4" />}
+            className="rounded-xl shadow-apple-sm"
+          >
+            Add Hub
+          </Button>
+        )}
       </div>
 
       {/* Filter and Search Bar */}

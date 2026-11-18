@@ -20,6 +20,7 @@ urlpatterns = [
     path('godowns/all', views.godowns_all_view, name='godowns_all'),
     path('godowns/cities', views.godowns_cities_view, name='godowns_cities'),
     path('godowns/<int:pk>', views.godown_detail_view, name='godown_detail'),
+    path('godowns/<int:pk>/reveal-cctv-password', views.reveal_cctv_password_view, name='reveal_cctv_password'),
     path('godowns/<int:pk>/summary', views.godown_summary_view, name='godown_summary'),
 
     # Broadband

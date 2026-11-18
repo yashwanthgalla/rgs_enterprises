@@ -118,6 +118,7 @@ class GodownSerializer(serializers.ModelSerializer):
     broadbandDetails = serializers.JSONField(source='broadband_details', required=False, default=list)
     cctvUsername = serializers.CharField(source='cctv_username', required=False, allow_null=True, allow_blank=True)
     cctvPassword = serializers.SerializerMethodField()
+    hasCctvPassword = serializers.SerializerMethodField()
     cctvAccessUrl = serializers.CharField(source='cctv_access_url', required=False, allow_null=True, allow_blank=True)
     hasLabourLicence = serializers.BooleanField(source='has_labour_licence', required=False, default=False)
     labourLicenceStartDate = serializers.DateField(source='labour_licence_start_date', required=False, allow_null=True)
@@ -137,10 +138,13 @@ class GodownSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
 
+    def get_hasCctvPassword(self, obj):
+        return bool(obj.cctv_password)
+
     def get_cctvPassword(self, obj):
-        # Return decrypted password so client can inspect if authorized
+        # Protected: Never broadcast plain-text password in bulk responses. Requires admin verification.
         if obj.cctv_password:
-            return decrypt_password(obj.cctv_password)
+            return '••••••••••••'
         return ""
 
     class Meta:
@@ -151,7 +155,7 @@ class GodownSerializer(serializers.ModelSerializer):
             'leaseStartDate', 'leaseEndDate', 'leaseDurationMonths', 'monthlyRent', 'securityAdvance', 'refundableAdvance',
             'notes', 'hubPocName', 'hubPocContact', 'hubModel', 'googleLocation',
             'operationsPocName', 'operationsPocMobile', 'broadbandDetails',
-            'cctvUsername', 'cctvPassword', 'cctvAccessUrl',
+            'cctvUsername', 'cctvPassword', 'hasCctvPassword', 'cctvAccessUrl',
             'hasLabourLicence', 'labourLicenceStartDate', 'labourLicenceExpiryDate',
             'hasTradeLicence', 'tradeLicenceStartDate', 'tradeLicenceExpiryDate',
             'totalSetupCost', 'electricityProvider', 'electricityServiceNumber',
@@ -214,11 +218,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
     godownId = serializers.IntegerField(source='godown_id', required=False, allow_null=True)
     godownName = serializers.CharField(source='godown.name', read_only=True)
     fullName = serializers.CharField(source='full_name')
-    monthlySalary = serializers.DecimalField(source='monthly_salary', max_digits=14, decimal_places=2)
+    monthlySalary = serializers.SerializerMethodField()
     joiningDate = serializers.DateField(source='joining_date')
     isDeleted = serializers.BooleanField(source='is_deleted', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    def get_monthlySalary(self, obj):
+        request = self.context.get('request')
+        if request and request.user and getattr(request.user, 'role', '').upper() == 'VIEWER':
+            return None  # Sensitive salary hidden from VIEWER role
+        return float(obj.monthly_salary or 0)
 
     class Meta:
         model = Employee

@@ -267,6 +267,8 @@ export const godownApi = {
     cachedGet(`/godowns/${id}`, { skipCache }, 20000).then(normalizeGodown),
   getSummary: (id: number | string, skipCache = false) =>
     cachedGet(`/godowns/${id}/summary`, { skipCache }, 20000),
+  revealCctvPassword: (id: number | string, adminPassword: string) =>
+    api.post(`/godowns/${id}/reveal-cctv-password`, { adminPassword }).then(unwrap),
   create: (data: any) => {
     const payload = {
       name: data.name || data.erpName,

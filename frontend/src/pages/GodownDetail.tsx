@@ -34,7 +34,9 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { FormField, Input, Select } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { AdminPasswordModal } from '../components/common/AdminPasswordModal';
 import {
   godownApi,
   rentApi,
@@ -79,8 +81,13 @@ export const GodownDetail: React.FC = () => {
     status: 'PENDING',
   });
 
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [submitting, setSubmitting] = useState(false);
   const [showCctvPassword, setShowCctvPassword] = useState(false);
+  const [revealedCctvPassword, setRevealedCctvPassword] = useState<string | null>(null);
+  const [verifyingAction, setVerifyingAction] = useState<'view' | 'copy' | null>(null);
   const [copiedCctv, setCopiedCctv] = useState(false);
 
   const handleCopyPassword = (pwd: string) => {
@@ -88,6 +95,42 @@ export const GodownDetail: React.FC = () => {
     setCopiedCctv(true);
     success('CCTV password copied to clipboard');
     setTimeout(() => setCopiedCctv(false), 2000);
+  };
+
+  const handlePasswordAction = (action: 'view' | 'copy') => {
+    if (!isAdmin) {
+      error('Access restricted: Only Administrators can view or copy CCTV credentials.');
+      return;
+    }
+
+    if (revealedCctvPassword !== null) {
+      if (action === 'view') {
+        setShowCctvPassword((prev) => !prev);
+      } else {
+        handleCopyPassword(revealedCctvPassword);
+      }
+      return;
+    }
+
+    setVerifyingAction(action);
+  };
+
+  const handleAdminVerify = async (adminPassword: string): Promise<boolean> => {
+    if (!id) return false;
+    try {
+      const res: any = await godownApi.revealCctvPassword(id, adminPassword);
+      const plainPassword = res?.cctvPassword || '';
+      setRevealedCctvPassword(plainPassword);
+
+      if (verifyingAction === 'view') {
+        setShowCctvPassword(true);
+      } else {
+        handleCopyPassword(plainPassword);
+      }
+      return true;
+    } catch (err: any) {
+      throw new Error(err.message || 'Incorrect administrator password.');
+    }
   };
 
   useEffect(() => {
@@ -481,28 +524,51 @@ export const GodownDetail: React.FC = () => {
                   <span className="font-mono font-semibold">{godown.cctvUsername || 'N/A'}</span>
                 </div>
                 <div className="py-1 border-b border-black/[0.04] dark:border-white/[0.04] space-y-1">
-                  <span className="text-gray-400 block">Password:</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 block">Password:</span>
+                    {!isAdmin && (
+                      <span className="text-[9px] px-1.5 py-0.5 font-semibold text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 rounded">
+                        Admin Only
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1.5 rounded-xl font-mono">
                     <span>
                       {showCctvPassword
-                        ? godown.cctvPassword || 'None'
+                        ? revealedCctvPassword || godown.cctvPassword || 'None'
                         : godown.cctvPassword ? '••••••••••••' : 'None'}
                     </span>
                     {godown.cctvPassword && (
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setShowCctvPassword(!showCctvPassword)}
+                          onClick={() => handlePasswordAction('view')}
                           className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                          title={showCctvPassword ? 'Hide password' : 'Show password'}
+                          title={
+                            !isAdmin
+                              ? 'Protected: Only Administrators can view passwords'
+                              : showCctvPassword
+                              ? 'Hide password'
+                              : 'Verify Admin Password to View'
+                          }
                         >
-                          {showCctvPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {!isAdmin ? (
+                            <EyeOff className="w-3.5 h-3.5 opacity-50" />
+                          ) : showCctvPassword ? (
+                            <EyeOff className="w-3.5 h-3.5 text-[#0071E3]" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleCopyPassword(godown.cctvPassword || '')}
+                          onClick={() => handlePasswordAction('copy')}
                           className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                          title="Copy password"
+                          title={
+                            !isAdmin
+                              ? 'Protected: Only Administrators can copy passwords'
+                              : 'Verify Admin Password to Copy'
+                          }
                         >
                           {copiedCctv ? <Check className="w-3.5 h-3.5 text-apple-success" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -969,6 +1035,16 @@ export const GodownDetail: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Admin Verification Modal for Viewing / Copying CCTV Password */}
+      <AdminPasswordModal
+        isOpen={Boolean(verifyingAction)}
+        onClose={() => setVerifyingAction(null)}
+        onConfirm={handleAdminVerify}
+        title="Administrator Verification Required"
+        description={`Enter your administrator account password to access protected CCTV credentials for ${godown?.erpName || godown?.name || 'this facility'}.`}
+        actionLabel={verifyingAction === 'copy' ? 'Verify & Copy' : 'Verify & Reveal'}
+      />
     </div>
   );
 };

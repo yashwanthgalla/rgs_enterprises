@@ -60,13 +60,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     }
   }, [location.pathname]);
 
-  const navItems: NavItem[] = [
+  const userRole = (user?.role || 'ADMIN').toUpperCase();
+
+  const allNavItems: (NavItem & { roles?: string[] })[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Hubs', path: '/hubs', icon: Warehouse },
     {
       label: 'Finance',
       path: '/finance',
       icon: Landmark,
+      roles: ['ADMIN'],
       children: [
         { label: 'Total Revenue', path: '/finance/revenue', icon: TrendingUp },
         { label: 'Rent', path: '/finance/rent', icon: Receipt },
@@ -82,11 +85,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       ],
     },
     { label: 'Visualance', path: '/visualance', icon: Video },
-    { label: 'Staff Directory', path: '/staff', icon: Users },
-    { label: 'Assets & Equipment', path: '/assets', icon: Wrench },
-    { label: 'Reports', path: '/reports', icon: BarChart3 },
-    { label: 'Settings', path: '/settings', icon: Settings },
+    { label: 'Staff Directory', path: '/staff', icon: Users, roles: ['ADMIN', 'MANAGER'] },
+    { label: 'Assets & Equipment', path: '/assets', icon: Wrench, roles: ['ADMIN', 'MANAGER'] },
+    { label: 'Reports', path: '/reports', icon: BarChart3, roles: ['ADMIN'] },
+    { label: 'Settings', path: '/settings', icon: Settings, roles: ['ADMIN'] },
   ];
+
+  const navItems = allNavItems.filter((item) => {
+    if (!item.roles) return true;
+    return item.roles.includes(userRole);
+  });
 
   const handleToggle = (path: string, defaultChildPath: string) => {
     if (openMenu === path) {
@@ -241,9 +249,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <p className="text-xs font-semibold text-[#111827] truncate">
                   {user?.fullName || user?.username || 'Administrator'}
                 </p>
-                <p className="text-[10px] text-[#6B7280] truncate">
-                  {user?.email || 'admin'}
-                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-[#6B7280] truncate">
+                    {user?.email || user?.username || 'admin'}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-[#0071E3]/10 text-[#0071E3] shrink-0">
+                    {userRole}
+                  </span>
+                </div>
               </div>
             </div>
 

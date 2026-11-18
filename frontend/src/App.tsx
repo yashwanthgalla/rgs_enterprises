@@ -6,6 +6,7 @@ import { SettingsProvider } from './context/SettingsContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { AppShell } from './components/layout/AppShell';
 import { PageSkeleton } from './components/ui/Skeleton';
+import { RoleGuard } from './components/common/RoleGuard';
 
 // Route-Based Code Splitting: Lazy-load page components on demand
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
@@ -39,9 +40,31 @@ export const App: React.FC = () => {
                     <Route path="hubs/:id" element={<GodownDetail />} />
                     <Route path="godowns" element={<Godowns />} />
                     <Route path="godowns/:id" element={<GodownDetail />} />
-                    <Route path="finance" element={<Finance />} />
-                    <Route path="finance/revenue" element={<Finance />} />
-                    <Route path="finance/rent" element={<Finance />} />
+                    {/* Finance: Restricted to ADMIN */}
+                    <Route
+                      path="finance"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN']}>
+                          <Finance />
+                        </RoleGuard>
+                      }
+                    />
+                    <Route
+                      path="finance/revenue"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN']}>
+                          <Finance />
+                        </RoleGuard>
+                      }
+                    />
+                    <Route
+                      path="finance/rent"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN']}>
+                          <Finance />
+                        </RoleGuard>
+                      }
+                    />
                     <Route path="rent-ledger" element={<Navigate to="/finance/rent" replace />} />
                     <Route path="information" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="information/electricity" element={<Expenses />} />
@@ -51,15 +74,45 @@ export const App: React.FC = () => {
                     <Route path="expenses/bills" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="expenses/electricity" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="expenses/wifi" element={<Navigate to="/information/wifi" replace />} />
-                    <Route path="staff" element={<StaffDirectory />} />
-                    <Route path="assets" element={<Assets />} />
+                    {/* Staff & Assets: ADMIN and MANAGER */}
+                    <Route
+                      path="staff"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
+                          <StaffDirectory />
+                        </RoleGuard>
+                      }
+                    />
+                    <Route
+                      path="assets"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
+                          <Assets />
+                        </RoleGuard>
+                      }
+                    />
                     <Route path="visualance" element={<Visualance />} />
                     <Route path="surveillance" element={<Navigate to="/visualance" replace />} />
                     <Route path="cctv" element={<Navigate to="/visualance" replace />} />
                     <Route path="information/visualance" element={<Navigate to="/visualance" replace />} />
                     <Route path="documents" element={<Navigate to="/" replace />} />
-                    <Route path="reports" element={<Reports />} />
-                    <Route path="settings" element={<Settings />} />
+                    {/* Reports & Settings: Restricted to ADMIN */}
+                    <Route
+                      path="reports"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN']}>
+                          <Reports />
+                        </RoleGuard>
+                      }
+                    />
+                    <Route
+                      path="settings"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN']}>
+                          <Settings />
+                        </RoleGuard>
+                      }
+                    />
                   </Route>
 
                   {/* Catch-all */}

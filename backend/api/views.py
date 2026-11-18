@@ -14,6 +14,12 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from .permissions import (
+    IsAdminRole,
+    IsAdminOrManagerRole,
+    IsManagerOrReadOnly,
+    IsAdminOrReadOnly,
+)
 
 from .models import (
     AppUser, Godown, RentEntry, Expense, Employee,
@@ -338,7 +344,7 @@ def dashboard_cashflow_trend_view(request):
 # GODOWNS
 # ============================================================================
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def godowns_view(request):
     if request.method == 'GET':
         page = int(request.GET.get('page', 0))
@@ -448,7 +454,7 @@ def godowns_cities_view(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def godown_detail_view(request, pk):
     try:
         godown = Godown.objects.get(pk=pk, is_deleted=False)
@@ -505,6 +511,37 @@ def godown_detail_view(request, pk):
         return api_success({"message": "Godown deleted successfully"})
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def reveal_cctv_password_view(request, pk):
+    """
+    Secure endpoint to reveal decrypted CCTV password.
+    Requires:
+    1. Authenticated user with ADMIN role.
+    2. Admin's own account password verification for zero-leak protection.
+    """
+    admin_password = request.data.get('adminPassword', '').strip()
+    if not admin_password:
+        return api_error("Administrator account password is required for verification.", status_code=status.HTTP_400_BAD_REQUEST)
+
+    user = request.user
+    pwd_bytes = admin_password.encode('utf-8')
+    hash_bytes = user.password_hash.encode('utf-8') if getattr(user, 'password_hash', None) else b''
+    if not hash_bytes or not bcrypt.checkpw(pwd_bytes, hash_bytes):
+        return api_error("Incorrect administrator password. Access denied.", status_code=status.HTTP_403_FORBIDDEN)
+
+    try:
+        godown = Godown.objects.get(pk=pk, is_deleted=False)
+    except Godown.DoesNotExist:
+        return api_error("Hub facility not found", status_code=status.HTTP_404_NOT_FOUND)
+
+    if not godown.cctv_password:
+        return api_success({"cctvPassword": ""}, message="No CCTV password configured for this hub")
+
+    decrypted = decrypt_password(godown.cctv_password)
+    return api_success({"cctvPassword": decrypted}, message="CCTV password revealed successfully")
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def godown_summary_view(request, pk):
@@ -531,7 +568,7 @@ def godown_summary_view(request, pk):
 # FINANCE MODULE (TOTAL REVENUE & RENT)
 # ============================================================================
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def finance_total_revenue_view(request):
     if request.method == 'GET':
         hub_id = request.GET.get('hubId')
@@ -580,7 +617,7 @@ def finance_total_revenue_view(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def finance_total_revenue_detail_view(request, pk):
     try:
         obj = FinanceTotalRevenue.objects.select_related('hub').get(pk=pk)
@@ -617,7 +654,7 @@ def finance_total_revenue_detail_view(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def finance_rent_view(request):
     if request.method == 'GET':
         hub_id = request.GET.get('hubId')
@@ -701,7 +738,7 @@ def finance_rent_view(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def finance_rent_detail_view(request, pk):
     try:
         obj = FinanceRent.objects.select_related('hub').get(pk=pk)
@@ -953,7 +990,7 @@ def record_expense_payment_view(request, pk):
 # EMPLOYEES & SALARIES
 # ============================================================================
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def employees_view(request):
     if request.method == 'GET':
         godown_id = request.GET.get('godownId')
@@ -977,7 +1014,7 @@ def employees_view(request):
 
 
 @api_view(['GET', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def employee_detail_view(request, pk):
     try:
         emp = Employee.objects.get(pk=pk, is_deleted=False)
@@ -1000,7 +1037,7 @@ def employees_by_godown_view(request, godown_id):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def salary_payments_view(request):
     if request.method == 'GET':
         employee_id = request.GET.get('employeeId')
@@ -1024,7 +1061,7 @@ def salary_payments_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def salary_payments_by_employee_view(request, employee_id):
     payments = SalaryPayment.objects.filter(employee_id=employee_id).select_related('employee').order_by('-created_at')
     return api_success(SalaryPaymentSerializer(payments, many=True).data)
@@ -1034,7 +1071,7 @@ def salary_payments_by_employee_view(request, employee_id):
 # ASSETS
 # ============================================================================
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def assets_view(request):
     if request.method == 'GET':
         godown_id = request.GET.get('godownId')
@@ -1058,7 +1095,7 @@ def assets_view(request):
 
 
 @api_view(['GET', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def asset_detail_view(request, pk):
     try:
         asset = Asset.objects.get(pk=pk, is_deleted=False)
@@ -1111,7 +1148,7 @@ def upload_document_view(request):
 # REPORTS
 # ============================================================================
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def reports_summary_view(request):
     year_param = request.GET.get('year')
     current_year = int(year_param) if year_param else timezone.now().year
@@ -1226,7 +1263,7 @@ def reports_summary_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def reports_godown_pnl_view(request):
     year_param = request.GET.get('year')
     current_year = int(year_param) if year_param else timezone.now().year
@@ -1300,7 +1337,7 @@ def reports_godown_pnl_view(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def reports_export_csv_view(request):
     export_type = request.GET.get('exportType') or request.GET.get('type') or 'total'
     hub_id = request.GET.get('hubId')
@@ -1692,7 +1729,7 @@ def reports_export_csv_view(request):
 # APP SETTINGS
 # ============================================================================
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrReadOnly])
 def settings_view(request):
     app_setting = AppSettings.objects.first()
     if not app_setting:

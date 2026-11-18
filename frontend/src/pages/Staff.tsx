@@ -16,11 +16,15 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { FormField, Input, Select } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { employeeApi, godownApi, salaryApi } from '../services/api';
 import { Staff, Godown } from '../types';
 
 export const StaffDirectory: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const isViewer = user?.role === 'VIEWER';
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
@@ -166,29 +170,31 @@ export const StaffDirectory: React.FC = () => {
           </p>
         </div>
 
-        <Button
-          onClick={() => {
-            setFormData({
-              fullName: '',
-              role: 'Security Guard',
-              phoneNumber: '',
-              email: '',
-              monthlySalary: '',
-              godownId: '',
-              joiningDate: new Date().toISOString().slice(0, 10),
-              status: 'ACTIVE',
-            });
-            setIsModalOpen(true);
-          }}
-          icon={<Plus className="w-4 h-4" />}
-          className="rounded-xl shadow-apple-sm"
-        >
-          Add Staff Member
-        </Button>
+          {!isViewer && (
+            <Button
+              onClick={() => {
+                setFormData({
+                  fullName: '',
+                  role: 'Security Guard',
+                  phoneNumber: '',
+                  email: '',
+                  monthlySalary: '',
+                  godownId: '',
+                  joiningDate: new Date().toISOString().slice(0, 10),
+                  status: 'ACTIVE',
+                });
+                setIsModalOpen(true);
+              }}
+              icon={<Plus className="w-4 h-4" />}
+              className="rounded-xl shadow-apple-sm"
+            >
+              Add Staff Member
+            </Button>
+          )}
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-2' : ''} gap-4`}>
         <Card className="p-4 flex items-center justify-between">
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Active Staff</span>
@@ -199,15 +205,17 @@ export const StaffDirectory: React.FC = () => {
           </div>
         </Card>
 
-        <Card className="p-4 flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Monthly Payroll Obligation</span>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(totalPayroll)}</p>
-          </div>
-          <div className="p-2.5 rounded-xl bg-apple-success/10 text-apple-success">
-            <DollarSign className="w-5 h-5" />
-          </div>
-        </Card>
+        {isAdmin && (
+          <Card className="p-4 flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Monthly Payroll Obligation</span>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(totalPayroll)}</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-apple-success/10 text-apple-success">
+              <DollarSign className="w-5 h-5" />
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -267,34 +275,39 @@ export const StaffDirectory: React.FC = () => {
                 <div>
                   <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Salary</span>
                   <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {formatCurrency(staff.monthlySalary)}
+                    {!isViewer ? formatCurrency(staff.monthlySalary) : '••••••'}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedStaff(staff);
-                      setSalaryData({
-                        amount: String(staff.monthlySalary || ''),
-                        paymentMonth: new Date().toISOString().slice(0, 7),
-                        paymentDate: new Date().toISOString().slice(0, 10),
-                        paymentMethod: 'BANK_TRANSFER',
-                      });
-                      setIsSalaryModalOpen(true);
-                    }}
-                    icon={<CreditCard className="w-3.5 h-3.5" />}
-                  >
-                    Pay
-                  </Button>
-                  <button
-                    onClick={() => handleDeleteStaff(staff.id)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedStaff(staff);
+                        setSalaryData({
+                          amount: String(staff.monthlySalary || ''),
+                          paymentMonth: new Date().toISOString().slice(0, 7),
+                          paymentDate: new Date().toISOString().slice(0, 10),
+                          paymentMethod: 'BANK_TRANSFER',
+                        });
+                        setIsSalaryModalOpen(true);
+                      }}
+                      icon={<CreditCard className="w-3.5 h-3.5" />}
+                    >
+                      Pay
+                    </Button>
+                  )}
+                  {!isViewer && (
+                    <button
+                      onClick={() => handleDeleteStaff(staff.id)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
+                      title="Remove Staff"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </Card>

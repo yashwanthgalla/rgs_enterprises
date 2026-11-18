@@ -522,16 +522,6 @@ export const Reports: React.FC = () => {
             </Select>
           </FormField>
 
-          {/* Template Format Details Card */}
-          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.08] space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-              Standard Template Columns Exported:
-            </span>
-            <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed font-mono">
-              Vendor, Hub Status, State, Hub Model, Owner, ERP Name, Start Date, End Date, Tenure, Area, Rent, Setup Cost/Month, Electricity, WiFi, Manpower, Housekeeping, WM Refreshment/Petty Cash, Total Revenue, Rent, TDS 10%, TDS Amount, Total Rent After TDS, GST 18%, Total Rent Including GST, Electricity Bill, WiFi Bill, Sorter Payments, Petty Cash, Total, Profit, Margin, Status
-            </p>
-          </div>
-
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
             <Button

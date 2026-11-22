@@ -10,6 +10,7 @@ import {
   Trash2,
   FileText,
   Building,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -59,6 +60,8 @@ export const Documents: React.FC = () => {
   });
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<DocumentItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,14 +92,18 @@ export const Documents: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this document?')) return;
+  const handleConfirmDeleteDoc = async () => {
+    if (!docToDelete) return;
+    setIsDeleting(true);
     try {
-      await documentApi.delete(id);
-      success('Document removed');
+      await documentApi.delete(docToDelete.id);
+      success(`Document "${docToDelete.title}" removed`);
+      setDocToDelete(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
     } catch (err: any) {
-      error('Failed to delete document: ' + err.message);
+      error('Failed to delete document: ' + (err.message || 'Error'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -230,7 +237,7 @@ export const Documents: React.FC = () => {
                         <span>Download</span>
                       </a>
                       <button
-                        onClick={() => handleDelete(doc.id)}
+                        onClick={() => setDocToDelete(doc)}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
                         title="Delete file"
                       >
@@ -310,6 +317,52 @@ export const Documents: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Document Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(docToDelete)}
+        onClose={() => !isDeleting && setDocToDelete(null)}
+        title="Delete Document"
+        description="Confirm removal of file from vault"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-apple-danger/5 border border-apple-danger/20 flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-apple-danger/10 text-apple-danger shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Are you sure you want to delete this document?
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                You are about to remove <strong>{docToDelete?.title}</strong> ({docToDelete?.documentType})
+                {docToDelete?.godownName ? ` from ${docToDelete.godownName}` : ''}. This file will be permanently deleted.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDocToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleConfirmDeleteDoc}
+              loading={isDeleting}
+              icon={<Trash2 className="w-4 h-4" />}
+            >
+              Delete Document
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

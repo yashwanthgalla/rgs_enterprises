@@ -143,6 +143,9 @@ export const Finance: React.FC = () => {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [revenueToDelete, setRevenueToDelete] = useState<FinanceTotalRevenue | null>(null);
+  const [rentToDelete, setRentToDelete] = useState<FinanceRent | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Total Revenue Live Auto Calculation
   const calcTotalRevenue = (form: typeof revenueForm): number => {
@@ -275,15 +278,19 @@ export const Finance: React.FC = () => {
     }
   };
 
-  const handleDeleteRevenue = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this yearly revenue record?')) return;
+  const handleConfirmDeleteRevenue = async () => {
+    if (!revenueToDelete) return;
+    setIsDeleting(true);
     try {
-      await financeApi.deleteTotalRevenue(id);
-      success('Record deleted successfully');
+      await financeApi.deleteTotalRevenue(revenueToDelete.id);
+      success('Yearly revenue record deleted successfully');
+      setRevenueToDelete(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.revenues() });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to delete: ' + (err.message || 'Error'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -403,15 +410,19 @@ export const Finance: React.FC = () => {
     }
   };
 
-  const handleDeleteRent = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this monthly rent record?')) return;
+  const handleConfirmDeleteRent = async () => {
+    if (!rentToDelete) return;
+    setIsDeleting(true);
     try {
-      await financeApi.deleteRent(id);
-      success('Record deleted successfully');
+      await financeApi.deleteRent(rentToDelete.id);
+      success('Monthly rent record deleted successfully');
+      setRentToDelete(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.rents() });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to delete: ' + (err.message || 'Error'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -541,7 +552,7 @@ export const Finance: React.FC = () => {
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteRevenue(item.id)}
+                              onClick={() => setRevenueToDelete(item)}
                               className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10"
                               title="Delete"
                             >
@@ -658,7 +669,7 @@ export const Finance: React.FC = () => {
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteRent(item.id)}
+                              onClick={() => setRentToDelete(item)}
                               className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10"
                               title="Delete"
                             >
@@ -1091,6 +1102,98 @@ export const Finance: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Revenue Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(revenueToDelete)}
+        onClose={() => !isDeleting && setRevenueToDelete(null)}
+        title="Delete Yearly Revenue Record"
+        description="Confirm deletion of revenue entry"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-apple-danger/5 border border-apple-danger/20 flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-apple-danger/10 text-apple-danger shrink-0 mt-0.5">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Are you sure you want to delete this yearly revenue record?
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                You are about to remove the revenue record for <strong>FY {revenueToDelete?.financialYear}</strong>
+                {revenueToDelete?.hubName ? ` (${revenueToDelete.hubName})` : ''} amounting to {revenueToDelete?.totalRevenue ? formatCurrency(revenueToDelete.totalRevenue) : ''}. This cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRevenueToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleConfirmDeleteRevenue}
+              loading={isDeleting}
+              icon={<Trash2 className="w-4 h-4" />}
+            >
+              Delete Record
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Rent Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(rentToDelete)}
+        onClose={() => !isDeleting && setRentToDelete(null)}
+        title="Delete Monthly Rent Record"
+        description="Confirm deletion of monthly lease entry"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-apple-danger/5 border border-apple-danger/20 flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-apple-danger/10 text-apple-danger shrink-0 mt-0.5">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Are you sure you want to delete this monthly rent record?
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                You are about to remove the rent entry for period <strong>{rentToDelete?.period}</strong>
+                {rentToDelete?.hubName ? ` (${rentToDelete.hubName})` : ''} totaling {rentToDelete?.total ? formatCurrency(rentToDelete.total) : ''}. This cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRentToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleConfirmDeleteRent}
+              loading={isDeleting}
+              icon={<Trash2 className="w-4 h-4" />}
+            >
+              Delete Record
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

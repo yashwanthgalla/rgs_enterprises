@@ -11,6 +11,7 @@ import {
   Building,
   Trash2,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -67,6 +68,8 @@ export const Assets: React.FC = () => {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,14 +108,18 @@ export const Assets: React.FC = () => {
     }
   };
 
-  const handleDeleteAsset = async (id: number) => {
-    if (!window.confirm('Delete this asset entry?')) return;
+  const handleConfirmDeleteAsset = async () => {
+    if (!assetToDelete) return;
+    setIsDeleting(true);
     try {
-      await assetApi.delete(id);
-      success('Asset deleted');
+      await assetApi.delete(assetToDelete.id);
+      success(`Asset "${assetToDelete.name}" deleted successfully`);
+      setAssetToDelete(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
     } catch (err: any) {
-      error('Failed to delete asset: ' + err.message);
+      error('Failed to delete asset: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -256,7 +263,7 @@ export const Assets: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => handleDeleteAsset(asset.id)}
+                  onClick={() => setAssetToDelete(asset)}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
                   title="Delete asset"
                 >
@@ -382,6 +389,52 @@ export const Assets: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Asset Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(assetToDelete)}
+        onClose={() => !isDeleting && setAssetToDelete(null)}
+        title="Delete Asset Entry"
+        description="Confirm removal of equipment from registry"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-apple-danger/5 border border-apple-danger/20 flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-apple-danger/10 text-apple-danger shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Are you sure you want to delete this asset?
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                You are about to delete <strong>{assetToDelete?.name}</strong> ({assetToDelete?.category})
+                {assetToDelete?.godownName ? ` assigned to ${assetToDelete.godownName}` : ''}. This record will be permanently removed.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAssetToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleConfirmDeleteAsset}
+              loading={isDeleting}
+              icon={<Trash2 className="w-4 h-4" />}
+            >
+              Delete Asset
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

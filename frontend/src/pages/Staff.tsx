@@ -13,6 +13,7 @@ import {
   Trash2,
   Building,
   Edit,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -81,6 +82,10 @@ export const StaffDirectory: React.FC = () => {
     paymentDate: new Date().toISOString().slice(0, 10),
     paymentMethod: 'BANK_TRANSFER',
   });
+
+  // Delete Staff Modal
+  const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -180,15 +185,19 @@ export const StaffDirectory: React.FC = () => {
     }
   };
 
-  const handleDeleteStaff = async (id: number) => {
-    if (!window.confirm('Delete this staff record?')) return;
+  const handleConfirmDeleteStaff = async () => {
+    if (!staffToDelete) return;
+    setIsDeleting(true);
     try {
-      await employeeApi.delete(id);
-      success('Staff record removed');
+      await employeeApi.delete(staffToDelete.id);
+      success(`Staff member "${staffToDelete.fullName}" removed successfully`);
+      setStaffToDelete(null);
       queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
-      error('Failed to delete staff: ' + err.message);
+      error('Failed to delete staff: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -352,7 +361,7 @@ export const StaffDirectory: React.FC = () => {
                   )}
                   {!isViewer && (
                     <button
-                      onClick={() => handleDeleteStaff(staff.id)}
+                      onClick={() => setStaffToDelete(staff)}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
                       title="Remove Staff"
                     >
@@ -516,6 +525,52 @@ export const StaffDirectory: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Staff Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(staffToDelete)}
+        onClose={() => !isDeleting && setStaffToDelete(null)}
+        title="Remove Staff Member"
+        description="Confirm removal of personnel record from directory"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-apple-danger/5 border border-apple-danger/20 flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-apple-danger/10 text-apple-danger shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Are you sure you want to remove this staff record?
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                You are about to remove <strong>{staffToDelete?.fullName}</strong> ({staffToDelete?.role})
+                {staffToDelete?.godownName ? ` from ${staffToDelete.godownName}` : ''}. This record will be permanently deleted from the directory.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStaffToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleConfirmDeleteStaff}
+              loading={isDeleting}
+              icon={<Trash2 className="w-4 h-4" />}
+            >
+              Delete Staff Record
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

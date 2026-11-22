@@ -69,14 +69,12 @@ export const HubDeleteModal: React.FC<HubDeleteModalProps> = ({
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 leading-relaxed font-medium">
-            <strong>Warning:</strong> This code will be released and reassigned to the next new hub
-            created in this state. All associated financial, staff, and asset history will be preserved
-            under this facility's records.
+          <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 leading-relaxed font-medium">
+            <strong>Permanent Deletion Warning:</strong> Deleting this Hub facility will permanently remove all overall linked records across Finance (revenue & rent), Operations (expenses & rent ledger), Assets/Equipment, and Staff payroll.
           </div>
 
           <p className="text-xs text-[#4B5563]">
-            Are you sure you want to deactivate and soft-delete <strong>{hubName} ({hubCode})</strong>?
+            Are you sure you want to delete <strong>{hubName} ({hubCode})</strong> and permanently purge all associated information?
           </p>
 
           {error && (
@@ -100,7 +98,7 @@ export const HubDeleteModal: React.FC<HubDeleteModalProps> = ({
               disabled={isLoading}
               className="flex-1 px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
             >
-              {isLoading ? 'Decommissioning...' : 'Confirm Decommission'}
+              {isLoading ? 'Deleting...' : 'Delete Hub & All Data'}
             </button>
           </div>
         </div>

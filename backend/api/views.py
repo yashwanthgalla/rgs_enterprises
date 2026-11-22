@@ -933,42 +933,36 @@ def godown_detail_view(request, pk):
         return api_error("Validation error", errors=serializer.errors)
 
     elif request.method == 'DELETE':
-        # Check if the hub has active Finance records (Total Revenue or Rent)
-        revenue_count = FinanceTotalRevenue.objects.filter(hub=godown).count()
-        rent_count = FinanceRent.objects.filter(hub=godown).count()
-        if revenue_count > 0 or rent_count > 0:
-            return api_error(
-                f"Cannot delete hub with active Finance records ({revenue_count} Revenue, {rent_count} Rent). "
-                f"Please delete the revenue and rent records manually from the Finance section first.",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-
         hub_state = godown.state
         released_code = godown.code
 
         with transaction.atomic():
-            # Delete all related operational data
+            # 1. Delete all Finance records (Total Revenue and Monthly Rent entries)
+            FinanceTotalRevenue.objects.filter(hub=godown).delete()
+            FinanceRent.objects.filter(hub=godown).delete()
+
+            # 2. Delete all operational and ledger data
             HubBroadband.objects.filter(hub=godown).delete()
             RentEntry.objects.filter(godown=godown).delete()
             Expense.objects.filter(godown=godown).delete()
             Asset.objects.filter(godown=godown).delete()
 
-            # Delete hub staff and their salary payments
+            # 3. Delete hub staff and their salary payments
             hub_employees = Employee.objects.filter(godown=godown)
             SalaryPayment.objects.filter(employee__in=hub_employees).delete()
             hub_employees.delete()
 
-            # Soft-delete the hub and release the unique code constraint
+            # 4. Soft-delete the hub and release the unique code constraint
             import time
             godown.code = f"DELETED_{int(time.time())}_{godown.id}_{released_code}"
             godown.is_deleted = True
             godown.save()
 
-            # Auto-resequence remaining active hubs in this state so codes stay contiguous and updated
+            # 5. Auto-resequence remaining active hubs in this state so codes stay contiguous and updated
             resequence_hub_codes_for_state(hub_state)
 
         return api_success({
-            "message": "Hub and all associated data deleted successfully",
+            "message": "Hub and all associated records (finance, rent, assets, staff, and operations) deleted successfully",
             "releasedCode": released_code
         })
 

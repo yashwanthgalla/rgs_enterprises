@@ -29,6 +29,8 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
+  CreditCard,
+  FileText,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -390,6 +392,7 @@ export const Godowns: React.FC = () => {
   const [hubToDelete, setHubToDelete] = useState<{ id: number; code: string; name: string } | null>(null);
   const [checkingFinance, setCheckingFinance] = useState(false);
   const [financeStats, setFinanceStats] = useState<{ revenueCount: number; rentCount: number } | null>(null);
+  const [confirmDeleteOverall, setConfirmDeleteOverall] = useState(false);
   const [deletingHub, setDeletingHub] = useState(false);
 
   const openDeleteModal = async (g: Godown, e: React.MouseEvent) => {
@@ -399,6 +402,7 @@ export const Godowns: React.FC = () => {
       code: g.code || '',
       name: g.erpName || g.name,
     });
+    setConfirmDeleteOverall(false);
     setCheckingFinance(true);
     setFinanceStats(null);
     try {
@@ -425,16 +429,18 @@ export const Godowns: React.FC = () => {
     try {
       const res: any = await godownApi.delete(hubToDelete.id);
       const releasedCode = res?.releasedCode || hubToDelete.code;
-      success(`Hub ${hubToDelete.name} decommissioned successfully. All associated data was removed and code ${releasedCode} has been released.`);
+      success(`Hub ${hubToDelete.name} and all related overall information (finance, rent, assets, staff, and operations) deleted successfully. Hub ID ${releasedCode} released.`);
       setHubToDelete(null);
+      setConfirmDeleteOverall(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.hubs.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
       refetchGodowns();
     } catch (err: any) {
-      error(err.message || 'Failed to decommission hub');
+      error(err.message || 'Failed to delete hub and related information');
     } finally {
       setDeletingHub(false);
     }
@@ -1511,76 +1517,79 @@ export const Godowns: React.FC = () => {
         onClose={() => {
           if (!deletingHub) setHubToDelete(null);
         }}
-        title={`Decommission Hub: ${hubToDelete?.name || ''} (${hubToDelete?.code || ''})`}
-        description="Review associated data and manual Finance removal requirements before proceeding."
+        title={`Delete Hub & Overall Related Information: ${hubToDelete?.name || ''} (${hubToDelete?.code || ''})`}
+        description="All financial, operational, asset, and personnel data linked to this hub will be permanently removed."
         maxWidth="xl"
       >
         <div className="space-y-5">
           {/* Section 1: Associated Data Deletion Notice */}
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2">
-            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">
+          <div className="p-4 rounded-2xl bg-apple-danger/10 border border-apple-danger/25 text-xs space-y-3">
+            <div className="flex items-center gap-2 text-apple-danger font-bold text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>All Associated Hub Data Will Be Permanently Removed</span>
+              <span>Overall Information Removal Warning</span>
             </div>
-            <p className="text-gray-700 dark:text-gray-300">
-              Decommissioning this Hub will permanently remove all data linked to this facility across the system:
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+              Deleting this Hub facility will permanently remove all overall information and linked records across the entire application:
             </p>
-            <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 pl-1">
-              <li>All registered infrastructure assets & equipment</li>
-              <li>Personnel & security staff assigned to this Hub and their payroll entries</li>
-              <li>Rent ledger records and tenant payment history</li>
-              <li>Operating utility expenses and petty cash ledgers</li>
-              <li>Broadband internet lines and CCTV credentials</li>
-            </ul>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-gray-700 dark:text-gray-300">
+              <div className="p-2.5 rounded-xl bg-white/60 dark:bg-black/20 border border-apple-danger/15 space-y-1">
+                <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-apple-danger" />
+                  Financial Records
+                </span>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {checkingFinance
+                    ? 'Checking finance records...'
+                    : `${financeStats?.revenueCount || 0} Annual Revenue & ${financeStats?.rentCount || 0} Monthly Rent statements`}
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/60 dark:bg-black/20 border border-apple-danger/15 space-y-1">
+                <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-apple-danger" />
+                  Personnel & Payroll
+                </span>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Assigned staff profiles and all monthly salary payment histories
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/60 dark:bg-black/20 border border-apple-danger/15 space-y-1">
+                <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 text-apple-danger" />
+                  Assets & Infrastructure
+                </span>
+                <p className="text-gray-600 dark:text-gray-400">
+                  CCTV configurations, hardware equipment, and broadband lines
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/60 dark:bg-black/20 border border-apple-danger/15 space-y-1">
+                <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-apple-danger" />
+                  Operations & Ledgers
+                </span>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Rent ledger invoices, utility bill records, and petty cash entries
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Section 2: Manual Revenue & Rent Requirements */}
-          {checkingFinance ? (
-            <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] text-center text-xs text-gray-500">
-              <div className="w-5 h-5 border-2 border-apple-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              Checking Finance module for active Revenue and Rent records...
-            </div>
-          ) : financeStats && (financeStats.revenueCount > 0 || financeStats.rentCount > 0) ? (
-            <div className="p-4 rounded-2xl bg-apple-danger/10 border border-apple-danger/25 text-xs space-y-3">
-              <div className="flex items-center gap-2 text-apple-danger font-bold text-sm">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>Action Required: Delete Revenue & Rent Manually</span>
-              </div>
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                This Hub currently has <span className="font-bold text-apple-danger">{financeStats.revenueCount} Total Revenue</span> and <span className="font-bold text-apple-danger">{financeStats.rentCount} Monthly Rent</span> record(s) recorded in Finance.
-              </p>
-              <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-apple-danger/20 text-gray-800 dark:text-gray-200">
-                <p className="font-semibold text-apple-danger mb-1">
-                  Financial records cannot be deleted automatically.
-                </p>
-                <p className="text-[11px] text-gray-600 dark:text-gray-400">
-                  To protect enterprise audit trails, you must manually delete the revenue and rent records in the Finance section before this Hub can be removed.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full flex items-center justify-center gap-2 font-semibold text-apple-danger border-apple-danger/30 hover:bg-apple-danger/10"
-                onClick={() => {
-                  setHubToDelete(null);
-                  navigate('/finance');
-                }}
-              >
-                <span>Go to Finance Section to Delete Records</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-2">
-              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>Finance Records Cleared</span>
-              </div>
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                No active Revenue or Rent records found for this Hub in Finance. Decommissioning this Hub will permanently clean up all remaining operational data and release code <span className="font-mono font-bold">{hubToDelete?.code}</span>.
-              </p>
-            </div>
-          )}
+          {/* Section 2: Confirmation Checkbox */}
+          <div className="p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] text-xs">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={confirmDeleteOverall}
+                onChange={(e) => setConfirmDeleteOverall(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-apple-danger focus:ring-apple-danger/20 cursor-pointer"
+              />
+              <span className="text-gray-800 dark:text-gray-200 leading-snug">
+                I understand this action is irreversible. Please delete <strong>{hubToDelete?.name} ({hubToDelete?.code})</strong> and <strong>permanently purge all overall related information</strong> across Finance, Staff, Assets, and Operations.
+              </span>
+            </label>
+          </div>
 
           {/* Modal Buttons */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
@@ -1595,12 +1604,12 @@ export const Godowns: React.FC = () => {
             <Button
               type="button"
               variant="danger"
-              disabled={checkingFinance || deletingHub || Boolean(financeStats && (financeStats.revenueCount > 0 || financeStats.rentCount > 0))}
+              disabled={deletingHub || !confirmDeleteOverall}
               loading={deletingHub}
               icon={<Trash2 className="w-4 h-4" />}
               onClick={confirmDeleteHub}
             >
-              Permanently Decommission Hub
+              Permanently Delete Hub & All Info
             </Button>
           </div>
         </div>

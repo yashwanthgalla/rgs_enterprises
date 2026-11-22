@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Building2, ArrowRight, ShieldCheck, Eye, EyeOff, KeyRound, CheckCircle2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Lock, Mail, Building2, ArrowRight, ShieldCheck, Eye, EyeOff, KeyRound, CheckCircle2, ArrowLeft, RefreshCw, Copy, Clipboard } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input, FormField } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -29,6 +29,7 @@ export const Login: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [sessionToken, setSessionToken] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState('');
@@ -264,7 +265,7 @@ export const Login: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* FORGOT PASSWORD MODAL (Brevo OTP Stateless Verification)                 */}
+      {/* FORGOT PASSWORD MODAL (Secure OTP Stateless Verification)                */}
       {/* ========================================================================= */}
       <Modal
         isOpen={isForgotModalOpen}
@@ -272,8 +273,8 @@ export const Login: React.FC = () => {
         title={forgotStep === 1 ? 'Reset Password' : 'Enter Verification Code'}
         description={
           forgotStep === 1
-            ? 'Enter your authorized email to receive a secure 6-digit one-time password (OTP).'
-            : `Enter the 6-digit OTP sent to ${forgotEmail} and set your new password.`
+            ? 'Enter your registered email to receive a secure 6-digit OTP dispatched from nagayashwanthgalla@outlook.com.'
+            : `Enter the 6-digit OTP dispatched to ${forgotEmail} and set your new password.`
         }
       >
         <div className="space-y-4">
@@ -286,11 +287,11 @@ export const Login: React.FC = () => {
 
           {forgotStep === 1 ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
-              <FormField label="Authorized Email Address" required>
+              <FormField label="Registered Email Address" required>
                 <div className="relative">
                   <Input
                     type="email"
-                    placeholder="e.g. admin@rgsenterprises.com"
+                    placeholder="e.g. name@rgsenterprises.com"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     className="pl-10"
@@ -302,7 +303,7 @@ export const Login: React.FC = () => {
               </FormField>
 
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                Security note: OTP dispatch is restricted to authorized administrator accounts. The OTP is valid for 10 minutes and does not require database storage.
+                Security note: OTP email is dispatched from <strong>nagayashwanthgalla@outlook.com</strong> directly to the receiver email entered above. The verification code is valid for 10 minutes.
               </p>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
@@ -326,16 +327,54 @@ export const Login: React.FC = () => {
           ) : (
             <form onSubmit={handleVerifyAndResetPassword} className="space-y-4">
               <FormField label="6-Digit Verification Code (OTP)" required>
-                <Input
-                  type="text"
-                  maxLength={6}
-                  placeholder="123456"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className="text-center font-mono tracking-widest text-lg font-bold"
-                  autoFocus
-                  required
-                />
+                <div className="relative flex items-center">
+                  <Input
+                    type="text"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    className="text-center font-mono tracking-widest text-lg font-bold pr-20"
+                    autoFocus
+                    required
+                  />
+                  <div className="absolute right-2 flex items-center gap-1">
+                    {otp ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(otp);
+                          toastSuccess('OTP copied to clipboard!');
+                        }}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-apple-accent hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        title="Copy OTP"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const text = await navigator.clipboard.readText();
+                            const clean = text.replace(/\D/g, '').slice(0, 6);
+                            if (clean) {
+                              setOtp(clean);
+                              toastSuccess('Pasted OTP from clipboard!');
+                            }
+                          } catch {
+                            // clipboard read permission or empty
+                          }
+                        }}
+                        className="px-2 py-1 rounded-md text-[11px] font-semibold text-apple-accent hover:bg-apple-accent/10 transition-colors flex items-center gap-1"
+                        title="Paste OTP from clipboard"
+                      >
+                        <Clipboard className="w-3.5 h-3.5" />
+                        <span>Paste</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </FormField>
 
               <FormField label="New Password (min 8 characters)" required>
@@ -359,13 +398,23 @@ export const Login: React.FC = () => {
               </FormField>
 
               <FormField label="Confirm New Password" required>
-                <Input
-                  type={showNewPassword ? 'text' : 'password'}
-                  placeholder="Repeat new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Repeat new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </FormField>
 
               <div className="flex items-center justify-between text-xs text-gray-500 pt-1">

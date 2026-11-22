@@ -20,6 +20,8 @@ const Assets = lazy(() => import('./pages/Assets').then((m) => ({ default: m.Ass
 const Visualance = lazy(() => import('./pages/Visualance').then((m) => ({ default: m.Visualance })));
 const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.Reports })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const Mailing = lazy(() => import('./pages/Mailing').then((m) => ({ default: m.Mailing })));
+const Invoice = lazy(() => import('./pages/Invoice').then((m) => ({ default: m.Invoice })));
 
 export const App: React.FC = () => {
   return (
@@ -125,6 +127,16 @@ export const App: React.FC = () => {
                         </RoleGuard>
                       }
                     />
+                    <Route
+                      path="mailing"
+                      element={
+                        <RoleGuard allowedRoles={['ADMIN']}>
+                          <Mailing />
+                        </RoleGuard>
+                      }
+                    />
+                    <Route path="invoice" element={<Invoice />} />
+                    <Route path="invoices" element={<Navigate to="/invoice" replace />} />
                   </Route>
 
                   {/* Catch-all */}

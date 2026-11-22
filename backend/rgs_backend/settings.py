@@ -146,6 +146,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Upload Size Limits (Up to 50MB for rich mailing attachments, folders & media)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
+
 # CORS Settings
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
@@ -184,8 +188,21 @@ STORAGE_BUCKET = os.getenv('STORAGE_BUCKET', 'godown-documents')
 # Brevo Mail Settings
 BREVO_API_KEY = os.getenv('BREVO_API_KEY', '')
 BREVO_SMTP_KEY = os.getenv('BREVO_SMTP_KEY', '')
-BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'rgsenterprise2026@gmail.com')
-BREVO_SENDER_NAME = os.getenv('BREVO_SENDER_NAME', 'Sai Babu P')
+BREVO_SMTP_USER = os.getenv('BREVO_SMTP_USER', 'c106ae001@smtp-brevo.com')
+BREVO_SMTP_HOST = os.getenv('BREVO_SMTP_HOST', 'smtp-relay.brevo.com')
+BREVO_SMTP_PORT = int(os.getenv('BREVO_SMTP_PORT', 587))
+BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'nagayashwanthgalla@outlook.com')
+BREVO_SENDER_NAME = os.getenv('BREVO_SENDER_NAME', 'RGS Enterprises')
+
+# Django Email Backend (Powered by Brevo SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = BREVO_SMTP_HOST
+EMAIL_PORT = BREVO_SMTP_PORT
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = BREVO_SMTP_USER
+EMAIL_HOST_PASSWORD = BREVO_SMTP_KEY
+DEFAULT_FROM_EMAIL = f"{BREVO_SENDER_NAME} <{BREVO_SENDER_EMAIL}>"
+
 BILLING_ALERT_EMAIL = os.getenv('BILLING_ALERT_EMAIL', 'rgsenterprise2026@gmail.com')
 ALLOWED_RESET_EMAILS = [
     e.strip().lower()

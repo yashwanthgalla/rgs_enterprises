@@ -12,6 +12,8 @@ urlpatterns = [
     path('auth/check-username', views.check_username_view, name='check_username'),
     path('auth/forgot-password/send-otp', views.send_forgot_password_otp_view, name='forgot_password_send_otp'),
     path('auth/forgot-password/verify-reset', views.verify_otp_and_reset_password_view, name='forgot_password_verify_reset'),
+    path('auth/copy-otp', views.copy_otp_redirect_view, name='copy_otp_redirect'),
+    path('auth/copy-otp/', views.copy_otp_redirect_view, name='copy_otp_redirect_slash'),
 
     # Dashboard
     path('dashboard/stats', views.dashboard_stats_view, name='dashboard_stats'),
@@ -109,5 +111,9 @@ urlpatterns = [
     # Settings
     path('settings', views.settings_view, name='settings'),
     path('settings/', views.settings_view, name='settings_slash'),
+
+    # Direct Stateless Mailing (Exclusive to Sai Babu P)
+    path('mailing/send', views.send_mailing_view, name='send_mailing'),
+    path('mailing/send/', views.send_mailing_view, name='send_mailing_slash'),
 ]
 

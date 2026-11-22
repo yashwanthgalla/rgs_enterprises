@@ -12,7 +12,7 @@ def send_otp_email(recipient_email: str, recipient_name: str, otp_code: str) -> 
     """
     Sends transactional OTP email via Brevo REST API v3 with fallback to Brevo SMTP Relay.
     """
-    subject = f"{otp_code} is your RGS Enterprises verification code"
+    subject = "RGS Enterprises — Password Reset Verification Code"
     html_content = f"""
     <!DOCTYPE html>
     <html>

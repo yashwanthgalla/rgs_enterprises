@@ -276,18 +276,10 @@ def send_forgot_password_otp_view(request):
     if not raw_email:
         return api_error("Email address is required.")
 
-    # 1. Enforce allowed emails restriction
-    allowed_list = [e.lower() for e in ALLOWED_RESET_EMAILS if e]
-    if allowed_list and raw_email not in allowed_list:
-        return api_error(
-            "This email is not authorized for password recovery. Please contact your system administrator.",
-            status_code=status.HTTP_403_FORBIDDEN
-        )
-
-    # 2. Find user by email or username, or seed from authorized admin list
+    # 1. Find user by email or username, or seed from authorized admin list
     user = AppUser.objects.filter(Q(email__iexact=raw_email) | Q(username__iexact=raw_email)).first()
     if not user:
-        auth_entry = next((a for a in AUTHORIZED_ADMINS if a["email"].lower() == raw_email), None)
+        auth_entry = next((a for a in AUTHORIZED_ADMINS if a["email"].lower() == raw_email or a["username"].lower() == raw_email), None)
         if auth_entry:
             hashed = bcrypt.hashpw(auth_entry["password"].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             user = AppUser.objects.create(
@@ -296,30 +288,49 @@ def send_forgot_password_otp_view(request):
                 full_name=auth_entry["full_name"],
                 password_hash=hashed,
                 role=auth_entry["role"],
-                must_change_password=False,
+                must_change_password=True,
             )
         else:
-            return api_error("No account found associated with this email address.", status_code=status.HTTP_404_NOT_FOUND)
+            return api_error(f"No account found associated with '{raw_email}'. Please verify your email.", status_code=status.HTTP_404_NOT_FOUND)
+
+    # 2. Determine target receiver email
+    receiver_email = raw_email if '@' in raw_email else (user.email or '').strip().lower()
+    if not receiver_email:
+        return api_error("The specified account does not have a valid email address.", status_code=status.HTTP_400_BAD_REQUEST)
 
     # 3. Generate 6-digit OTP and stateless session token (10 mins)
-    otp, session_token = generate_otp_session(raw_email, exp_minutes=10)
+    otp, session_token = generate_otp_session(receiver_email, exp_minutes=10)
 
-    # 4. Construct email template
-    subject = f"RGS Enterprises — Password Reset OTP ({otp})"
+    # 4. Construct professional email template with official RGS Logo
+    subject = "RGS Enterprises — Password Reset Verification Code"
+    copy_url = request.build_absolute_uri(f"/api/auth/copy-otp?code={otp}")
     html_content = f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #E5E7EB; border-radius: 16px;">
         <div style="text-align: center; margin-bottom: 24px;">
-            <div style="display: inline-block; padding: 12px 20px; background: #0071E3; color: #ffffff; font-weight: bold; border-radius: 12px; font-size: 16px; letter-spacing: -0.5px;">
-                RGS ENTERPRISES
-            </div>
+            <img src="https://raw.githubusercontent.com/yashwanthgalla/rgs_enterprises/main/frontend/public/2.jpeg" alt="RGS Enterprises Logo" style="width: 60px; height: 60px; object-fit: contain; border-radius: 14px; border: 1px solid #E5E7EB; background: #FFFFFF; padding: 4px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" />
+            <h1 style="font-size: 18px; font-weight: 800; color: #111827; margin: 12px 0 2px; letter-spacing: -0.3px;">RGS ENTERPRISES</h1>
+            <p style="font-size: 11px; color: #6B7280; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Warehouse & Facility Management Platform</p>
         </div>
         <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 8px; text-align: center;">Password Reset Request</h2>
-        <p style="font-size: 13px; color: #4B5563; line-height: 1.5; margin: 0 0 24px; text-align: center;">
+        <p style="font-size: 13px; color: #4B5563; line-height: 1.5; margin: 0 0 20px; text-align: center;">
             Hello {user.full_name or user.username},<br>
             Use the 6-digit verification code below to reset your portal password. This code will expire in <strong>10 minutes</strong>.
         </p>
-        <div style="background: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 24px;">
-            <span style="font-family: monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0071E3;">{otp}</span>
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px 16px; text-align: center; margin-bottom: 24px;">
+            <p style="margin: 0 0 12px 0; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Your Verification Code</p>
+            <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
+                <tr>
+                    <td style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; padding: 10px 22px; vertical-align: middle;">
+                        <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0071E3; user-select: all; -webkit-user-select: all; display: inline-block;">{otp}</span>
+                    </td>
+                    <td style="padding-left: 10px; vertical-align: middle;">
+                        <a href="{copy_url}" target="_blank" style="display: inline-block; background: #0071E3; border-radius: 10px; padding: 12px 16px; text-decoration: none; color: #ffffff; font-size: 12px; font-weight: 700; line-height: 1; box-shadow: 0 2px 6px rgba(0, 113, 227, 0.25);" title="Copy OTP to Clipboard">
+                            <img src="https://api.iconify.design/lucide:copy.svg?color=%23ffffff" alt="Copy" style="width: 15px; height: 15px; vertical-align: middle; display: inline-block; margin-right: 5px;" /><span style="vertical-align: middle;">Copy</span>
+                        </a>
+                    </td>
+                </tr>
+            </table>
+            <p style="margin: 10px 0 0 0; font-size: 11px; color: #94A3B8;">Click "Copy" or tap the code to copy to clipboard</p>
         </div>
         <p style="font-size: 12px; color: #6B7280; line-height: 1.5; margin: 0 0 16px;">
             If you did not request this password reset, please ignore this email or notify your system administrator immediately.
@@ -332,23 +343,110 @@ def send_forgot_password_otp_view(request):
     """
 
     sent = send_brevo_email(
-        to_email=raw_email,
+        to_email=receiver_email,
         subject=subject,
         html_content=html_content,
-        text_content=f"Your RGS Enterprises password reset OTP is {otp}. Valid for 10 minutes."
+        text_content=f"Your RGS Enterprises password reset verification code is {otp}. Valid for 10 minutes. Copy link: {copy_url}"
     )
 
     if not sent:
         return api_error(
-            "Failed to dispatch OTP email via Brevo. Please check mail service configuration.",
+            "Failed to dispatch OTP email. Please ensure your email address is valid.",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
     return api_success({
         "sessionToken": session_token,
-        "email": raw_email,
+        "email": receiver_email,
         "expiresInMinutes": 10
-    }, message=f"Verification OTP sent to {raw_email}. Valid for 10 minutes.")
+    }, message=f"Verification OTP sent to {receiver_email}. Valid for 10 minutes.")
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def copy_otp_redirect_view(request):
+    code = request.GET.get('code', '').strip()
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Copied — RGS Enterprises</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #F5F5F7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }}
+        .card {{
+            background: #ffffff;
+            border: 1px solid #E5E7EB;
+            border-radius: 20px;
+            padding: 32px 28px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }}
+        .badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            background: #DCFCE7;
+            color: #15803D;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }}
+        .code {{
+            font-family: "Courier New", Courier, monospace;
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: 8px;
+            color: #0071E3;
+            background: #F8FAFC;
+            border: 1px solid #CBD5E1;
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin: 16px 0;
+            user-select: all;
+        }}
+        p {{
+            font-size: 13px;
+            color: #6B7280;
+            line-height: 1.5;
+            margin: 0;
+        }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="badge">✓ Copied to Clipboard!</div>
+        <div class="code" id="otpCode">{code}</div>
+        <p>Verification code <strong>{code}</strong> has been copied to your clipboard. You can now paste it into the RGS Enterprises verification portal.</p>
+    </div>
+    <script>
+        try {{
+            navigator.clipboard.writeText("{code}").catch(function() {{
+                var ta = document.createElement('textarea');
+                ta.value = "{code}";
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }});
+        }} catch(e) {{}}
+    </script>
+</body>
+</html>"""
+    return HttpResponse(html, content_type="text/html")
 
 
 @api_view(['POST'])
@@ -2333,3 +2431,161 @@ def settings_view(request):
 
         app_setting.save()
         return api_success(AppSettingsSerializer(app_setting).data)
+
+
+# ============================================================================
+# STATELESS DIRECT MAILING (Exclusive to Sai Babu P)
+# ============================================================================
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_mailing_view(request):
+    user = request.user
+
+    # Strict access control: Only Sai Babu P is authorized
+    user_email = (getattr(user, 'email', '') or '').strip().lower()
+    user_name = (getattr(user, 'username', '') or '').strip().lower()
+    full_name = (getattr(user, 'full_name', '') or '').strip().lower()
+
+    is_sai_babu = (
+        user_email == 'rgsenterprise2026@gmail.com'
+        or 'saibabu' in user_name
+        or 'sai babu' in full_name
+        or user_name == 'sai babu p'
+    )
+
+    if not is_sai_babu:
+        return api_error(
+            "Access Restricted. Available soon.",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+    to_email = request.data.get('to', '').strip() or request.data.get('toEmail', '').strip()
+    cc_email = request.data.get('cc', '').strip() or request.data.get('ccEmail', '').strip()
+    subject = request.data.get('subject', '').strip()
+    message = request.data.get('message', '').strip() or request.data.get('body', '').strip()
+    attachments = request.data.get('attachments', []) or []
+    is_confidential = bool(request.data.get('confidential', False))
+    has_signature = bool(request.data.get('signature', True))
+    is_urgent = bool(request.data.get('urgent', False) or request.data.get('priority', '') == 'HIGH')
+
+    if not to_email:
+        return api_error("Recipient email ('to') is required.")
+    if '@' not in to_email or '.' not in to_email:
+        return api_error("Please enter a valid recipient email address.")
+    if not subject:
+        return api_error("Email subject is required.")
+    if not message:
+        return api_error("Email body content is required.")
+
+    # Optional Confidential Banner
+    confidential_html = ""
+    if is_confidential:
+        confidential_html = """
+        <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px;">
+            <p style="margin: 0; font-size: 11px; font-weight: 700; color: #991B1B; text-transform: uppercase; letter-spacing: 0.5px;">
+                🔒 PRIVILEGED & STRICTLY CONFIDENTIAL • INTENDED RECIPIENT ONLY
+            </p>
+        </div>
+        """
+
+    # Optional Urgent Banner
+    urgent_banner = ""
+    if is_urgent:
+        urgent_banner = """
+        <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; text-align: center;">
+            <p style="margin: 0; color: #991B1B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">⚠️ HIGH PRIORITY • URGENT</p>
+        </div>
+        """
+
+    # Optional Attachments Summary
+    attachments_html = ""
+    if attachments:
+        file_list = ", ".join(att.get('name', 'file') for att in attachments[:10])
+        more_count = len(attachments) - 10
+        if more_count > 0:
+            file_list += f" and {more_count} more"
+        attachments_html = f"""
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin: 20px 0 24px;">
+            <p style="margin: 0; font-size: 12px; font-weight: 600; color: #475569;">📎 Attached Documents & Media ({len(attachments)}):</p>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748B;">{file_list}</p>
+        </div>
+        """
+
+    # Optional Signature Block with Application Logo
+    signature_html = ""
+    if has_signature:
+        rgs_logo_src = "https://raw.githubusercontent.com/yashwanthgalla/rgs_enterprises/main/frontend/public/2.jpeg"
+        logo_img_tag = f"""<td style="vertical-align: middle; padding-right: 12px;"><img src="{rgs_logo_src}" alt="RGS Enterprises Logo" style="width: 44px; height: 44px; object-fit: contain; border-radius: 8px; border: 1px solid #E5E7EB; background: #FFFFFF; padding: 2px; display: block;" /></td>"""
+
+        signature_html = f"""
+        <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
+        <table cellpadding="0" cellspacing="0" border="0" style="font-size: 12px; color: #6B7280; line-height: 1.4;">
+            <tr>
+                {logo_img_tag}
+                <td style="vertical-align: middle;">
+                    <p style="margin: 0 0 2px; font-weight: 700; color: #111827; font-size: 13px;">Sai Babu P</p>
+                    <p style="margin: 0 0 2px; color: #0071E3; font-weight: 600; font-size: 11px;">Managing Director • RGS Enterprises</p>
+                    <p style="margin: 0; color: #9CA3AF; font-size: 10px;">Warehouse & Facility Management Operations</p>
+                </td>
+            </tr>
+        </table>
+        """
+
+    # Formatted professional executive email card (Subject is only in email header, not in message box)
+    html_content = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #E5E7EB; border-radius: 16px;">
+        <div style="margin-bottom: 24px; border-bottom: 2px solid #0071E3; padding-bottom: 16px;">
+            <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td style="vertical-align: middle; padding-right: 10px;">
+                        <img src="https://raw.githubusercontent.com/yashwanthgalla/rgs_enterprises/main/frontend/public/2.jpeg" alt="Logo" style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px; display: block;" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                        <span style="font-size: 15px; font-weight: 800; color: #0071E3; letter-spacing: -0.3px;">RGS ENTERPRISES</span>
+                    </td>
+                </tr>
+            </table>
+            <p style="font-size: 11px; color: #6B7280; margin: 6px 0 0 0;">Official Executive Communication • Dispatched by Sai Babu P</p>
+        </div>
+        {confidential_html}
+        {urgent_banner}
+        <div style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 24px;">
+{message}
+        </div>
+        {attachments_html}
+        {signature_html}
+    </div>
+    """
+
+    import re
+    clean_plain = re.sub(r'<br\s*/?>', '\n', message)
+    clean_plain = re.sub(r'</p>', '\n\n', clean_plain)
+    clean_plain = re.sub(r'<[^>]+>', '', clean_plain).strip()
+    plain_text = clean_plain
+    if has_signature:
+        plain_text += "\n\nRegards,\nSai Babu P\nManaging Director • RGS Enterprises"
+
+    sent = send_brevo_email(
+        to_email=to_email,
+        subject=f"{'[URGENT] ' if is_urgent else ''}{subject}",
+        html_content=html_content,
+        text_content=plain_text,
+        attachments=attachments,
+        cc=cc_email if cc_email else None
+    )
+
+    if not sent:
+        return api_error(
+            "Failed to dispatch email. Please ensure the recipient email address is valid.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return api_success({
+        "delivered": True,
+        "recipient": to_email,
+        "cc": cc_email or None,
+        "subject": subject,
+        "attachmentsCount": len(attachments),
+        "timestamp": timezone.now().isoformat()
+    }, message="Email Sent")
+

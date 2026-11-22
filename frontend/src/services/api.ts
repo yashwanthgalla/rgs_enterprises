@@ -145,7 +145,7 @@ api.interceptors.response.use(
 );
 
 // Helper unwrapper for backend ApiResponse<T>
-export const unwrap = <T>(res: { data: { data?: T; [key: string]: any } }): T => {
+export const unwrap = <T>(res: { data: { data?: T;[key: string]: any } }): T => {
   if (res.data && 'data' in res.data && res.data.data !== undefined) {
     return res.data.data as T;
   }
@@ -683,3 +683,22 @@ export const settingsApi = {
     return api.put('/settings', payload).then(unwrap).then(normalizeSettings);
   },
 };
+
+export const mailingApi = {
+  send: (data: {
+    to: string;
+    subject: string;
+    message: string;
+    cc?: string;
+    confidential?: boolean;
+    signature?: boolean;
+    urgent?: boolean;
+    attachments?: Array<{
+      name: string;
+      type: string;
+      size: number;
+      content: string; // Base64
+    }>;
+  }) => api.post('/mailing/send', data).then(unwrap),
+};
+

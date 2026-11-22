@@ -74,16 +74,45 @@ export const FirstLoginModal: React.FC = () => {
     return displayName.slice(0, 2).toUpperCase();
   }, [displayName]);
 
-  // Username syntax validation: 3-20 letters, numbers, or underscores
+  // Sync state if user loads after mount
+  useEffect(() => {
+    if (!username && (user?.fullName || user?.username)) {
+      setUsername(user.fullName || user.username);
+    }
+    if (!email && user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  // Username syntax validation: 3-30 letters, numbers, spaces, underscores, dots, hyphens
   const isUsernameSyntaxValid = useMemo(() => {
-    return /^[a-zA-Z0-9_]{3,20}$/.test(username);
+    const trimmed = username.trim();
+    return trimmed.length >= 3 && trimmed.length <= 30 && /^[a-zA-Z0-9_.\- ]+$/.test(trimmed);
   }, [username]);
+
+  // Check if username matches current user's username or full name
+  const isCurrentUsername = useMemo(() => {
+    const trimmed = username.trim().toLowerCase();
+    const currentUsername = (user?.username || '').trim().toLowerCase();
+    const currentFullName = (user?.fullName || '').trim().toLowerCase();
+    return (
+      trimmed.length >= 3 &&
+      (trimmed === currentUsername || trimmed === currentFullName)
+    );
+  }, [username, user?.username, user?.fullName]);
+
+  const isUsernameValidAndAvailable = useMemo(() => {
+    if (!username.trim() || !isUsernameSyntaxValid) return false;
+    if (isCurrentUsername) return true;
+    return isUsernameAvailable === true || isUsernameAvailable === null;
+  }, [username, isUsernameSyntaxValid, isCurrentUsername, isUsernameAvailable]);
 
   // Debounced availability check
   useEffect(() => {
-    if (!username || username === user?.username) {
+    const trimmed = username.trim();
+    if (!trimmed || isCurrentUsername) {
       setIsCheckingUsername(false);
-      setIsUsernameAvailable(null);
+      setIsUsernameAvailable(true);
       setUsernameError(null);
       return;
     }
@@ -92,7 +121,7 @@ export const FirstLoginModal: React.FC = () => {
       setIsCheckingUsername(false);
       setIsUsernameAvailable(false);
       if (usernameTouched) {
-        setUsernameError('Use 3–20 letters, numbers or underscores.');
+        setUsernameError('Use 3–30 letters, numbers, spaces or underscores.');
       }
       return;
     }
@@ -102,7 +131,7 @@ export const FirstLoginModal: React.FC = () => {
 
     const timer = setTimeout(async () => {
       try {
-        const res = (await authApi.checkUsername(username.trim())) as any;
+        const res = (await authApi.checkUsername(trimmed)) as any;
         if (res && res.available) {
           setIsUsernameAvailable(true);
           setUsernameError(null);
@@ -111,15 +140,15 @@ export const FirstLoginModal: React.FC = () => {
           setUsernameError('Already taken');
         }
       } catch {
-        // Fallback: If network check fails, don't hard block typing
-        setIsUsernameAvailable(null);
+        // Fallback: If network check fails, allow user to proceed
+        setIsUsernameAvailable(true);
       } finally {
         setIsCheckingUsername(false);
       }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [username, isUsernameSyntaxValid, usernameTouched, user?.username]);
+  }, [username, isUsernameSyntaxValid, usernameTouched, isCurrentUsername]);
 
   // Password rules checklist
   const passwordRules = useMemo(() => {
@@ -150,11 +179,10 @@ export const FirstLoginModal: React.FC = () => {
   // Overall form validity
   const isFormValid =
     isUsernameSyntaxValid &&
-    isUsernameAvailable !== false &&
+    isUsernameValidAndAvailable &&
     isPasswordValid &&
     passwordsMatch &&
-    !isSubmitting &&
-    !isCheckingUsername;
+    !isSubmitting;
 
   // Track Caps Lock state
   const handlePasswordKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -163,8 +191,8 @@ export const FirstLoginModal: React.FC = () => {
 
   const handleBlurUsername = () => {
     setUsernameTouched(true);
-    if (!isUsernameSyntaxValid && username) {
-      setUsernameError('Use 3–20 letters, numbers or underscores.');
+    if (!isUsernameSyntaxValid && username.trim()) {
+      setUsernameError('Use 3–30 letters, numbers, spaces or underscores.');
     }
   };
 
@@ -307,9 +335,12 @@ export const FirstLoginModal: React.FC = () => {
                   ref={usernameInputRef}
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value.toLowerCase().trim())}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (usernameError) setUsernameError(null);
+                  }}
                   onBlur={handleBlurUsername}
-                  placeholder="e.g. yashwanth_galla"
+                  placeholder="e.g. Sai Babu P"
                   autoComplete="username"
                   required
                   aria-invalid={Boolean(usernameError)}
@@ -317,7 +348,7 @@ export const FirstLoginModal: React.FC = () => {
                   className={`w-full h-[48px] pl-10 pr-10 text-sm font-medium rounded-[12px] bg-slate-50 dark:bg-slate-800/70 text-slate-900 dark:text-slate-100 border transition-all duration-150 outline-none ${
                     usernameError
                       ? 'border-red-500 focus:ring-2 focus:ring-red-500/20'
-                      : isUsernameAvailable
+                      : isUsernameValidAndAvailable && !isCheckingUsername
                       ? 'border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                       : 'border-slate-200 dark:border-slate-700 focus:border-[#0A74E6] focus:ring-2 focus:ring-[#0A74E6]/20'
                   }`}
@@ -327,7 +358,7 @@ export const FirstLoginModal: React.FC = () => {
                   {isCheckingUsername && (
                     <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
                   )}
-                  {!isCheckingUsername && isUsernameAvailable && (
+                  {!isCheckingUsername && isUsernameValidAndAvailable && (
                     <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   )}
                   {!isCheckingUsername && usernameError && (

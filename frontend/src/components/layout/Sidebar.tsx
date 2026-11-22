@@ -19,6 +19,9 @@ import {
   Info,
   Landmark,
   Video,
+  Mail,
+  Lock,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -47,6 +50,8 @@ const chunkPrefetchers: Record<string, () => Promise<any>> = {
   '/staff': () => import('../../pages/Staff'),
   '/assets': () => import('../../pages/Assets'),
   '/reports': () => import('../../pages/Reports'),
+  '/invoice': () => import('../../pages/Invoice'),
+  '/mailing': () => import('../../pages/Mailing'),
   '/settings': () => import('../../pages/Settings'),
 };
 
@@ -138,6 +143,7 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ComponentType<{ className?: string }>;
+  isAvailableSoon?: boolean;
   children?: {
     label: string;
     path: string;
@@ -173,8 +179,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [location.pathname]);
 
   const userRole = (user?.role || 'ADMIN').toUpperCase();
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  const userName = (user?.username || '').toLowerCase().trim();
+  const userFullName = (user?.fullName || '').toLowerCase().trim();
 
-  const allNavItems: (NavItem & { roles?: string[] })[] = [
+  const isSaiBabu =
+    userEmail === 'rgsenterprise2026@gmail.com' ||
+    userName === 'saibabu' ||
+    userName === 'sai babu p' ||
+    userFullName.includes('sai babu');
+
+  const allNavItems: (NavItem & { roles?: string[]; isLockedForOthers?: boolean })[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Hubs', path: '/hubs', icon: Warehouse },
     {
@@ -200,6 +215,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { label: 'Staff Directory', path: '/staff', icon: Users, roles: ['ADMIN', 'MANAGER'] },
     { label: 'Assets & Equipment', path: '/assets', icon: Wrench, roles: ['ADMIN', 'MANAGER'] },
     { label: 'Reports', path: '/reports', icon: BarChart3, roles: ['ADMIN'] },
+    { label: 'Invoice', path: '/invoice', icon: FileText, isAvailableSoon: true },
+    { label: 'Mailing', path: '/mailing', icon: Mail, roles: ['ADMIN'], isLockedForOthers: true },
     { label: 'Settings', path: '/settings', icon: Settings, roles: ['ADMIN'] },
   ];
 
@@ -406,6 +423,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }
 
             // Standard NavItem
+            const isLockedItem = item.isAvailableSoon || (item.path === '/mailing' && !isSaiBabu);
+
             if (isCollapsed) {
               return (
                 <NavLink
@@ -415,10 +434,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={() => prefetchRoute(item.path)}
                   onFocus={() => prefetchRoute(item.path)}
                   end={item.path === '/'}
-                  title={item.label}
+                  title={isLockedItem ? `${item.label} (Available soon)` : item.label}
                   className={({ isActive }) =>
                     clsx(
-                      'flex items-center justify-center w-11 h-10 mx-auto rounded-xl transition-all duration-150',
+                      'relative flex items-center justify-center w-11 h-10 mx-auto rounded-xl transition-all duration-150',
                       isActive
                         ? 'bg-[#0071E3] text-white shadow-apple-sm'
                         : 'text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
@@ -426,6 +445,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }
                 >
                   <Icon className="w-4 h-4 shrink-0" />
+                  {isLockedItem && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white" />
+                  )}
                 </NavLink>
               );
             }
@@ -440,15 +462,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 end={item.path === '/'}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150',
+                    'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150',
                     isActive
                       ? 'bg-[#0071E3] text-white shadow-apple-sm'
                       : 'text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
                   )
                 }
               >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </div>
+                {isLockedItem && (
+                  <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium border border-amber-500/20">
+                    <Lock className="w-2.5 h-2.5" />
+                    Soon
+                  </span>
+                )}
               </NavLink>
             );
           })}

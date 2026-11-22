@@ -86,8 +86,9 @@ def generate_financial_csv(year: int, export_type: str = 'total', hub_id: int = 
             profit = total_rev - total_cost
             margin = profit - setup_cost
 
+            owner_val = getattr(hub, 'owner_name', None) or getattr(hub, 'owner_address', None) or 'Owner'
             writer.writerow([
-                month_label, vendor_name, hub.status, state_code, hub.model, hub.owner_address or 'Owner', hub.name,
+                month_label, vendor_name, hub.status, state_code, hub.model, owner_val, hub.name,
                 start_date, end_date, tenure, area,
                 round(rent_val, 2), round(setup_cost, 2), 0.0, 0.0, 0.0, 0.0, 0.0, round(total_rev, 2),
                 round(rent_val, 2), '10%', round(tds_amt, 2), round(rent_after_tds, 2), '18%', round(rent_inc_gst, 2),
@@ -124,8 +125,9 @@ def generate_financial_csv(year: int, export_type: str = 'total', hub_id: int = 
         profit = total_rev - total_cost
         margin = profit - setup_cost
 
+        owner_val = getattr(hub, 'owner_name', None) or getattr(hub, 'owner_address', None) or 'Owner'
         writer.writerow([
-            vendor_name, hub.status, state_code, hub.model, hub.owner_address or 'Owner', hub.name,
+            vendor_name, hub.status, state_code, hub.model, owner_val, hub.name,
             start_date, end_date, tenure, area,
             round(rent_val, 2), round(setup_cost, 2), 0.0, 0.0, 0.0, 0.0, 0.0, round(total_rev, 2),
             round(rent_val, 2), '10%', round(tds_amt, 2), round(rent_after_tds, 2), '18%', round(rent_inc_gst, 2),

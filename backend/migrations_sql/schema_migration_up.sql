@@ -7,6 +7,8 @@ ALTER TABLE godown DROP COLUMN IF EXISTS occupied_sq_ft;
 ALTER TABLE godown DROP COLUMN IF EXISTS occupied_sqft;
 
 -- 2. Alter/extend godown with all specified fields
+ALTER TABLE godown ADD COLUMN IF NOT EXISTS owner_name VARCHAR(255);
+ALTER TABLE hubs ADD COLUMN IF NOT EXISTS owner_name VARCHAR(255);
 ALTER TABLE godown ADD COLUMN IF NOT EXISTS erp_name VARCHAR(255);
 ALTER TABLE godown ADD COLUMN IF NOT EXISTS hub_poc_name VARCHAR(255);
 ALTER TABLE godown ADD COLUMN IF NOT EXISTS hub_poc_contact VARCHAR(20);

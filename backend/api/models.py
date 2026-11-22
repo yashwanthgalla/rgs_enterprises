@@ -83,6 +83,7 @@ class Godown(models.Model):
     electricity_service_number = models.CharField(max_length=100, blank=True, null=True)
     lease_contact_name = models.CharField(max_length=200, blank=True, null=True)
     lease_contact_mobile = models.CharField(max_length=50, blank=True, null=True)
+    owner_name = models.CharField(max_length=255, blank=True, null=True)
     owner_address = models.TextField(blank=True, null=True)
     hub_details = models.JSONField(default=dict, blank=True, null=True)
     is_deleted = models.BooleanField(default=False)

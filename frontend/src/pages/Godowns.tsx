@@ -31,6 +31,7 @@ import {
   ArrowRight,
   CreditCard,
   FileText,
+  Download,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -263,6 +264,7 @@ export const Godowns: React.FC = () => {
     monthlyRent: '',
 
     // 8. Lease Contact and Owner Information
+    ownerName: '',
     leaseContactName: '',
     leaseContactMobile: '',
     ownerAddress: '',
@@ -299,7 +301,7 @@ export const Godowns: React.FC = () => {
       name: '',
       code: initialCode,
       state: 'Telangana',
-      city: 'Hyderabad',
+      city: 'Enter City',
       hubPocName: '',
       hubPocContact: '',
       capacitySqFt: '',
@@ -325,6 +327,7 @@ export const Godowns: React.FC = () => {
       totalSetupCost: '',
       securityAdvance: '',
       monthlyRent: '',
+      ownerName: '',
       leaseContactName: '',
       leaseContactMobile: '',
       ownerAddress: '',
@@ -380,6 +383,7 @@ export const Godowns: React.FC = () => {
       totalSetupCost: g.totalSetupCost ? String(g.totalSetupCost) : '',
       securityAdvance: g.securityAdvance ? String(g.securityAdvance) : (g.refundableAdvance ? String(g.refundableAdvance) : ''),
       monthlyRent: g.monthlyRent ? String(g.monthlyRent) : '',
+      ownerName: g.ownerName || g.leaseContactName || '',
       leaseContactName: g.leaseContactName || '',
       leaseContactMobile: g.leaseContactMobile || '',
       ownerAddress: g.ownerAddress || '',
@@ -630,7 +634,8 @@ export const Godowns: React.FC = () => {
         monthlyRent: Number(parseFloat(formData.monthlyRent || '0').toFixed(2)),
 
         // 8. Lease Contact & Owner Information
-        leaseContactName: formData.leaseContactName.trim() || null,
+        ownerName: formData.ownerName.trim() || formData.leaseContactName.trim() || null,
+        leaseContactName: formData.leaseContactName.trim() || formData.ownerName.trim() || null,
         leaseContactMobile: formData.leaseContactMobile.trim() || null,
         ownerAddress: formData.ownerAddress.trim() || null,
 
@@ -693,6 +698,85 @@ export const Godowns: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const handleExportHubs = () => {
+    if (godowns.length === 0) {
+      error('No hubs available to export.');
+      return;
+    }
+
+    const headers = [
+      'Hub ID',
+      'ERP Name',
+      'Current Tenant',
+      'Owner Name',
+      'Owner Mobile',
+      'Owner Address',
+      'State',
+      'City',
+      'Location Address',
+      'Google Maps Link',
+      'Total Capacity (Sq Ft)',
+      'Monthly Rent (INR)',
+      'Refundable Advance (INR)',
+      'Tenure (Months)',
+      'Lease Start Date',
+      'Lease End Date',
+      'Hub Status',
+      'Hub Model',
+      'Hub POC Name',
+      'Hub POC Contact',
+      'Operations POC Name',
+      'Operations POC Mobile',
+      'Labour Licence Available',
+      'Trade Licence Available',
+    ];
+
+    const escapeCsv = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = godowns.map((g) => [
+      escapeCsv(g.code || `HUB#${g.id}`),
+      escapeCsv(g.erpName || g.name),
+      escapeCsv(g.currentTenant || 'Vacant'),
+      escapeCsv(g.ownerName || g.leaseContactName || 'N/A'),
+      escapeCsv(g.leaseContactMobile || 'N/A'),
+      escapeCsv(g.ownerAddress || 'N/A'),
+      escapeCsv(g.state || 'N/A'),
+      escapeCsv(g.city || 'N/A'),
+      escapeCsv(g.locationAddress || g.address || 'N/A'),
+      escapeCsv(g.googleLocation || 'N/A'),
+      escapeCsv(g.totalCapacity || g.sizeSqft || 0),
+      escapeCsv(g.monthlyRent || 0),
+      escapeCsv(g.securityAdvance || g.refundableAdvance || 0),
+      escapeCsv(g.leaseDurationMonths || 'N/A'),
+      escapeCsv(g.leaseStartDate || 'N/A'),
+      escapeCsv(g.leaseEndDate || 'N/A'),
+      escapeCsv(g.status || g.hubStatus || 'ACTIVE'),
+      escapeCsv(g.hubModel || 'LDP'),
+      escapeCsv(g.hubPocName || 'N/A'),
+      escapeCsv(g.hubPocContact || 'N/A'),
+      escapeCsv(g.operationsPocName || g.opsPocName || 'N/A'),
+      escapeCsv(g.operationsPocMobile || g.opsPocMobile || 'N/A'),
+      escapeCsv(g.hasLabourLicence ? 'Yes' : 'No'),
+      escapeCsv(g.hasTradeLicence ? 'Yes' : 'No'),
+    ]);
+
+    const csvContent = '\ufeff' + [headers.map(escapeCsv).join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `rgs_hubs_registry_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    success('Hubs registry exported to Excel CSV successfully');
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       {/* Top Controls */}
@@ -709,15 +793,25 @@ export const Godowns: React.FC = () => {
           </p>
         </div>
 
-        {!isViewer && (
+        <div className="flex items-center gap-2">
           <Button
-            onClick={openCreateModal}
-            icon={<Plus className="w-4 h-4" />}
+            variant="outline"
+            onClick={handleExportHubs}
+            icon={<Download className="w-4 h-4" />}
             className="rounded-xl shadow-apple-sm"
           >
-            Add Hub
+            Export Excel
           </Button>
-        )}
+          {!isViewer && (
+            <Button
+              onClick={openCreateModal}
+              icon={<Plus className="w-4 h-4" />}
+              className="rounded-xl shadow-apple-sm"
+            >
+              Add Hub
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -1018,7 +1112,7 @@ export const Godowns: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <FormField label="Total Capacity (Number, Optional)">
+              <FormField label="Total Capacity">
                 <Input
                   type="number"
                   step="0.01"
@@ -1144,15 +1238,17 @@ export const Godowns: React.FC = () => {
                 />
               </FormField>
 
-              <FormField label="Total Lease Duration">
-                <div className="min-h-[42px] px-3.5 py-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-gray-200">
-                  <span className="flex items-center gap-1.5 text-apple-accent">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{formData.leaseDurationMonths} Months</span>
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-normal">
-                    Auto-calculated
-                  </span>
+              <FormField label="Tenure (Months)" hint="Auto-calculated or enter manually">
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 12, 24, 36..."
+                    value={formData.leaseDurationMonths || ''}
+                    onChange={(e) => setFormData({ ...formData, leaseDurationMonths: parseInt(e.target.value) || 0 })}
+                    className="pl-9 font-semibold"
+                  />
+                  <Clock className="w-4 h-4 text-apple-accent absolute left-3 top-3 pointer-events-none" />
                 </div>
               </FormField>
             </div>
@@ -1259,22 +1355,20 @@ export const Godowns: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleLabourLicenceToggle(true)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    formData.hasLabourLicence
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${formData.hasLabourLicence
                       ? 'bg-apple-accent text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                    }`}
                 >
                   Yes
                 </button>
                 <button
                   type="button"
                   onClick={() => handleLabourLicenceToggle(false)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    !formData.hasLabourLicence
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${!formData.hasLabourLicence
                       ? 'bg-gray-700 text-white shadow-sm dark:bg-gray-600'
                       : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                    }`}
                 >
                   No
                 </button>
@@ -1327,22 +1421,20 @@ export const Godowns: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleTradeLicenceToggle(true)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    formData.hasTradeLicence
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${formData.hasTradeLicence
                       ? 'bg-apple-accent text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                    }`}
                 >
                   Yes
                 </button>
                 <button
                   type="button"
                   onClick={() => handleTradeLicenceToggle(false)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    !formData.hasTradeLicence
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${!formData.hasTradeLicence
                       ? 'bg-gray-700 text-white shadow-sm dark:bg-gray-600'
                       : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                    }`}
                 >
                   No
                 </button>
@@ -1438,15 +1530,15 @@ export const Godowns: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField label="Lease Contact Name">
+              <FormField label="Owner Name">
                 <Input
-                  placeholder="e.g. Rajesh Reddy (Owner / Agent)"
-                  value={formData.leaseContactName}
-                  onChange={(e) => setFormData({ ...formData, leaseContactName: e.target.value })}
+                  placeholder="e.g. Rajesh Reddy (Property Owner)"
+                  value={formData.ownerName}
+                  onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
                 />
               </FormField>
 
-              <FormField label="Lease Contact Mobile Number (10 Digits)">
+              <FormField label="Owner / Lease Contact Mobile (10 Digits)">
                 <Input
                   placeholder="e.g. 9440011223"
                   maxLength={10}
@@ -1456,14 +1548,23 @@ export const Godowns: React.FC = () => {
               </FormField>
             </div>
 
-            <FormField label="Owner Address">
-              <Textarea
-                placeholder="Permanent residential or business address of the owner..."
-                rows={2}
-                value={formData.ownerAddress}
-                onChange={(e) => setFormData({ ...formData, ownerAddress: e.target.value })}
-              />
-            </FormField>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label="Lease Contact Person / Agent (Optional)">
+                <Input
+                  placeholder="e.g. Ramesh Sharma (Agent / Broker)"
+                  value={formData.leaseContactName}
+                  onChange={(e) => setFormData({ ...formData, leaseContactName: e.target.value })}
+                />
+              </FormField>
+
+              <FormField label="Owner Address">
+                <Input
+                  placeholder="Permanent residential or business address of the owner..."
+                  value={formData.ownerAddress}
+                  onChange={(e) => setFormData({ ...formData, ownerAddress: e.target.value })}
+                />
+              </FormField>
+            </div>
           </div>
 
           {/* Additional Notes */}

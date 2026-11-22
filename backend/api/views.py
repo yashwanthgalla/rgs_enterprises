@@ -213,10 +213,14 @@ def update_profile_view(request):
         user.email = email.strip()
 
     if new_password:
-        if not current_password:
-            return api_error("Current password is required to set a new password")
-        if not bcrypt.checkpw(current_password.encode('utf-8'), user.password_hash.encode('utf-8')):
-            return api_error("Current password is incorrect")
+        if not user.must_change_password:
+            if not current_password:
+                return api_error("Current password is required to set a new password")
+            if not bcrypt.checkpw(current_password.encode('utf-8'), user.password_hash.encode('utf-8')):
+                return api_error("Current password is incorrect")
+        else:
+            if current_password and not bcrypt.checkpw(current_password.encode('utf-8'), user.password_hash.encode('utf-8')):
+                return api_error("Current password is incorrect")
         
         salt = bcrypt.gensalt(10)
         user.password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt).decode('utf-8')
@@ -762,8 +766,16 @@ def godowns_view(request):
             data['name'] = data['erpName']
         if 'locationAddress' in data and not data.get('address'):
             data['address'] = data['locationAddress']
+        if 'ownerName' in data and not data.get('owner_name'):
+            data['owner_name'] = data['ownerName']
+        elif 'owner_name' in data and not data.get('ownerName'):
+            data['ownerName'] = data['owner_name']
         elif 'location' in data and not data.get('address'):
             data['address'] = data['location']
+        if 'ownerName' in data and not data.get('owner_name'):
+            data['owner_name'] = data['ownerName']
+        elif 'owner_name' in data and not data.get('ownerName'):
+            data['ownerName'] = data['owner_name']
 
         # 1. State: strictly asked from user and normalized
         state = str(data.get('state') or 'Telangana').strip()
@@ -880,6 +892,10 @@ def godown_detail_view(request, pk):
             data['name'] = data['erpName']
         if 'locationAddress' in data and not data.get('address'):
             data['address'] = data['locationAddress']
+        if 'ownerName' in data and not data.get('owner_name'):
+            data['owner_name'] = data['ownerName']
+        elif 'owner_name' in data and not data.get('ownerName'):
+            data['ownerName'] = data['owner_name']
 
         # Check if state is changing
         old_state = godown.state
@@ -1883,7 +1899,7 @@ def reports_export_csv_view(request):
         hub_status = godown.hub_status or godown.status or 'Active'
         state = godown.state or 'ANDHRA PRADESH'
         hub_model = godown.hub_model or 'OSH'
-        owner = godown.lease_contact_name or godown.current_tenant or 'Owner'
+        owner = godown.owner_name or godown.lease_contact_name or godown.current_tenant or 'Owner'
         erp_name = godown.erp_name or godown.name or f'Hub #{godown.id}'
         start_date = godown.lease_start_date.isoformat() if godown.lease_start_date else ''
         end_date = godown.lease_end_date.isoformat() if godown.lease_end_date else ''
@@ -2121,7 +2137,7 @@ def reports_export_csv_view(request):
         hub_status = godown.hub_status or godown.status or 'Active'
         state = godown.state or 'ANDHRA PRADESH'
         hub_model = godown.hub_model or 'OSH'
-        owner = godown.lease_contact_name or godown.current_tenant or 'Owner'
+        owner = godown.owner_name or godown.lease_contact_name or godown.current_tenant or 'Owner'
         erp_name = godown.erp_name or godown.name or f'Hub #{godown.id}'
         start_date = godown.lease_start_date.isoformat() if godown.lease_start_date else ''
         end_date = godown.lease_end_date.isoformat() if godown.lease_end_date else ''

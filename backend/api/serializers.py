@@ -134,6 +134,7 @@ class GodownSerializer(serializers.ModelSerializer):
     electricityServiceNumber = serializers.CharField(source='electricity_service_number', required=False, allow_null=True, allow_blank=True)
     leaseContactName = serializers.CharField(source='lease_contact_name', required=False, allow_null=True, allow_blank=True)
     leaseContactMobile = serializers.CharField(source='lease_contact_mobile', required=False, allow_null=True, allow_blank=True)
+    ownerName = serializers.CharField(source='owner_name', required=False, allow_null=True, allow_blank=True)
     ownerAddress = serializers.CharField(source='owner_address', required=False, allow_null=True, allow_blank=True)
     hubDetails = serializers.JSONField(source='hub_details', required=False, default=dict)
     
@@ -162,7 +163,7 @@ class GodownSerializer(serializers.ModelSerializer):
             'hasLabourLicence', 'labourLicenceStartDate', 'labourLicenceExpiryDate',
             'hasTradeLicence', 'tradeLicenceStartDate', 'tradeLicenceExpiryDate',
             'totalSetupCost', 'electricityProvider', 'electricityServiceNumber',
-            'leaseContactName', 'leaseContactMobile', 'ownerAddress', 'hubDetails',
+            'leaseContactName', 'leaseContactMobile', 'ownerName', 'ownerAddress', 'hubDetails',
             'isDeleted', 'createdAt', 'updatedAt'
         ]
 

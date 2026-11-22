@@ -19,7 +19,11 @@ class AppUser(models.Model):
 
     @property
     def is_authenticated(self):
-        return True
+        return getattr(self, '_is_authenticated', True)
+
+    @is_authenticated.setter
+    def is_authenticated(self, value):
+        self._is_authenticated = bool(value)
 
     def __str__(self):
         return f"{self.full_name} ({self.username})"

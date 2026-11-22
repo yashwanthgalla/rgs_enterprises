@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   ReceiptText,
   Search,
@@ -23,11 +26,32 @@ export const RentLedger: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
-  const [rents, setRents] = useState<RentEntry[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Hubs reference list
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
+      const gRes = await godownApi.getAllList().catch(() => godownApi.getAll(0, 100));
+      return Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const godowns: Godown[] = hubsQuery.data || [];
+
+  // Rents list query with keepPreviousData
+  const rentsQuery = useQuery({
+    queryKey: queryKeys.finance.rentEntries(),
+    queryFn: async () => {
+      const rRes = await rentApi.getAll({ size: 100 });
+      return Array.isArray(rRes) ? rRes : (rRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+  const rents: RentEntry[] = rentsQuery.data || [];
+  const loading = rentsQuery.isLoading && !rentsQuery.data;
 
   // Payment Recording Modal
   const [selectedRent, setSelectedRent] = useState<RentEntry | null>(null);
@@ -50,30 +74,6 @@ export const RentLedger: React.FC = () => {
   });
 
   const [submitting, setSubmitting] = useState(false);
-
-  const fetchRents = async () => {
-    setLoading(true);
-    try {
-      const [rRes, gRes] = await Promise.all([
-        rentApi.getAll({ size: 100 }),
-        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
-      ]);
-
-      const rentList = Array.isArray(rRes) ? rRes : (rRes as any)?.content || [];
-      const godownList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
-
-      setRents(rentList);
-      setGodowns(godownList);
-    } catch (err: any) {
-      error('Failed to load rent roll: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRents();
-  }, []);
 
   const openPayModal = (rent: RentEntry) => {
     setSelectedRent(rent);
@@ -101,7 +101,8 @@ export const RentLedger: React.FC = () => {
 
       success('Payment recorded successfully!');
       setIsPayModalOpen(false);
-      fetchRents();
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to record payment: ' + (err.message || 'Error'));
     } finally {
@@ -133,7 +134,8 @@ export const RentLedger: React.FC = () => {
 
       success('Rent ledger entry added');
       setIsCreateModalOpen(false);
-      fetchRents();
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to add entry: ' + (err.message || 'Error'));
     } finally {
@@ -410,7 +412,7 @@ export const RentLedger: React.FC = () => {
               <option value="">-- Choose Hub --</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name} ({g.location}) - {g.currentTenant || 'Vacant'}
+                  {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''} ({g.currentTenant || 'Vacant'})
                 </option>
               ))}
             </Select>

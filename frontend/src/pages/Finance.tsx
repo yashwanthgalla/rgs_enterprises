@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   Landmark,
   Plus,
@@ -64,12 +67,50 @@ export const Finance: React.FC = () => {
     }
   }, [location.pathname, searchParams, navigate]);
 
-  const [hubs, setHubs] = useState<Godown[]>([]);
   const [selectedHubId, setSelectedHubId] = useState<string>('ALL');
-  const [loading, setLoading] = useState(true);
+
+  // Load Hubs with session-long cache
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
+      const res: any = await godownApi.getAllList();
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const hubs: Godown[] = hubsQuery.data || [];
+
+  // Query Total Revenues with keepPreviousData to prevent flashing on hub filter change
+  const revenuesQuery = useQuery({
+    queryKey: queryKeys.finance.revenues(selectedHubId !== 'ALL' ? { hubId: selectedHubId } : undefined),
+    queryFn: async () => {
+      const params: any = {};
+      if (selectedHubId !== 'ALL') params.hubId = selectedHubId;
+      const res: any = await financeApi.getTotalRevenues(params);
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+
+  // Query Rents with keepPreviousData
+  const rentsQuery = useQuery({
+    queryKey: queryKeys.finance.rents(selectedHubId !== 'ALL' ? { hubId: selectedHubId } : undefined),
+    queryFn: async () => {
+      const params: any = {};
+      if (selectedHubId !== 'ALL') params.hubId = selectedHubId;
+      const res: any = await financeApi.getRents(params);
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+
+  const revenueList: FinanceTotalRevenue[] = revenuesQuery.data || [];
+  const rentList: FinanceRent[] = rentsQuery.data || [];
+  const loading = activeTab === 'REVENUE' ? (revenuesQuery.isLoading && !revenuesQuery.data) : (rentsQuery.isLoading && !rentsQuery.data);
 
   // Tab 1: Total Revenue State
-  const [revenueList, setRevenueList] = useState<FinanceTotalRevenue[]>([]);
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [editingRevenue, setEditingRevenue] = useState<FinanceTotalRevenue | null>(null);
   const [revenueForm, setRevenueForm] = useState({
@@ -86,7 +127,6 @@ export const Finance: React.FC = () => {
   });
 
   // Tab 2: Rent State
-  const [rentList, setRentList] = useState<FinanceRent[]>([]);
   const [isRentModalOpen, setIsRentModalOpen] = useState(false);
   const [editingRent, setEditingRent] = useState<FinanceRent | null>(null);
   const [rentForm, setRentForm] = useState({
@@ -103,64 +143,6 @@ export const Finance: React.FC = () => {
   });
 
   const [submitting, setSubmitting] = useState(false);
-
-  // Load Hubs
-  const fetchHubs = async () => {
-    try {
-      const res: any = await godownApi.getAllList();
-      const data = Array.isArray(res) ? res : res?.content || [];
-      setHubs(data);
-      if (data.length > 0 && selectedHubId === 'ALL') {
-        // keep ALL as default filter
-      }
-    } catch (err: any) {
-      error('Failed to load hubs list: ' + (err.message || 'Error'));
-    }
-  };
-
-  // Load Total Revenue Records
-  const fetchRevenues = async () => {
-    setLoading(true);
-    try {
-      const params: any = {};
-      if (selectedHubId !== 'ALL') params.hubId = selectedHubId;
-      const res: any = await financeApi.getTotalRevenues(params);
-      const data = Array.isArray(res) ? res : res?.content || [];
-      setRevenueList(data);
-    } catch (err: any) {
-      error('Failed to load Total Revenue records: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load Rent Records
-  const fetchRents = async () => {
-    setLoading(true);
-    try {
-      const params: any = {};
-      if (selectedHubId !== 'ALL') params.hubId = selectedHubId;
-      const res: any = await financeApi.getRents(params);
-      const data = Array.isArray(res) ? res : res?.content || [];
-      setRentList(data);
-    } catch (err: any) {
-      error('Failed to load Rent records: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHubs();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'REVENUE') {
-      fetchRevenues();
-    } else {
-      fetchRents();
-    }
-  }, [activeTab, selectedHubId]);
 
   // Total Revenue Live Auto Calculation
   const calcTotalRevenue = (form: typeof revenueForm): number => {
@@ -284,7 +266,8 @@ export const Finance: React.FC = () => {
         success('Total Revenue record saved successfully');
       }
       setIsRevenueModalOpen(false);
-      fetchRevenues();
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.revenues() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to save record: ' + (err.message || 'Error'));
     } finally {
@@ -297,7 +280,8 @@ export const Finance: React.FC = () => {
     try {
       await financeApi.deleteTotalRevenue(id);
       success('Record deleted successfully');
-      fetchRevenues();
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.revenues() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to delete: ' + (err.message || 'Error'));
     }
@@ -410,7 +394,8 @@ export const Finance: React.FC = () => {
         success('Monthly Rent record saved successfully');
       }
       setIsRentModalOpen(false);
-      fetchRents();
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.rents() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to save record: ' + (err.message || 'Error'));
     } finally {
@@ -423,7 +408,8 @@ export const Finance: React.FC = () => {
     try {
       await financeApi.deleteRent(id);
       success('Record deleted successfully');
-      fetchRents();
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.rents() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to delete: ' + (err.message || 'Error'));
     }
@@ -460,7 +446,7 @@ export const Finance: React.FC = () => {
               <option value="ALL">All Hubs / Portfolio</option>
               {hubs.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.erpName || h.name}
+                  {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
                 </option>
               ))}
             </select>
@@ -709,7 +695,7 @@ export const Finance: React.FC = () => {
                 <option value="">Select a Hub</option>
                 {hubs.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.erpName || h.name}
+                    {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
                   </option>
                 ))}
               </Select>
@@ -885,7 +871,7 @@ export const Finance: React.FC = () => {
                 <option value="">Select a Hub</option>
                 {hubs.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.erpName || h.name}
+                    {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
                   </option>
                 ))}
               </Select>

@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   Users,
   Search,
@@ -9,6 +12,7 @@ import {
   CreditCard,
   Trash2,
   Building,
+  Edit,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -28,16 +32,38 @@ export const StaffDirectory: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Add Staff Modal
+  // Long-lived Hub dropdown list
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
+      const gRes = await godownApi.getAllList().catch(() => godownApi.getAll(0, 100));
+      return Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const godowns: Godown[] = hubsQuery.data || [];
+
+  // Staff list query with keepPreviousData
+  const staffQuery = useQuery({
+    queryKey: queryKeys.staff.list(),
+    queryFn: async () => {
+      const sRes = await employeeApi.getAll({ size: 100 });
+      return Array.isArray(sRes) ? sRes : (sRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+  const staffList: Staff[] = staffQuery.data || [];
+  const loading = staffQuery.isLoading && !staffQuery.data;
+
+  // Add / Edit Staff Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [formData, setFormData] = useState({
     fullName: '',
-    role: 'Security Guard',
+    role: '',
     phoneNumber: '',
     email: '',
     monthlySalary: '',
@@ -58,55 +84,71 @@ export const StaffDirectory: React.FC = () => {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchStaff = async () => {
-    setLoading(true);
-    try {
-      const [sRes, gRes] = await Promise.all([
-        employeeApi.getAll({ size: 100 }),
-        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
-      ]);
-
-      const employees = Array.isArray(sRes) ? sRes : (sRes as any)?.content || [];
-      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
-
-      setStaffList(employees);
-      setGodowns(gList);
-    } catch (err: any) {
-      error('Failed to load personnel: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
+  const openCreateModal = () => {
+    setEditingStaff(null);
+    setFormData({
+      fullName: '',
+      role: '',
+      phoneNumber: '',
+      email: '',
+      monthlySalary: '',
+      godownId: '',
+      joiningDate: new Date().toISOString().slice(0, 10),
+      status: 'ACTIVE',
+    });
+    setIsModalOpen(true);
   };
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
+  const openEditModal = (staff: Staff) => {
+    setEditingStaff(staff);
+    setFormData({
+      fullName: staff.fullName || '',
+      role: staff.role || '',
+      phoneNumber: staff.phoneNumber || staff.phone || '',
+      email: staff.email || '',
+      monthlySalary: String(staff.monthlySalary ?? ''),
+      godownId: staff.godownId ? String(staff.godownId) : '',
+      joiningDate: staff.joiningDate || new Date().toISOString().slice(0, 10),
+      status: staff.status || 'ACTIVE',
+    });
+    setIsModalOpen(true);
+  };
 
-  const handleCreateStaff = async (e: React.FormEvent) => {
+  const handleSubmitStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.phoneNumber || !formData.monthlySalary) {
-      error('Please fill required fields');
+    if (!formData.fullName.trim() || !formData.role.trim() || !formData.phoneNumber.trim() || !formData.monthlySalary) {
+      error('Please fill required fields (Full Name, Role / Designation, Phone, Salary)');
       return;
     }
 
     setSubmitting(true);
     try {
-      await employeeApi.create({
-        fullName: formData.fullName,
-        role: formData.role,
-        phoneNumber: formData.phoneNumber,
-        email: formData.email || null,
+      const payload = {
+        fullName: formData.fullName.trim(),
+        role: formData.role.trim(),
+        phoneNumber: formData.phoneNumber.trim(),
+        phone: formData.phoneNumber.trim(),
+        email: formData.email.trim() || null,
         monthlySalary: Number(formData.monthlySalary),
         godownId: formData.godownId ? Number(formData.godownId) : null,
         joiningDate: formData.joiningDate,
         status: formData.status,
-      });
+      };
 
-      success('Staff member registered');
+      if (editingStaff) {
+        await employeeApi.update(editingStaff.id, payload);
+        success('Staff member updated successfully');
+      } else {
+        await employeeApi.create(payload);
+        success('Staff member registered');
+      }
+
       setIsModalOpen(false);
-      fetchStaff();
+      setEditingStaff(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
-      error('Failed to register staff: ' + (err.message || 'Error'));
+      error('Operation failed: ' + (err.message || 'Error'));
     } finally {
       setSubmitting(false);
     }
@@ -129,6 +171,8 @@ export const StaffDirectory: React.FC = () => {
 
       success(`Salary disbursed for ${selectedStaff.fullName}`);
       setIsSalaryModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff.salaries() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to record salary: ' + err.message);
     } finally {
@@ -141,7 +185,8 @@ export const StaffDirectory: React.FC = () => {
     try {
       await employeeApi.delete(id);
       success('Staff record removed');
-      setStaffList((prev) => prev.filter((s) => s.id !== id));
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats() });
     } catch (err: any) {
       error('Failed to delete staff: ' + err.message);
     }
@@ -172,19 +217,7 @@ export const StaffDirectory: React.FC = () => {
 
           {!isViewer && (
             <Button
-              onClick={() => {
-                setFormData({
-                  fullName: '',
-                  role: 'Security Guard',
-                  phoneNumber: '',
-                  email: '',
-                  monthlySalary: '',
-                  godownId: '',
-                  joiningDate: new Date().toISOString().slice(0, 10),
-                  status: 'ACTIVE',
-                });
-                setIsModalOpen(true);
-              }}
+              onClick={openCreateModal}
               icon={<Plus className="w-4 h-4" />}
               className="rounded-xl shadow-apple-sm"
             >
@@ -301,6 +334,15 @@ export const StaffDirectory: React.FC = () => {
                   )}
                   {!isViewer && (
                     <button
+                      onClick={() => openEditModal(staff)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-apple-accent hover:bg-apple-accent/10 transition-colors"
+                      title="Edit Staff Member"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {!isViewer && (
+                    <button
                       onClick={() => handleDeleteStaff(staff.id)}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
                       title="Remove Staff"
@@ -315,14 +357,21 @@ export const StaffDirectory: React.FC = () => {
         </div>
       )}
 
-      {/* Add Staff Modal */}
+      {/* Add / Edit Staff Modal */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Add Personnel Member"
-        description="Register a security guard, technician, or warehouse manager."
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingStaff(null);
+        }}
+        title={editingStaff ? `Edit Personnel Member: ${editingStaff.fullName}` : 'Add Personnel Member'}
+        description={
+          editingStaff
+            ? `Update role designation, monthly salary, and contact details for ${editingStaff.fullName}.`
+            : 'Register a security guard, technician, or warehouse manager.'
+        }
       >
-        <form onSubmit={handleCreateStaff} className="space-y-4">
+        <form onSubmit={handleSubmitStaff} className="space-y-4">
           <FormField label="Full Name" required>
             <Input
               placeholder="e.g. Ramesh Kumar"
@@ -332,18 +381,14 @@ export const StaffDirectory: React.FC = () => {
             />
           </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Role / Designation" required>
-              <Select
+              <Input
+                placeholder="e.g. Security Guard, Supervisor, Technician..."
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              >
-                <option value="Security Guard">Security Guard</option>
-                <option value="Head Guard">Head Guard</option>
-                <option value="Warehouse Supervisor">Warehouse Supervisor</option>
-                <option value="Electrician">Electrician</option>
-                <option value="Maintenance Crew">Maintenance Crew</option>
-              </Select>
+                required
+              />
             </FormField>
 
             <FormField label="Monthly Salary (₹)" required>
@@ -357,7 +402,7 @@ export const StaffDirectory: React.FC = () => {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Phone Number" required>
               <Input
                 placeholder="e.g. +91 98765 12345"
@@ -385,18 +430,21 @@ export const StaffDirectory: React.FC = () => {
               <option value="">General (All Hubs)</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name} - {g.location}
+                  {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                 </option>
               ))}
             </Select>
           </FormField>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => {
+              setIsModalOpen(false);
+              setEditingStaff(null);
+            }}>
               Cancel
             </Button>
             <Button type="submit" loading={submitting}>
-              Add Personnel
+              {editingStaff ? 'Save Changes' : 'Add Personnel'}
             </Button>
           </div>
         </form>
@@ -410,7 +458,7 @@ export const StaffDirectory: React.FC = () => {
         description={`Logging payout for ${selectedStaff?.fullName}`}
       >
         <form onSubmit={handleDisburseSalary} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Salary Month" required>
               <Input
                 type="month"

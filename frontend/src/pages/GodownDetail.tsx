@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../api/queryKeys';
+import { STALE_TIMES } from '../api/queryClient';
+import { PageSkeleton } from '../components/ui/Skeleton';
 import {
   ArrowLeft,
   Warehouse,
@@ -7,10 +11,8 @@ import {
   Square,
   IndianRupee,
   ReceiptText,
-  Receipt,
   Users,
   Wrench,
-  Plus,
   Phone,
   Calendar,
   CheckCircle2,
@@ -31,20 +33,16 @@ import {
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Modal } from '../components/ui/Modal';
-import { FormField, Input, Select } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { AdminPasswordModal } from '../components/common/AdminPasswordModal';
 import {
   godownApi,
-  rentApi,
-  expenseApi,
   assetApi,
   employeeApi,
 } from '../services/api';
-import { Godown, RentEntry, Expense, Asset, Staff } from '../types';
+import { Godown, Asset, Staff } from '../types';
 
 export const GodownDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,39 +50,41 @@ export const GodownDetail: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
-  const [godown, setGodown] = useState<Godown | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'rent' | 'expenses' | 'assets' | 'staff'>('overview');
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'staff'>('overview');
 
-  // Tab Data States
-  const [rents, setRents] = useState<RentEntry[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-
-  // Modals
-  const [isRentModalOpen, setIsRentModalOpen] = useState(false);
-  const [rentFormData, setRentFormData] = useState({
-    amountDue: '',
-    month: new Date().toISOString().slice(0, 7), // YYYY-MM
-    dueDate: new Date().toISOString().slice(0, 10),
-    tenantName: '',
+  // TanStack Query: Independent tab and detail fetching with 5m cache
+  const { data: godown, isLoading: isGodownLoading } = useQuery({
+    queryKey: queryKeys.hubs.detail(id || ''),
+    queryFn: () => godownApi.getById(id!),
+    enabled: Boolean(id),
+    staleTime: STALE_TIMES.STANDARD,
   });
 
-  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [expenseFormData, setExpenseFormData] = useState({
-    title: '',
-    category: 'ELECTRICITY',
-    amount: '',
-    expenseDate: new Date().toISOString().slice(0, 10),
-    billResponsibility: 'COMPANY',
-    status: 'PENDING',
+  const { data: assets = [] } = useQuery({
+    queryKey: queryKeys.assets.byHub(id || ''),
+    queryFn: async () => {
+      const res: any = await assetApi.getByGodown(id!);
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+    enabled: Boolean(id),
+    staleTime: STALE_TIMES.STANDARD,
   });
+
+  const { data: staffList = [] } = useQuery({
+    queryKey: queryKeys.staff.byHub(id || ''),
+    queryFn: async () => {
+      const res: any = await employeeApi.getByGodown(id!);
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+    enabled: Boolean(id),
+    staleTime: STALE_TIMES.STANDARD,
+  });
+
+  const loading = isGodownLoading && !godown;
 
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
-  const [submitting, setSubmitting] = useState(false);
   const [showCctvPassword, setShowCctvPassword] = useState(false);
   const [revealedCctvPassword, setRevealedCctvPassword] = useState<string | null>(null);
   const [verifyingAction, setVerifyingAction] = useState<'view' | 'copy' | null>(null);
@@ -133,93 +133,10 @@ export const GodownDetail: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!id) return;
-
-    const loadAllDetails = async () => {
-      setLoading(true);
-      try {
-        const [gRes, rRes, eRes, aRes, sRes] = await Promise.allSettled([
-          godownApi.getById(id),
-          rentApi.getByGodown(id),
-          expenseApi.getByGodown(id),
-          assetApi.getByGodown(id),
-          employeeApi.getByGodown(id),
-        ]);
-
-        if (gRes.status === 'fulfilled') setGodown(gRes.value as any);
-        if (rRes.status === 'fulfilled') setRents(Array.isArray(rRes.value) ? rRes.value : (rRes.value as any)?.content || []);
-        if (eRes.status === 'fulfilled') setExpenses(Array.isArray(eRes.value) ? eRes.value : (eRes.value as any)?.content || []);
-        if (aRes.status === 'fulfilled') setAssets(Array.isArray(aRes.value) ? aRes.value : (aRes.value as any)?.content || []);
-        if (sRes.status === 'fulfilled') setStaffList(Array.isArray(sRes.value) ? sRes.value : (sRes.value as any)?.content || []);
-      } catch (err: any) {
-        error('Failed to load facility data: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAllDetails();
-  }, [id]);
-
-  const handleCreateRent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || !godown) return;
-
-    setSubmitting(true);
-    try {
-      const year = parseInt(rentFormData.month.split('-')[0], 10);
-      await rentApi.create({
-        godownId: Number(id),
-        tenantName: rentFormData.tenantName || godown.currentTenant || 'Tenant',
-        month: rentFormData.month,
-        year: year,
-        amountDue: Number(rentFormData.amountDue),
-        dueDate: rentFormData.dueDate,
-        status: 'DUE',
-      });
-      success('Rent invoice generated');
-      setIsRentModalOpen(false);
-      const updated = await rentApi.getByGodown(id);
-      setRents(Array.isArray(updated) ? updated : (updated as any)?.content || []);
-    } catch (err: any) {
-      error(err.message || 'Failed to generate rent');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleCreateExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id) return;
-
-    setSubmitting(true);
-    try {
-      await expenseApi.create({
-        godownId: Number(id),
-        title: expenseFormData.title,
-        category: expenseFormData.category,
-        amount: Number(expenseFormData.amount),
-        expenseDate: expenseFormData.expenseDate,
-        billResponsibility: expenseFormData.billResponsibility,
-        status: expenseFormData.status,
-      });
-      success('Bill recorded');
-      setIsExpenseModalOpen(false);
-      const updated = await expenseApi.getByGodown(id);
-      setExpenses(Array.isArray(updated) ? updated : (updated as any)?.content || []);
-    } catch (err: any) {
-      error(err.message || 'Failed to record bill');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   if (loading || !godown) {
     return (
-      <div className="py-24 text-center text-xs text-gray-400">
-        <div className="w-8 h-8 border-2 border-apple-accent border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        Loading facility details...
+      <div className="space-y-6">
+        <PageSkeleton />
       </div>
     );
   }
@@ -241,8 +158,13 @@ export const GodownDetail: React.FC = () => {
           <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
             {godown.erpName || godown.name}
           </h1>
+          {godown.code && (
+            <Badge variant="accent" size="sm" className="font-mono font-bold tracking-wider">
+              {godown.code}
+            </Badge>
+          )}
           {godown.hubModel && (
-            <Badge variant="accent" size="sm">
+            <Badge variant="neutral" size="sm">
               Model: {godown.hubModel}
             </Badge>
           )}
@@ -268,15 +190,6 @@ export const GodownDetail: React.FC = () => {
             icon={<IndianRupee className="w-3.5 h-3.5" />}
           >
             Finance Rent
-          </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsExpenseModalOpen(true)}
-            icon={<Plus className="w-3.5 h-3.5" />}
-          >
-            Add Bill
           </Button>
         </div>
       </div>
@@ -347,8 +260,6 @@ export const GodownDetail: React.FC = () => {
       <div className="flex border-b border-black/[0.08] dark:border-white/[0.08] gap-6 text-sm font-medium overflow-x-auto">
         {[
           { key: 'overview', label: 'Overview', icon: Warehouse },
-          { key: 'rent', label: `Rent Roll (${rents.length})`, icon: ReceiptText },
-          { key: 'expenses', label: `Operating Bills (${expenses.length})`, icon: Receipt },
           { key: 'assets', label: `Equipment (${assets.length})`, icon: Wrench },
           { key: 'staff', label: `Staff (${staffList.length})`, icon: Users },
         ].map((tab) => {
@@ -738,121 +649,6 @@ export const GodownDetail: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'rent' && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm">Rent Records</h3>
-            <Button
-              size="sm"
-              onClick={() => setIsRentModalOpen(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
-            >
-              Generate Rent Due
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase font-semibold">
-                  <th className="py-2.5 px-2">Month</th>
-                  <th className="py-2.5 px-2">Tenant</th>
-                  <th className="py-2.5 px-2">Due Date</th>
-                  <th className="py-2.5 px-2">Amount Due</th>
-                  <th className="py-2.5 px-2">Amount Paid</th>
-                  <th className="py-2.5 px-2">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                {rents.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400">
-                      No rent records logged for this godown yet.
-                    </td>
-                  </tr>
-                ) : (
-                  rents.map((r) => (
-                    <tr key={r.id}>
-                      <td className="py-2.5 px-2 font-semibold">{r.month}</td>
-                      <td className="py-2.5 px-2">{r.tenantName}</td>
-                      <td className="py-2.5 px-2 text-gray-500">{r.dueDate}</td>
-                      <td className="py-2.5 px-2 font-medium">{formatCurrency(r.amountDue)}</td>
-                      <td className="py-2.5 px-2 text-apple-success font-medium">{formatCurrency(r.amountPaid)}</td>
-                      <td className="py-2.5 px-2">
-                        <Badge
-                          variant={r.status === 'PAID' ? 'success' : r.status === 'OVERDUE' ? 'danger' : 'warning'}
-                          size="sm"
-                        >
-                          {r.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'expenses' && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm">Operating Expenses & Utility Bills</h3>
-            <Button
-              size="sm"
-              onClick={() => setIsExpenseModalOpen(true)}
-              icon={<Plus className="w-3.5 h-3.5" />}
-            >
-              Add Bill
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-black/[0.06] dark:border-white/[0.08] text-gray-400 uppercase font-semibold">
-                  <th className="py-2.5 px-2">Title</th>
-                  <th className="py-2.5 px-2">Category</th>
-                  <th className="py-2.5 px-2">Date</th>
-                  <th className="py-2.5 px-2">Amount</th>
-                  <th className="py-2.5 px-2">Payer</th>
-                  <th className="py-2.5 px-2">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
-                {expenses.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400">
-                      No operating bills logged for this godown.
-                    </td>
-                  </tr>
-                ) : (
-                  expenses.map((e) => (
-                    <tr key={e.id}>
-                      <td className="py-2.5 px-2 font-semibold">{e.title}</td>
-                      <td className="py-2.5 px-2 text-gray-500">{e.category}</td>
-                      <td className="py-2.5 px-2">{e.expenseDate}</td>
-                      <td className="py-2.5 px-2 font-medium">{formatCurrency(e.amount)}</td>
-                      <td className="py-2.5 px-2">
-                        <Badge variant={e.billResponsibility === 'TENANT' ? 'accent' : 'neutral'} size="sm">
-                          {e.billResponsibility}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <Badge variant={e.status === 'PAID' ? 'success' : 'warning'} size="sm">
-                          {e.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
       {activeTab === 'assets' && (
         <Card className="p-6">
           <h3 className="font-semibold text-sm mb-4">Equipment & Assets Registered</h3>
@@ -905,136 +701,6 @@ export const GodownDetail: React.FC = () => {
           </div>
         </Card>
       )}
-
-      {/* Add Rent Due Modal */}
-      <Modal
-        isOpen={isRentModalOpen}
-        onClose={() => setIsRentModalOpen(false)}
-        title="Generate Rent Invoice"
-        description="Schedule a monthly rental invoice for this godown's tenant."
-      >
-        <form onSubmit={handleCreateRent} className="space-y-4">
-          <FormField label="Tenant Name" required>
-            <Input
-              value={rentFormData.tenantName}
-              onChange={(e) => setRentFormData({ ...rentFormData, tenantName: e.target.value })}
-              required
-            />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Billing Month" required>
-              <Input
-                type="month"
-                value={rentFormData.month}
-                onChange={(e) => setRentFormData({ ...rentFormData, month: e.target.value })}
-                required
-              />
-            </FormField>
-
-            <FormField label="Due Date" required>
-              <Input
-                type="date"
-                value={rentFormData.dueDate}
-                onChange={(e) => setRentFormData({ ...rentFormData, dueDate: e.target.value })}
-                required
-              />
-            </FormField>
-          </div>
-
-          <FormField label="Amount Due (₹)" required>
-            <Input
-              type="number"
-              value={rentFormData.amountDue}
-              onChange={(e) => setRentFormData({ ...rentFormData, amountDue: e.target.value })}
-              required
-            />
-          </FormField>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
-            <Button type="button" variant="outline" onClick={() => setIsRentModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={submitting}>
-              Generate Invoice
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Add Bill Modal */}
-      <Modal
-        isOpen={isExpenseModalOpen}
-        onClose={() => setIsExpenseModalOpen(false)}
-        title="Record Operating Bill"
-        description="Log an electricity, tax, or maintenance expense for this facility."
-      >
-        <form onSubmit={handleCreateExpense} className="space-y-4">
-          <FormField label="Bill Title" required>
-            <Input
-              placeholder="e.g. TSSPDCL Commercial Electricity - Oct 2026"
-              value={expenseFormData.title}
-              onChange={(e) => setExpenseFormData({ ...expenseFormData, title: e.target.value })}
-              required
-            />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Category">
-              <Select
-                value={expenseFormData.category}
-                onChange={(e) => setExpenseFormData({ ...expenseFormData, category: e.target.value })}
-              >
-                <option value="ELECTRICITY">Electricity</option>
-                <option value="WATER">Water</option>
-                <option value="PROPERTY_TAX">Property Tax</option>
-                <option value="MAINTENANCE">Maintenance</option>
-                <option value="SECURITY">Security</option>
-                <option value="OTHER">Other</option>
-              </Select>
-            </FormField>
-
-            <FormField label="Amount (₹)" required>
-              <Input
-                type="number"
-                value={expenseFormData.amount}
-                onChange={(e) => setExpenseFormData({ ...expenseFormData, amount: e.target.value })}
-                required
-              />
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Expense Date" required>
-              <Input
-                type="date"
-                value={expenseFormData.expenseDate}
-                onChange={(e) => setExpenseFormData({ ...expenseFormData, expenseDate: e.target.value })}
-                required
-              />
-            </FormField>
-
-            <FormField label="Billed To">
-              <Select
-                value={expenseFormData.billResponsibility}
-                onChange={(e) => setExpenseFormData({ ...expenseFormData, billResponsibility: e.target.value })}
-              >
-                <option value="COMPANY">Company (Owner)</option>
-                <option value="TENANT">Tenant Reimbursement</option>
-              </Select>
-            </FormField>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
-            <Button type="button" variant="outline" onClick={() => setIsExpenseModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={submitting}>
-              Save Bill
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Admin Verification Modal for Viewing / Copying CCTV Password */}
       <AdminPasswordModal

@@ -8,14 +8,18 @@ from .models import AppUser
 class JWTAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
         auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return None
+        raw_token = None
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0].lower() == 'bearer':
+                raw_token = parts[1]
 
-        parts = auth_header.split()
-        if len(parts) != 2 or parts[0].lower() != 'bearer':
-            return None
+        # Support token query parameter (essential for direct browser downloads / exports)
+        if not raw_token:
+            raw_token = getattr(request, 'query_params', request.GET).get('token')
 
-        raw_token = parts[1]
+        if not raw_token:
+            return None
         try:
             payload = jwt.decode(
                 raw_token,

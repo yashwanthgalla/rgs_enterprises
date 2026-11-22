@@ -218,22 +218,28 @@ class EmployeeSerializer(serializers.ModelSerializer):
     godownId = serializers.IntegerField(source='godown_id', required=False, allow_null=True)
     godownName = serializers.CharField(source='godown.name', read_only=True)
     fullName = serializers.CharField(source='full_name')
-    monthlySalary = serializers.SerializerMethodField()
+    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    phoneNumber = serializers.CharField(source='phone', required=False, allow_blank=True, allow_null=True)
+    monthlySalary = serializers.DecimalField(source='monthly_salary', max_digits=14, decimal_places=2, required=False, default=0)
     joiningDate = serializers.DateField(source='joining_date')
     isDeleted = serializers.BooleanField(source='is_deleted', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
 
-    def get_monthlySalary(self, obj):
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['monthlySalary'] = float(instance.monthly_salary or 0)
+        ret['phone'] = instance.phone or ''
+        ret['phoneNumber'] = instance.phone or ''
         request = self.context.get('request')
         if request and request.user and getattr(request.user, 'role', '').upper() == 'VIEWER':
-            return None  # Sensitive salary hidden from VIEWER role
-        return float(obj.monthly_salary or 0)
+            ret['monthlySalary'] = None  # Sensitive salary hidden from VIEWER role
+        return ret
 
     class Meta:
         model = Employee
         fields = [
-            'id', 'godownId', 'godownName', 'fullName', 'role', 'phone', 'email',
+            'id', 'godownId', 'godownName', 'fullName', 'role', 'phone', 'phoneNumber', 'email',
             'monthlySalary', 'joiningDate', 'status', 'isDeleted', 'createdAt', 'updatedAt'
         ]
 

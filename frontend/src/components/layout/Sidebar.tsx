@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { perfLogger } from '../../utils/perfLogger';
 import {
   LayoutDashboard,
   Warehouse,
@@ -21,6 +22,109 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { clsx } from 'clsx';
+
+import { queryClient, STALE_TIMES } from '../../api/queryClient';
+import { queryKeys } from '../../api/queryKeys';
+import {
+  dashboardApi,
+  godownApi,
+  financeApi,
+  employeeApi,
+  assetApi,
+  reportApi,
+} from '../../services/api';
+
+// Lazy chunk prefetch map to warm the browser cache before user clicks
+const chunkPrefetchers: Record<string, () => Promise<any>> = {
+  '/': () => import('../../pages/Dashboard'),
+  '/hubs': () => import('../../pages/Godowns'),
+  '/finance/revenue': () => import('../../pages/Finance'),
+  '/finance/rent': () => import('../../pages/Finance'),
+  '/information/electricity': () => import('../../pages/Expenses'),
+  '/information/wifi': () => import('../../pages/Expenses'),
+  '/visualance': () => import('../../pages/Visualance'),
+  '/staff': () => import('../../pages/Staff'),
+  '/assets': () => import('../../pages/Assets'),
+  '/reports': () => import('../../pages/Reports'),
+  '/settings': () => import('../../pages/Settings'),
+};
+
+const prefetchRoute = (path: string) => {
+  // 1. Prefetch lazy JS chunk
+  const prefetcher = chunkPrefetchers[path];
+  if (prefetcher) {
+    prefetcher().catch(() => {});
+  }
+
+  // 2. Prefetch main route query to hide database latency completely
+  try {
+    if (path === '/') {
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.dashboard.stats(),
+        queryFn: () => dashboardApi.getStats(),
+        staleTime: STALE_TIMES.STANDARD,
+      });
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.dashboard.reminders(),
+        queryFn: () => dashboardApi.getReminders(),
+        staleTime: STALE_TIMES.STANDARD,
+      });
+    } else if (path === '/hubs') {
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.hubs.list({ page: 0, size: 100, showDeleted: false }),
+        queryFn: async () => {
+          const res: any = await godownApi.getAll(0, 100, false, { show_deleted: 'false' });
+          return Array.isArray(res) ? res : res?.content || [];
+        },
+        staleTime: STALE_TIMES.LONG_LIVED,
+      });
+    } else if (path.startsWith('/finance')) {
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.finance.rents(),
+        queryFn: async () => {
+          const res: any = await financeApi.getRents();
+          return Array.isArray(res) ? res : res?.content || [];
+        },
+        staleTime: STALE_TIMES.DYNAMIC,
+      });
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.finance.revenues(),
+        queryFn: async () => {
+          const res: any = await financeApi.getTotalRevenues();
+          return Array.isArray(res) ? res : res?.content || [];
+        },
+        staleTime: STALE_TIMES.DYNAMIC,
+      });
+    } else if (path === '/staff') {
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.staff.list(),
+        queryFn: async () => {
+          const res: any = await employeeApi.getAll();
+          return Array.isArray(res) ? res : res?.content || [];
+        },
+        staleTime: STALE_TIMES.DYNAMIC,
+      });
+    } else if (path === '/assets') {
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.assets.list(),
+        queryFn: async () => {
+          const res: any = await assetApi.getAll();
+          return Array.isArray(res) ? res : res?.content || [];
+        },
+        staleTime: STALE_TIMES.STANDARD,
+      });
+    } else if (path === '/reports') {
+      const yr = new Date().getFullYear();
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.reports.summary(yr),
+        queryFn: () => reportApi.getSummary(yr),
+        staleTime: STALE_TIMES.DYNAMIC,
+      });
+    }
+  } catch (err) {
+    console.warn('Navigation prefetch failed silently:', err);
+  }
+};
 
 interface SidebarProps {
   isOpen: boolean;
@@ -103,9 +207,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       // Opening one menu automatically collapses the other
       setOpenMenu(path);
       if (!location.pathname.startsWith(path)) {
-        navigate(defaultChildPath);
+        perfLogger.startRoute(defaultChildPath);
+        startTransition(() => {
+          navigate(defaultChildPath);
+        });
       }
     }
+  };
+
+  const handleNavClick = (e: React.MouseEvent, path: string) => {
+    e.preventDefault();
+    onClose();
+    if (location.pathname !== path) {
+      perfLogger.startRoute(path);
+      startTransition(() => {
+        navigate(path);
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    startTransition(() => {
+      navigate('/login');
+    });
   };
 
   return (
@@ -196,7 +321,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                           <NavLink
                             key={sub.path}
                             to={sub.path}
-                            onClick={onClose}
+                            onClick={(e) => handleNavClick(e, sub.path)}
+                            onMouseEnter={() => prefetchRoute(sub.path)}
+                            onFocus={() => prefetchRoute(sub.path)}
                             className={clsx(
                               'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-150',
                               isSubActive
@@ -220,7 +347,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                onClick={onClose}
+                onClick={(e) => handleNavClick(e, item.path)}
+                onMouseEnter={() => prefetchRoute(item.path)}
+                onFocus={() => prefetchRoute(item.path)}
                 end={item.path === '/'}
                 className={({ isActive }) =>
                   clsx(
@@ -261,7 +390,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
 
             <button
-              onClick={logout}
+              onClick={handleLogout}
               title="Sign Out"
               className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2] transition-colors"
             >

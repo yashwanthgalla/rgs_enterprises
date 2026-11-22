@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ShieldX } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -11,6 +11,7 @@ interface RoleGuardProps {
 
 export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
 
   if (isLoading) {
     return null;
@@ -34,7 +35,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
             Your current role (<strong className="text-gray-700">{userRole}</strong>) does not have permission to view or manage this database table.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => (window.location.href = '/')}>
+        <Button variant="outline" size="sm" onClick={() => navigate('/')}>
           Return to Dashboard
         </Button>
       </div>

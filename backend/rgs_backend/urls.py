@@ -6,5 +6,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('actuator/health', health_check),
     path('health', health_check),
+    path('api/', include('api.urls')),
     path('api/v1/', include('api.urls')),
 ]

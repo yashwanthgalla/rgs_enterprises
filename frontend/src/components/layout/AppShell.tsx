@@ -1,8 +1,10 @@
-import React, { useState, Suspense, lazy } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import React, { useState, Suspense, lazy, useEffect } from 'react';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '../../context/AuthContext';
+import { PageSkeleton } from '../ui/Skeleton';
+import { perfLogger } from '../../utils/perfLogger';
 
 // Lazy-load FirstLoginModal so users only load it when required
 const FirstLoginModal = lazy(() =>
@@ -12,14 +14,17 @@ const FirstLoginModal = lazy(() =>
 export const AppShell: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
-  if (isLoading) {
+  useEffect(() => {
+    perfLogger.endRoute(location.pathname);
+  }, [location.pathname]);
+
+  // If initial auth is validating with no saved credentials, render minimal page skeleton
+  if (isLoading && !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-apple-bg dark:bg-apple-darkBg">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-apple-accent border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold text-gray-400">Loading RGS Enterprises...</span>
-        </div>
+      <div className="min-h-screen bg-apple-bg dark:bg-apple-darkBg p-8">
+        <PageSkeleton />
       </div>
     );
   }
@@ -33,14 +38,17 @@ export const AppShell: React.FC = () => {
       {/* Background Brand Watermark */}
       <div className="site-bg-watermark" aria-hidden="true" />
 
-      {/* Sidebar for Desktop & Mobile drawer */}
+      {/* Sidebar for Desktop & Mobile drawer - NEVER unmounts on route changes */}
       <Sidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
       {/* Main Content Area */}
       <div className="lg:pl-64 flex flex-col flex-1 relative z-10">
         <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          <Outlet />
+          {/* Suspense boundary only wraps the content area, preserving the AppShell, Sidebar and Header permanently */}
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

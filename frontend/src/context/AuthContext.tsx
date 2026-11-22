@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { User, AuthResponse } from '../types';
 import { authApi } from '../services/api';
+import { queryClient, clearQueryCache } from '../api/queryClient';
+import { bootstrapSessionData } from '../api/bootstrap';
 
 interface AuthContextType {
   user: User | null;
@@ -39,35 +41,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // If token already exists in localStorage, do not block the UI with initial isLoading=true
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    return !localStorage.getItem('token');
+  });
 
-  // Validate session on mount
+  // Validate session on mount (silent background verification)
   useEffect(() => {
+    let isMounted = true;
     const initAuth = async () => {
       const savedToken = localStorage.getItem('token');
       if (savedToken) {
         try {
           const userData = (await authApi.me()) as any;
-          if (userData) {
+          if (isMounted && userData) {
             setUser(userData);
             setMustChangePassword(!!userData.mustChangePassword);
             localStorage.setItem('user', JSON.stringify(userData));
+            bootstrapSessionData(queryClient);
           }
         } catch {
           // Token expired or invalid
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setToken(null);
-          setUser(null);
+          if (isMounted) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setToken(null);
+            setUser(null);
+          }
         }
       }
-      setIsLoading(false);
+      if (isMounted) {
+        setIsLoading(false);
+      }
     };
 
     initAuth();
+
+    const handleUnauthorized = () => {
+      setToken(null);
+      setUser(null);
+      setMustChangePassword(false);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
   }, []);
 
-  const login = async (credentials: { username: string; password: string }): Promise<User> => {
+  const login = useCallback(async (credentials: { username: string; password: string }): Promise<User> => {
     const res = await authApi.login(credentials);
     const authData = res as any;
     const newToken = authData.token;
@@ -86,9 +109,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(newToken);
     setUser(userObj);
     setMustChangePassword(!!userObj.mustChangePassword);
+    setIsLoading(false);
+    bootstrapSessionData(queryClient);
 
     return userObj;
-  };
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
@@ -96,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     setUser(null);
     setMustChangePassword(false);
-    window.location.href = '/login';
+    clearQueryCache();
   }, []);
 
   const updateUser = useCallback((updatedFields: Partial<User>) => {
@@ -108,23 +133,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!token && !!user,
-        isLoading,
-        mustChangePassword,
-        login,
-        logout,
-        updateUser,
-        setMustChangePassword,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      isAuthenticated: !!token && !!user,
+      isLoading,
+      mustChangePassword,
+      login,
+      logout,
+      updateUser,
+      setMustChangePassword,
+    }),
+    [user, token, isLoading, mustChangePassword, login, logout, updateUser]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

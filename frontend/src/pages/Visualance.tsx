@@ -627,11 +627,11 @@ export const Visualance: React.FC = () => {
         maxWidth="lg"
       >
         <form onSubmit={handleSaveCctv} className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-[#0071E3]/5 border border-[#0071E3]/15 text-xs text-gray-700 flex items-start gap-2.5">
+          <div className="p-3.5 rounded-xl bg-[#0071E3]/5 border border-[#0071E3]/15 text-xs text-gray-700 dark:text-gray-300 flex items-start gap-2.5">
             <Video className="w-4 h-4 text-[#0071E3] shrink-0 mt-0.5" />
             <p>
               Update camera NVR web portal address, surveillance credentials, and streaming IP for{' '}
-              <strong className="text-[#111827]">{editingHub?.erpName || editingHub?.name}</strong>.
+              <strong className="text-[#111827] dark:text-white">{editingHub?.erpName || editingHub?.name}</strong>.
             </p>
           </div>
 
@@ -674,7 +674,7 @@ export const Visualance: React.FC = () => {
             </div>
           </FormField>
 
-          <div className="flex justify-end gap-2 pt-4 border-t border-[#F3F4F6]">
+          <div className="flex justify-end gap-2 pt-4 border-t border-[#F3F4F6] dark:border-white/10">
             <Button
               type="button"
               variant="outline"

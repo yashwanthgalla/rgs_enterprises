@@ -126,9 +126,7 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       apiCache.clear();
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
 
     const data = error.response?.data;
@@ -163,10 +161,12 @@ const normalizeList = <T>(res: any, mapper: (item: any) => T): T[] => {
 // Normalizers
 export const normalizeGodown = (g: any): Godown => {
   if (!g) return g;
-  const location = g.location || [g.address, g.city, g.state].filter(Boolean).join(', ') || 'Hyderabad';
+  const location = g.location || g.locationAddress || g.address || [g.city, g.state].filter(Boolean).join(', ') || '';
   return {
     ...g,
     location,
+    city: g.city || '',
+    state: g.state || '',
     capacitySqFt: g.capacitySqFt ?? Number(g.sizeSqft) ?? 0,
     occupiedSqFt: g.occupiedSqFt ?? (g.currentTenant ? (g.sizeSqft || g.capacitySqFt || 0) : 0),
     monthlyRent: Number(g.monthlyRent || 0),
@@ -243,6 +243,14 @@ export const authApi = {
     currentPassword?: string;
     newPassword?: string;
   }) => api.put('/auth/profile', data).then(unwrap),
+  sendForgotPasswordOtp: (email: string) =>
+    api.post('/auth/forgot-password/send-otp', { email }).then(unwrap),
+  verifyOtpAndResetPassword: (data: {
+    email: string;
+    otp: string;
+    sessionToken: string;
+    newPassword: string;
+  }) => api.post('/auth/forgot-password/verify-reset', data).then(unwrap),
 };
 
 export const dashboardApi = {
@@ -253,32 +261,44 @@ export const dashboardApi = {
 };
 
 export const godownApi = {
-  getAll: (page = 0, size = 50, skipCache = false) =>
-    cachedGet(`/godowns?page=${page}&size=${size}`, { skipCache }, 20000).then((res: any) => {
+  getAll: (page = 0, size = 50, skipCache = false, params?: any) =>
+    cachedGet('/hubs/', { params: { page: page + 1, size, ...params }, skipCache }, 20000).then((res: any) => {
+      if (res?.results) {
+        return { content: res.results.map(normalizeGodown), totalElements: res.count };
+      }
       if (res?.content) {
         return { ...res, content: res.content.map(normalizeGodown) };
       }
       return normalizeList(res, normalizeGodown);
     }),
   getAllList: (skipCache = false) =>
-    cachedGet('/godowns/all', { skipCache }, 30000).then((res: any) => normalizeList(res, normalizeGodown)),
-  getCities: (skipCache = false) => cachedGet('/godowns/cities', { skipCache }, 60000),
+    cachedGet('/hubs/', { skipCache }, 30000).then((res: any) => {
+      const list = res?.results || (Array.isArray(res) ? res : res?.content || []);
+      return list.map(normalizeGodown);
+    }),
+  getCities: (skipCache = false) => cachedGet('/hubs/cities/', { skipCache }, 60000).catch(() => []),
   getById: (id: number | string, skipCache = false) =>
-    cachedGet(`/godowns/${id}`, { skipCache }, 20000).then(normalizeGodown),
+    cachedGet(`/hubs/${id}/`, { skipCache }, 20000).then(normalizeGodown),
   getSummary: (id: number | string, skipCache = false) =>
-    cachedGet(`/godowns/${id}/summary`, { skipCache }, 20000),
+    cachedGet(`/hubs/${id}/summary/`, { skipCache }, 20000).catch(() => null),
+  getNextCode: (state = 'Telangana') =>
+    api.get(`/hubs/next-code/?state=${encodeURIComponent(state)}`).then(unwrap).catch(() => ({ code: '' })),
   revealCctvPassword: (id: number | string, adminPassword: string) =>
-    api.post(`/godowns/${id}/reveal-cctv-password`, { adminPassword }).then(unwrap),
+    api.post(`/hubs/${id}/cctv/reveal/`, { adminPassword }).then(unwrap).then((res: any) => ({
+      ...res,
+      cctvPassword: res?.password || res?.cctvPassword || '',
+    })),
+  restore: (id: number | string) => api.post(`/hubs/${id}/restore/`).then(unwrap),
   create: (data: any) => {
     const payload = {
       name: data.name || data.erpName,
       erpName: data.erpName || data.name,
-      code: data.code || `HUB-${Math.floor(100 + Math.random() * 900)}`,
-      city: data.city || 'Hyderabad',
+      code: data.code || undefined,
+      city: data.city || '',
       state: data.state || 'Telangana',
-      address: data.address || data.locationAddress || data.location || 'Location Address',
-      locationAddress: data.locationAddress || data.address || data.location || 'Location Address',
-      pincode: data.pincode || '500051',
+      address: data.address || data.locationAddress || data.location || '',
+      locationAddress: data.locationAddress || data.address || data.location || '',
+      pincode: data.pincode || '',
       sizeSqft: data.capacitySqFt ? Number(data.capacitySqFt) : (data.sizeSqft ? Number(data.sizeSqft) : 0),
       totalCapacity: data.capacitySqFt ? Number(data.capacitySqFt) : (data.totalCapacity ? Number(data.totalCapacity) : 0),
       status: data.status || 'ACTIVE',
@@ -316,18 +336,18 @@ export const godownApi = {
       ownerAddress: data.ownerAddress || null,
       notes: data.notes || null,
     };
-    return api.post('/godowns', payload).then(unwrap).then(normalizeGodown);
+    return api.post('/hubs/', payload).then(unwrap).then(normalizeGodown);
   },
   update: (id: number | string, data: any) => {
     const payload = {
       name: data.name || data.erpName,
       erpName: data.erpName || data.name,
-      code: data.code || `HUB-${id}`,
-      city: data.city || 'Hyderabad',
+      code: data.code || undefined,
+      city: data.city || '',
       state: data.state || 'Telangana',
-      address: data.address || data.locationAddress || data.location || 'Location Address',
-      locationAddress: data.locationAddress || data.address || data.location || 'Location Address',
-      pincode: data.pincode || '500051',
+      address: data.address || data.locationAddress || data.location || '',
+      locationAddress: data.locationAddress || data.address || data.location || '',
+      pincode: data.pincode || '',
       sizeSqft: data.capacitySqFt ? Number(data.capacitySqFt) : (data.sizeSqft ? Number(data.sizeSqft) : 0),
       totalCapacity: data.capacitySqFt ? Number(data.capacitySqFt) : (data.totalCapacity ? Number(data.totalCapacity) : 0),
       status: data.status || 'ACTIVE',
@@ -365,13 +385,15 @@ export const godownApi = {
       ownerAddress: data.ownerAddress || null,
       notes: data.notes || null,
     };
-    return api.put(`/godowns/${id}`, payload).then(unwrap).then(normalizeGodown);
+    return api.put(`/hubs/${id}/`, payload).then(unwrap).then(normalizeGodown);
   },
   patch: (id: number | string, data: any) => {
-    return api.put(`/godowns/${id}`, data).then(unwrap).then(normalizeGodown);
+    return api.patch(`/hubs/${id}/`, data).then(unwrap).then(normalizeGodown);
   },
-  delete: (id: number | string) => api.delete(`/godowns/${id}`).then(unwrap),
+  delete: (id: number | string) => api.delete(`/hubs/${id}/`).then(unwrap),
 };
+
+export const hubApi = godownApi;
 
 export const financeApi = {
   getTotalRevenues: (params?: { hubId?: number | string; financialYear?: string }, skipCache = false) =>
@@ -491,6 +513,17 @@ export const employeeApi = {
     };
     return api.post('/employees', payload).then(unwrap).then(normalizeStaff);
   },
+  update: (id: number | string, data: any) => {
+    const payload: any = {};
+    if (data.godownId !== undefined) payload.godownId = data.godownId ? Number(data.godownId) : null;
+    if (data.fullName !== undefined) payload.fullName = data.fullName;
+    if (data.role !== undefined) payload.role = data.role;
+    if (data.phoneNumber !== undefined || data.phone !== undefined) payload.phone = data.phoneNumber || data.phone;
+    if (data.email !== undefined) payload.email = data.email || null;
+    if (data.monthlySalary !== undefined) payload.monthlySalary = Number(data.monthlySalary);
+    if (data.status !== undefined) payload.status = data.status;
+    return api.put(`/employees/${id}`, payload).then(unwrap).then(normalizeStaff);
+  },
   delete: (id: number | string) => api.delete(`/employees/${id}`).then(unwrap),
 };
 
@@ -563,15 +596,49 @@ export const reportApi = {
   getGodownPnl: (year?: number, skipCache = false) =>
     cachedGet('/reports/godown-pnl', { params: { year }, skipCache }, 30000),
   exportCsvUrl: (params?: { year?: number; type?: 'total' | 'single'; hubId?: number | string } | number) => {
+    const q = new URLSearchParams();
     if (typeof params === 'number') {
-      return `${API_BASE_URL}/reports/export-csv?year=${params}`;
+      q.append('year', String(params));
+    } else {
+      if (params?.year) q.append('year', String(params.year));
+      if (params?.type) q.append('type', params.type);
+      if (params?.hubId) q.append('hubId', String(params.hubId));
     }
+    const token = localStorage.getItem('token');
+    if (token) q.append('token', token);
+    const qs = q.toString();
+    return `${API_BASE_URL}/reports/export-csv${qs ? `?${qs}` : ''}`;
+  },
+  downloadCsv: async (params?: { year?: number; type?: 'total' | 'single'; hubId?: number | string }) => {
     const q = new URLSearchParams();
     if (params?.year) q.append('year', String(params.year));
     if (params?.type) q.append('type', params.type);
     if (params?.hubId) q.append('hubId', String(params.hubId));
     const qs = q.toString();
-    return `${API_BASE_URL}/reports/export-csv${qs ? `?${qs}` : ''}`;
+    const response = await api.get(`/reports/export-csv${qs ? `?${qs}` : ''}`, {
+      responseType: 'blob',
+    });
+
+    let filename = params?.type === 'single'
+      ? `hub_financial_report_${params?.year || new Date().getFullYear()}.csv`
+      : `all_hubs_financial_report_${params?.year || new Date().getFullYear()}.csv`;
+
+    const disposition = response.headers?.['content-disposition'];
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) filename = match[1];
+    }
+
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
   },
 };
 

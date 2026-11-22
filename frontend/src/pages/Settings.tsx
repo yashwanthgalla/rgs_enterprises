@@ -3,7 +3,6 @@ import {
   ShieldCheck,
   User,
   Lock,
-  Building2,
   Mail,
   Save,
   Key,
@@ -12,13 +11,11 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { FormField, Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
-import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { authApi } from '../services/api';
 
 export const Settings: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const { settings, updateSettings } = useSettings();
   const { success, error } = useToast();
 
   // Profile State
@@ -31,16 +28,6 @@ export const Settings: React.FC = () => {
     confirmPassword: '',
   });
   const [profileLoading, setProfileLoading] = useState(false);
-
-  // Company Settings State
-  const [companyData, setCompanyData] = useState({
-    companyName: settings.companyName || 'RGS ENTERPRISES',
-    companyTagline: settings.companyTagline || 'Industrial Hub & Warehouse Assets Management',
-    contactEmail: settings.contactEmail || 'rgsenterprise2026@gmail.com',
-    contactPhone: settings.contactPhone || '',
-    currency: settings.currency || '₹',
-  });
-  const [companyLoading, setCompanyLoading] = useState(false);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,19 +89,6 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleCompanySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCompanyLoading(true);
-    try {
-      await updateSettings(companyData);
-      success('Company branding updated');
-    } catch (err: any) {
-      error('Failed to update company settings: ' + err.message);
-    } finally {
-      setCompanyLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-8 animate-fadeIn max-w-4xl">
       {/* Top Header */}
@@ -123,7 +97,7 @@ export const Settings: React.FC = () => {
           Settings & Account Security
         </h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Update your administrator credentials, email, password, and enterprise branding
+          Update your administrator credentials, email, and password security
         </p>
       </div>
 
@@ -213,68 +187,6 @@ export const Settings: React.FC = () => {
               icon={<Save className="w-4 h-4" />}
             >
               Update Credentials
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Organization Branding */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 pb-5 border-b border-black/[0.06] dark:border-white/[0.08]">
-          <div className="p-2.5 rounded-2xl bg-apple-purple/10 text-[#5856D6]">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-              Enterprise Branding
-            </h2>
-            <p className="text-xs text-gray-400">
-              Company title and currency symbol displayed across invoices
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleCompanySubmit} className="space-y-4 mt-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Organization Name" required>
-              <Input
-                value={companyData.companyName}
-                onChange={(e) => setCompanyData({ ...companyData, companyName: e.target.value })}
-                required
-              />
-            </FormField>
-
-            <FormField label="Currency Symbol" required>
-              <Input
-                value={companyData.currency}
-                onChange={(e) => setCompanyData({ ...companyData, currency: e.target.value })}
-                required
-              />
-            </FormField>
-          </div>
-
-          <FormField label="Company Tagline">
-            <Input
-              value={companyData.companyTagline}
-              onChange={(e) => setCompanyData({ ...companyData, companyTagline: e.target.value })}
-            />
-          </FormField>
-
-          <FormField label="Contact Email">
-            <Input
-              type="email"
-              value={companyData.contactEmail}
-              onChange={(e) => setCompanyData({ ...companyData, contactEmail: e.target.value })}
-            />
-          </FormField>
-
-          <div className="flex justify-end pt-3">
-            <Button
-              type="submit"
-              loading={companyLoading}
-              icon={<Save className="w-4 h-4" />}
-            >
-              Save Branding
             </Button>
           </div>
         </form>

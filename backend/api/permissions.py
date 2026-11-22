@@ -46,14 +46,14 @@ class IsManagerOrReadOnly(permissions.BasePermission):
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
-    Allows read-only access to all authenticated users,
-    but restricts write operations to ADMIN.
+    Allows read-only access to all users (including unauthenticated for public branding),
+    but restricts write operations to Administrators.
     """
     message = "Modifications are restricted to Administrators only."
 
     def has_permission(self, request, view):
-        if not (request.user and getattr(request.user, 'is_authenticated', False)):
-            return False
         if request.method in permissions.SAFE_METHODS:
             return True
+        if not (request.user and getattr(request.user, 'is_authenticated', False)):
+            return False
         return getattr(request.user, 'role', '').upper() == 'ADMIN'

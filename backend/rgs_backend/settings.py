@@ -82,8 +82,15 @@ elif DATABASE_URL:
             'PASSWORD': urllib.parse.unquote(parsed.password or ''),
             'HOST': parsed.hostname,
             'PORT': str(parsed.port or 5432),
+            'CONN_MAX_AGE': 0,  # Recommended by Supabase pooler: close connection after request to prevent idle TCP reset
+            'CONN_HEALTH_CHECKS': True,
             'OPTIONS': {
                 'sslmode': 'require',
+                'connect_timeout': 10,
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5,
             },
         }
     }
@@ -94,10 +101,17 @@ else:
             'NAME': os.getenv('DB_NAME', 'postgres'),
             'USER': os.getenv('DB_USER', 'postgres.gsnnpzbzdevsuupywwco'),
             'PASSWORD': os.getenv('DB_PASSWORD', 'RGS@Enterprisesp5'),
-            'HOST': os.getenv('DB_HOST', 'aws-0-ap-south-1.pooler.supabase.com'),
+            'HOST': os.getenv('DB_HOST', 'aws-0-ap-southeast-2.pooler.supabase.com'),
             'PORT': os.getenv('DB_PORT', '5432'),
+            'CONN_MAX_AGE': 0,
+            'CONN_HEALTH_CHECKS': True,
             'OPTIONS': {
                 'sslmode': 'require',
+                'connect_timeout': 10,
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5,
             },
         }
     }
@@ -166,3 +180,18 @@ JWT_EXPIRATION_MS = int(os.getenv('JWT_EXPIRATION_MS', '86400000'))
 SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://ekkoeycylhhxykepbikl.supabase.co')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', 'sb_publishable_eUvog9Tlihv-uPTvLV6LGQ_tRRLHMNQ')
 STORAGE_BUCKET = os.getenv('STORAGE_BUCKET', 'godown-documents')
+
+# Brevo Mail Settings
+BREVO_API_KEY = os.getenv('BREVO_API_KEY', '')
+BREVO_SMTP_KEY = os.getenv('BREVO_SMTP_KEY', '')
+BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'rgsenterprise2026@gmail.com')
+BREVO_SENDER_NAME = os.getenv('BREVO_SENDER_NAME', 'Sai Babu P')
+BILLING_ALERT_EMAIL = os.getenv('BILLING_ALERT_EMAIL', 'rgsenterprise2026@gmail.com')
+ALLOWED_RESET_EMAILS = [
+    e.strip().lower()
+    for e in os.getenv(
+        'ALLOWED_RESET_EMAILS',
+        'rgsenterprise2026@gmail.com,bschandrasekhar4@gmail.com,gprabhakar024@gmail.com,nagayashwanthgalla@gmail.com'
+    ).split(',')
+    if e.strip()
+]

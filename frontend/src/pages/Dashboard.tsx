@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../api/queryKeys';
 import {
   Warehouse,
   ReceiptText,
@@ -29,40 +31,35 @@ export const Dashboard: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { user } = useAuth();
 
-  const [stats, setStats] = useState<any>(null);
-  const [reminders, setReminders] = useState<any[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading: statsLoading, isFetching: statsFetching, refetch: refetchStats } = useQuery({
+    queryKey: queryKeys.dashboard.stats(),
+    queryFn: () => dashboardApi.getStats(),
+  });
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      const [statsRes, remindersRes, godownsRes] = await Promise.allSettled([
-        dashboardApi.getStats(),
-        dashboardApi.getReminders(),
-        godownApi.getAll(0, 5),
-      ]);
+  const { data: reminders = [], isLoading: remindersLoading, refetch: refetchReminders } = useQuery({
+    queryKey: queryKeys.dashboard.reminders(),
+    queryFn: async () => {
+      const res = await dashboardApi.getReminders();
+      return Array.isArray(res) ? res : [];
+    },
+  });
 
-      if (statsRes.status === 'fulfilled' && statsRes.value) {
-        setStats(statsRes.value);
-      }
-      if (remindersRes.status === 'fulfilled' && remindersRes.value) {
-        setReminders(Array.isArray(remindersRes.value) ? remindersRes.value : []);
-      }
-      if (godownsRes.status === 'fulfilled' && godownsRes.value) {
-        const data = godownsRes.value as any;
-        setGodowns(Array.isArray(data) ? data : data.content || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
+  const { data: godowns = [], isLoading: hubsLoading, refetch: refetchHubs } = useQuery({
+    queryKey: queryKeys.hubs.list({ page: 0, size: 5 }),
+    queryFn: async () => {
+      const res: any = await godownApi.getAll(0, 5);
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+  });
+
+  const loading = (statsLoading && !stats) || (remindersLoading && reminders.length === 0);
+  const isRefreshing = statsFetching;
+
+  const fetchDashboardData = () => {
+    refetchStats();
+    refetchReminders();
+    refetchHubs();
   };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -91,7 +88,7 @@ export const Dashboard: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={fetchDashboardData}
-            icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}
+            icon={<RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />}
           >
             Refresh
           </Button>
@@ -138,6 +135,7 @@ export const Dashboard: React.FC = () => {
             <StatCard
               title="Profit / Month"
               value={formatCurrency(stats?.monthlyProfit ?? ((stats?.monthlyTotalRevenue ?? 0) - (stats?.monthlyRentTotal ?? 0)))}
+              subtitle="Monthly net profit"
               icon={TrendingUp}
               color="purple"
               onClick={() => navigate('/finance')}

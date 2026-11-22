@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   Zap,
   Wifi,
@@ -31,9 +34,6 @@ export const Expenses: React.FC = () => {
   const navigate = useNavigate();
   const { success, error } = useToast();
 
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
-
   // Active Tab: 'electricity' | 'wifi'
   const activeTab: 'electricity' | 'wifi' = location.pathname.includes('/wifi')
     ? 'wifi'
@@ -42,9 +42,6 @@ export const Expenses: React.FC = () => {
   const handleTabChange = (tab: 'electricity' | 'wifi') => {
     navigate(`/information/${tab}`);
   };
-
-  // Selected Hub for editing / viewing active details
-  const [selectedHubId, setSelectedHubId] = useState<string>('');
 
   // Search & Filter State for Electricity
   const [elecSearchQuery, setElecSearchQuery] = useState('');
@@ -61,26 +58,27 @@ export const Expenses: React.FC = () => {
   const [broadbandList, setBroadbandList] = useState<BroadbandConnection[]>([]);
   const [savingWifi, setSavingWifi] = useState(false);
 
-  const fetchGodowns = async () => {
-    setLoading(true);
-    try {
+  // Selected Hub for editing / viewing active details
+  const [selectedHubId, setSelectedHubId] = useState<string>('');
+
+  // Hub facilities reference list (30 min cache)
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
       const gRes = await godownApi.getAllList().catch(() => godownApi.getAll(0, 100));
-      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+      return Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const godowns: Godown[] = hubsQuery.data || [];
+  const loading = hubsQuery.isLoading && !hubsQuery.data;
 
-      setGodowns(gList);
-      if (gList.length > 0 && !selectedHubId) {
-        setSelectedHubId(String(gList[0].id));
-      }
-    } catch (err: any) {
-      error('Failed to load hubs: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Set default selected hub when loaded
   useEffect(() => {
-    fetchGodowns();
-  }, []);
+    if (godowns.length > 0 && !selectedHubId) {
+      setSelectedHubId(String(godowns[0].id));
+    }
+  }, [godowns, selectedHubId]);
 
   const selectedGodown = godowns.find((g) => String(g.id) === String(selectedHubId)) || godowns[0];
 
@@ -152,14 +150,12 @@ export const Expenses: React.FC = () => {
     }
     setSavingElectricity(true);
     try {
-      const updatedGodown = await godownApi.patch(selectedHubId, {
+      await godownApi.patch(selectedHubId, {
         electricityProvider: electricityProvider.trim(),
         electricityServiceNumber: electricityServiceNumber.trim(),
       });
 
-      setGodowns((prev) =>
-        prev.map((g) => (String(g.id) === String(selectedHubId) ? { ...g, ...updatedGodown } : g))
-      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.hubs.all });
       success('Electricity details saved and updated to the Hub section!');
       setIsElectricityEditing(false);
     } catch (err: any) {
@@ -196,13 +192,11 @@ export const Expenses: React.FC = () => {
             bb.serviceContactNumber
         );
 
-      const updatedGodown = await godownApi.patch(selectedHubId, {
+      await godownApi.patch(selectedHubId, {
         broadbandDetails: cleanBbs,
       });
 
-      setGodowns((prev) =>
-        prev.map((g) => (String(g.id) === String(selectedHubId) ? { ...g, ...updatedGodown } : g))
-      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.hubs.all });
       setBroadbandList(cleanBbs);
       success('WiFi & broadband connections saved and synced to the Hub profile!');
       setIsWifiEditing(false);
@@ -386,7 +380,7 @@ export const Expenses: React.FC = () => {
                 >
                   {filteredElecHubs.map((g) => (
                     <option key={g.id} value={g.id}>
-                      {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                      {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                     </option>
                   ))}
                 </select>
@@ -601,7 +595,7 @@ export const Expenses: React.FC = () => {
                     >
                       {godowns.map((g) => (
                         <option key={g.id} value={g.id}>
-                          {g.erpName || g.name} {g.code ? `(${g.code})` : ''}
+                          {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                         </option>
                       ))}
                     </select>

@@ -11,8 +11,8 @@ import { RoleGuard } from './components/common/RoleGuard';
 // Route-Based Code Splitting: Lazy-load page components on demand
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
-const Godowns = lazy(() => import('./pages/Godowns').then((m) => ({ default: m.Godowns })));
-const GodownDetail = lazy(() => import('./pages/GodownDetail').then((m) => ({ default: m.GodownDetail })));
+const Hubs = lazy(() => import('./pages/Godowns').then((m) => ({ default: m.Godowns })));
+const HubDetail = lazy(() => import('./pages/GodownDetail').then((m) => ({ default: m.GodownDetail })));
 const Finance = lazy(() => import('./pages/Finance').then((m) => ({ default: m.Finance })));
 const Expenses = lazy(() => import('./pages/Expenses').then((m) => ({ default: m.Expenses })));
 const StaffDirectory = lazy(() => import('./pages/Staff').then((m) => ({ default: m.StaffDirectory })));
@@ -28,18 +28,29 @@ export const App: React.FC = () => {
         <AuthProvider>
           <SettingsProvider>
             <BrowserRouter>
-              <Suspense fallback={<div className="p-8"><PageSkeleton /></div>}>
-                <Routes>
-                  {/* Public Route */}
-                  <Route path="/login" element={<Login />} />
+              <Routes>
+                {/* Public Route */}
+                <Route
+                  path="/login"
+                  element={
+                    <Suspense fallback={<div className="p-8"><PageSkeleton /></div>}>
+                      <Login />
+                    </Suspense>
+                  }
+                />
 
-                  {/* Protected Layout Routes */}
-                  <Route path="/" element={<AppShell />}>
-                    <Route index element={<Dashboard />} />
-                    <Route path="hubs" element={<Godowns />} />
-                    <Route path="hubs/:id" element={<GodownDetail />} />
-                    <Route path="godowns" element={<Godowns />} />
-                    <Route path="godowns/:id" element={<GodownDetail />} />
+                {/* Protected Layout Routes (AppShell persistent layout never unmounts) */}
+                <Route path="/" element={<AppShell />}>
+                  <Route index element={<Dashboard />} />
+
+                    {/* Standardized Hub Routes (Numeric IDs) */}
+                    <Route path="hubs" element={<Hubs />} />
+                    <Route path="hubs/:id" element={<HubDetail />} />
+
+                    {/* Legacy Bookmark Redirects */}
+                    <Route path="godowns" element={<Navigate to="/hubs" replace />} />
+                    <Route path="godowns/:id" element={<Navigate to="/hubs" replace />} />
+
                     {/* Finance: Restricted to ADMIN */}
                     <Route
                       path="finance"
@@ -69,11 +80,11 @@ export const App: React.FC = () => {
                     <Route path="information" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="information/electricity" element={<Expenses />} />
                     <Route path="information/wifi" element={<Expenses />} />
-                    {/* Backwards compatibility for /expenses */}
                     <Route path="expenses" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="expenses/bills" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="expenses/electricity" element={<Navigate to="/information/electricity" replace />} />
                     <Route path="expenses/wifi" element={<Navigate to="/information/wifi" replace />} />
+
                     {/* Staff & Assets: ADMIN and MANAGER */}
                     <Route
                       path="staff"
@@ -96,6 +107,7 @@ export const App: React.FC = () => {
                     <Route path="cctv" element={<Navigate to="/visualance" replace />} />
                     <Route path="information/visualance" element={<Navigate to="/visualance" replace />} />
                     <Route path="documents" element={<Navigate to="/" replace />} />
+
                     {/* Reports & Settings: Restricted to ADMIN */}
                     <Route
                       path="reports"
@@ -118,7 +130,6 @@ export const App: React.FC = () => {
                   {/* Catch-all */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-              </Suspense>
             </BrowserRouter>
           </SettingsProvider>
         </AuthProvider>

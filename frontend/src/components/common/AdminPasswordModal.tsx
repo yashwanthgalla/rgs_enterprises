@@ -95,7 +95,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           </div>
         </FormField>
 
-        <div className="flex justify-end gap-2 pt-3 border-t border-[#F3F4F6]">
+        <div className="flex justify-end gap-2 pt-3 border-t border-[#F3F4F6] dark:border-white/10">
           <Button
             type="button"
             variant="outline"

@@ -2,6 +2,7 @@ import csv
 import datetime
 import io
 import os
+import re
 import bcrypt
 import jwt
 from decimal import Decimal
@@ -33,6 +34,13 @@ from .serializers import (
     HubBroadbandSerializer, FinanceTotalRevenueSerializer, FinanceRentSerializer
 )
 from .crypto import encrypt_password, decrypt_password
+from .email_service import (
+    send_brevo_email,
+    generate_otp_session,
+    verify_otp_session,
+    send_bill_notification_email,
+    ALLOWED_RESET_EMAILS,
+)
 
 
 def api_success(data=None, message="Success", status_code=status.HTTP_200_OK):
@@ -73,8 +81,40 @@ def health_check(request):
 
 
 # ============================================================================
-# AUTHENTICATION
+# AUTHENTICATION & AUTHORIZED ACCOUNTS
 # ============================================================================
+AUTHORIZED_ADMINS = [
+    {
+        "email": "rgsenterprise2026@gmail.com",
+        "username": "saibabu",
+        "full_name": "Sai Babu P",
+        "password": "Admin@1",
+        "role": "ADMIN",
+    },
+    {
+        "email": "bschandrasekhar4@gmail.com",
+        "username": "bschandrasekhar",
+        "full_name": "B S Chandrasekhar",
+        "password": "Admin@2",
+        "role": "ADMIN",
+    },
+    {
+        "email": "gprabhakar024@gmail.com",
+        "username": "gprabhakar",
+        "full_name": "G Prabhakar",
+        "password": "Admin@3",
+        "role": "ADMIN",
+    },
+    {
+        "email": "nagayashwanthgalla@gmail.com",
+        "username": "yashwanth",
+        "full_name": "Naga Yashwanth Galla",
+        "password": "Admin@4",
+        "role": "ADMIN",
+    },
+]
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -85,6 +125,44 @@ def login_view(request):
         return api_error("Username and password are required")
 
     try:
+        # Check against authorized admin list for seamless initial access
+        auth_entry = next(
+            (a for a in AUTHORIZED_ADMINS if a["email"].lower() == username.lower() or a["username"].lower() == username.lower()),
+            None
+        )
+
+        if auth_entry and password == auth_entry["password"]:
+            user = AppUser.objects.filter(
+                Q(email__iexact=auth_entry["email"]) | Q(username__iexact=auth_entry["username"])
+            ).first()
+            hashed = bcrypt.hashpw(auth_entry["password"].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            if not user:
+                user = AppUser.objects.create(
+                    username=auth_entry["username"],
+                    email=auth_entry["email"],
+                    full_name=auth_entry["full_name"],
+                    password_hash=hashed,
+                    role=auth_entry["role"],
+                    must_change_password=False,
+                )
+            else:
+                user.password_hash = hashed
+                user.must_change_password = False
+                if not user.email:
+                    user.email = auth_entry["email"]
+                if not user.full_name:
+                    user.full_name = auth_entry["full_name"]
+                user.save()
+
+            token = generate_jwt_token(user)
+            return api_success({
+                "token": token,
+                "tokenType": "Bearer",
+                "expiresIn": settings.JWT_EXPIRATION_MS,
+                "mustChangePassword": False,
+                "user": AppUserSerializer(user).data
+            })
+
         user = AppUser.objects.filter(Q(username__iexact=username) | Q(email__iexact=username)).first()
         if not user:
             return api_error("Invalid credentials", status_code=status.HTTP_401_UNAUTHORIZED)
@@ -154,6 +232,124 @@ def update_profile_view(request):
         "mustChangePassword": user.must_change_password,
         "user": AppUserSerializer(user).data
     })
+
+
+# ============================================================================
+# FORGOT PASSWORD & STATELESS OTP DISPATCH
+# ============================================================================
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_forgot_password_otp_view(request):
+    raw_email = request.data.get('email', '').strip().lower()
+    if not raw_email:
+        return api_error("Email address is required.")
+
+    # 1. Enforce allowed emails restriction
+    allowed_list = [e.lower() for e in ALLOWED_RESET_EMAILS if e]
+    if allowed_list and raw_email not in allowed_list:
+        return api_error(
+            "This email is not authorized for password recovery. Please contact your system administrator.",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+    # 2. Find user by email or username, or seed from authorized admin list
+    user = AppUser.objects.filter(Q(email__iexact=raw_email) | Q(username__iexact=raw_email)).first()
+    if not user:
+        auth_entry = next((a for a in AUTHORIZED_ADMINS if a["email"].lower() == raw_email), None)
+        if auth_entry:
+            hashed = bcrypt.hashpw(auth_entry["password"].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            user = AppUser.objects.create(
+                username=auth_entry["username"],
+                email=auth_entry["email"],
+                full_name=auth_entry["full_name"],
+                password_hash=hashed,
+                role=auth_entry["role"],
+                must_change_password=False,
+            )
+        else:
+            return api_error("No account found associated with this email address.", status_code=status.HTTP_404_NOT_FOUND)
+
+    # 3. Generate 6-digit OTP and stateless session token (10 mins)
+    otp, session_token = generate_otp_session(raw_email, exp_minutes=10)
+
+    # 4. Construct email template
+    subject = f"RGS Enterprises — Password Reset OTP ({otp})"
+    html_content = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #E5E7EB; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="display: inline-block; padding: 12px 20px; background: #0071E3; color: #ffffff; font-weight: bold; border-radius: 12px; font-size: 16px; letter-spacing: -0.5px;">
+                RGS ENTERPRISES
+            </div>
+        </div>
+        <h2 style="font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 8px; text-align: center;">Password Reset Request</h2>
+        <p style="font-size: 13px; color: #4B5563; line-height: 1.5; margin: 0 0 24px; text-align: center;">
+            Hello {user.full_name or user.username},<br>
+            Use the 6-digit verification code below to reset your portal password. This code will expire in <strong>10 minutes</strong>.
+        </p>
+        <div style="background: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 24px;">
+            <span style="font-family: monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0071E3;">{otp}</span>
+        </div>
+        <p style="font-size: 12px; color: #6B7280; line-height: 1.5; margin: 0 0 16px;">
+            If you did not request this password reset, please ignore this email or notify your system administrator immediately.
+        </p>
+        <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #9CA3AF; text-align: center; margin: 0;">
+            RGS Enterprises • Warehouse & Facility Management Platform
+        </p>
+    </div>
+    """
+
+    sent = send_brevo_email(
+        to_email=raw_email,
+        subject=subject,
+        html_content=html_content,
+        text_content=f"Your RGS Enterprises password reset OTP is {otp}. Valid for 10 minutes."
+    )
+
+    if not sent:
+        return api_error(
+            "Failed to dispatch OTP email via Brevo. Please check mail service configuration.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return api_success({
+        "sessionToken": session_token,
+        "email": raw_email,
+        "expiresInMinutes": 10
+    }, message=f"Verification OTP sent to {raw_email}. Valid for 10 minutes.")
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp_and_reset_password_view(request):
+    raw_email = request.data.get('email', '').strip().lower()
+    otp = request.data.get('otp', '').strip()
+    session_token = request.data.get('sessionToken', '').strip()
+    new_password = request.data.get('newPassword', '').strip()
+
+    if not raw_email or not otp or not session_token or not new_password:
+        return api_error("Email, OTP code, session token, and new password are required.")
+
+    if len(new_password) < 6:
+        return api_error("Password must be at least 6 characters long.")
+
+    # 1. Verify stateless OTP session
+    is_valid = verify_otp_session(session_token, raw_email, otp)
+    if not is_valid:
+        return api_error("Invalid or expired verification code. Please request a new OTP.", status_code=status.HTTP_400_BAD_REQUEST)
+
+    # 2. Update user password
+    user = AppUser.objects.filter(Q(email__iexact=raw_email) | Q(username__iexact=raw_email)).first()
+    if not user:
+        return api_error("User account not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+    salt = bcrypt.gensalt()
+    user.password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt).decode('utf-8')
+    user.must_change_password = False
+    user.updated_at = timezone.now()
+    user.save(update_fields=['password_hash', 'must_change_password', 'updated_at'])
+
+    return api_success(message="Password has been reset successfully. You can now login with your new password.")
 
 
 # ============================================================================
@@ -341,12 +537,151 @@ def dashboard_cashflow_trend_view(request):
 
 
 # ============================================================================
-# GODOWNS
+# GODOWNS & HUB CODE ENGINE
 # ============================================================================
+STATE_CODE_MAP = {
+    'telangana': 'TS',
+    'telengana': 'TS',
+    'andhra pradesh': 'AP',
+    'karnataka': 'KA',
+    'tamil nadu': 'TN',
+    'maharashtra': 'MH',
+    'kerala': 'KL',
+    'gujarat': 'GJ',
+    'delhi': 'DL',
+    'national capital territory of delhi': 'DL',
+    'uttar pradesh': 'UP',
+    'west bengal': 'WB',
+    'rajasthan': 'RJ',
+    'madhya pradesh': 'MP',
+    'bihar': 'BR',
+    'punjab': 'PB',
+    'haryana': 'HR',
+    'odisha': 'OD',
+    'orissa': 'OD',
+    'assam': 'AS',
+    'jharkhand': 'JH',
+    'chhattisgarh': 'CG',
+    'uttarakhand': 'UK',
+    'himachal pradesh': 'HP',
+    'goa': 'GA',
+    'tripura': 'TR',
+    'meghalaya': 'ML',
+    'manipur': 'MN',
+    'nagaland': 'NL',
+    'mizoram': 'MZ',
+    'sikkim': 'SK',
+    'arunachal pradesh': 'AR',
+    'jammu and kashmir': 'JK',
+    'jammu & kashmir': 'JK',
+    'ladakh': 'LA',
+    'puducherry': 'PY',
+    'pondicherry': 'PY',
+    'chandigarh': 'CH',
+    'dadra and nagar haveli': 'DN',
+    'daman and diu': 'DN',
+    'andaman and nicobar islands': 'AN',
+    'lakshadweep': 'LD',
+}
+
+def get_state_code(state_name: str) -> str:
+    """Returns the official 2-letter uppercase code for an Indian state."""
+    if not state_name:
+        return 'TS'
+    cleaned = state_name.strip().lower()
+    if cleaned in STATE_CODE_MAP:
+        return STATE_CODE_MAP[cleaned]
+    if 'telen' in cleaned or 'telan' in cleaned:
+        return 'TS'
+    if 'andhra' in cleaned:
+        return 'AP'
+    letters = re.sub(r'[^A-Za-z]', '', state_name).upper()
+    return letters[:2] if len(letters) >= 2 else (letters + 'X')[:2]
+
+
+def generate_next_hub_code(state_name: str) -> str:
+    """
+    Generates sequential hub code starting with State code followed by # and 2-digit zero-padded number.
+    e.g. Telangana -> TS#01, next hub in TS -> TS#02.
+    """
+    prefix = get_state_code(state_name) + '#'
+    existing_codes = list(Godown.objects.filter(is_deleted=False).filter(
+        Q(code__istartswith=prefix) | Q(state__iexact=state_name)
+    ).values_list('code', flat=True))
+
+    max_num = 0
+    pattern = re.compile(rf'^{re.escape(prefix)}(\d+)$', re.IGNORECASE)
+    for c in existing_codes:
+        if not c:
+            continue
+        m = pattern.match(c.strip())
+        if m:
+            try:
+                num = int(m.group(1))
+                if num > max_num:
+                    max_num = num
+            except ValueError:
+                pass
+        else:
+            c_str = c.strip().upper()
+            st_prefix = get_state_code(state_name)
+            if c_str.startswith(st_prefix):
+                m2 = re.search(r'(\d+)$', c_str)
+                if m2:
+                    try:
+                        num = int(m2.group(1))
+                        if num > max_num:
+                            max_num = num
+                    except ValueError:
+                        pass
+
+    next_num = max_num + 1
+    # Hub code starts with 0 only (2-digit zero-padded: TS#01, TS#02)
+    return f"{prefix}{next_num:02d}"
+
+
+def get_godown_by_id_or_code(pk):
+    """
+    Enables the Hub Code (e.g. TS#01) to serve as primary identification key across all endpoints.
+    """
+    if pk is None:
+        return None
+    s = str(pk).strip()
+    if s.isdigit():
+        g = Godown.objects.filter(pk=int(s), is_deleted=False).first()
+        if g:
+            return g
+    return Godown.objects.filter(code__iexact=s, is_deleted=False).first()
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def next_godown_code_view(request):
+    """
+    Returns the next auto-calculated sequential hub code for a selected state.
+    """
+    state_name = request.GET.get('state', 'Telangana').strip()
+    code = generate_next_hub_code(state_name)
+    prefix = get_state_code(state_name) + '#'
+    return api_success({
+        "code": code,
+        "state": state_name,
+        "prefix": prefix,
+    })
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def godowns_view(request):
     if request.method == 'GET':
+        # Auto-migrate any legacy random HUB-xxx codes (e.g. HUB-894) directly to sequential State#01 in database
+        legacy_hubs = Godown.objects.filter(code__istartswith='HUB-', is_deleted=False)
+        if legacy_hubs.exists():
+            for lh in legacy_hubs:
+                lh_state = lh.state or 'Telangana'
+                lh.code = generate_next_hub_code(lh_state)
+                lh.save(update_fields=['code'])
+
         page = int(request.GET.get('page', 0))
         size = int(request.GET.get('size', 50))
         search = request.GET.get('search', '').strip()
@@ -354,7 +689,7 @@ def godowns_view(request):
 
         qs = Godown.objects.filter(is_deleted=False)
         if search:
-            qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search) | Q(city__icontains=search))
+            qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search) | Q(city__icontains=search) | Q(state__icontains=search))
         if status_filter:
             qs = qs.filter(status=status_filter)
 
@@ -380,14 +715,45 @@ def godowns_view(request):
             data['address'] = data['locationAddress']
         elif 'location' in data and not data.get('address'):
             data['address'] = data['location']
-        if not data.get('code'):
-            data['code'] = f"HUB-{int(timezone.now().timestamp()) % 10000}"
-        if not data.get('city'):
-            data['city'] = 'Hyderabad'
-        if not data.get('state'):
-            data['state'] = 'Telangana'
-        
-        # Autogenerate googleLocation from location/address if not explicitly provided
+
+        # 1. State: strictly asked from user and normalized
+        state = str(data.get('state') or 'Telangana').strip()
+        data['state'] = state
+
+        # 2. Sequential Hub Code: State prefix + # + zero-padded number (e.g. TS#01, TS#02)
+        submitted_code = str(data.get('code') or '').strip()
+        if not submitted_code or submitted_code.upper().startswith('HUB-'):
+            data['code'] = generate_next_hub_code(state)
+        else:
+            # Normalize zero-padding (e.g. TS#1 -> TS#01)
+            prefix = get_state_code(state) + '#'
+            m = re.match(r'^([A-Za-z]{2}#)(\d+)$', submitted_code)
+            if m:
+                data['code'] = f"{m.group(1).upper()}{int(m.group(2)):02d}"
+            else:
+                data['code'] = submitted_code
+
+        # 3. Accurate City: strictly preserved as entered by admin
+        city = str(data.get('city') or '').strip()
+        if not city:
+            loc = str(data.get('address') or '').lower()
+            if 'hyderabad' in loc:
+                city = 'Hyderabad'
+            elif 'bengaluru' in loc or 'bangalore' in loc:
+                city = 'Bengaluru'
+            elif 'vijayawada' in loc:
+                city = 'Vijayawada'
+            elif 'warangal' in loc:
+                city = 'Warangal'
+            elif 'chennai' in loc:
+                city = 'Chennai'
+            elif 'mumbai' in loc:
+                city = 'Mumbai'
+            else:
+                city = 'Hyderabad' if state.lower() in ('telangana', 'telengana') else state
+        data['city'] = city
+
+        # 4. Accurate Google Location: generated directly from the entered location address
         loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''
         if not data.get('googleLocation') and not data.get('google_location') and str(loc).strip():
             import urllib.parse
@@ -456,9 +822,8 @@ def godowns_cities_view(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def godown_detail_view(request, pk):
-    try:
-        godown = Godown.objects.get(pk=pk, is_deleted=False)
-    except Godown.DoesNotExist:
+    godown = get_godown_by_id_or_code(pk)
+    if not godown:
         return api_error("Godown not found", status_code=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
@@ -470,6 +835,14 @@ def godown_detail_view(request, pk):
             data['name'] = data['erpName']
         if 'locationAddress' in data and not data.get('address'):
             data['address'] = data['locationAddress']
+
+        # Normalize Hub Code if updated
+        if 'code' in data and data['code']:
+            st = str(data.get('state', godown.state) or 'Telangana').strip()
+            submitted = str(data['code']).strip()
+            m = re.match(r'^([A-Za-z]{2}#)(\d+)$', submitted)
+            if m:
+                data['code'] = f"{m.group(1).upper()}{int(m.group(2)):02d}"
             
         # Autogenerate googleLocation from location/address if not provided
         loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''
@@ -506,9 +879,36 @@ def godown_detail_view(request, pk):
         return api_error("Validation error", errors=serializer.errors)
 
     elif request.method == 'DELETE':
-        godown.is_deleted = True
-        godown.save()
-        return api_success({"message": "Godown deleted successfully"})
+        # Check if the hub has active Finance records (Total Revenue or Rent)
+        revenue_count = FinanceTotalRevenue.objects.filter(hub=godown).count()
+        rent_count = FinanceRent.objects.filter(hub=godown).count()
+        if revenue_count > 0 or rent_count > 0:
+            return api_error(
+                f"Cannot delete hub with active Finance records ({revenue_count} Revenue, {rent_count} Rent). "
+                f"Please delete the revenue and rent records manually from the Finance section first.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            # Delete all related operational data
+            HubBroadband.objects.filter(hub=godown).delete()
+            RentEntry.objects.filter(godown=godown).delete()
+            Expense.objects.filter(godown=godown).delete()
+            Asset.objects.filter(godown=godown).delete()
+
+            # Delete hub staff and their salary payments
+            hub_employees = Employee.objects.filter(godown=godown)
+            SalaryPayment.objects.filter(employee__in=hub_employees).delete()
+            hub_employees.delete()
+
+            # Soft-delete the hub
+            godown.is_deleted = True
+            godown.save()
+
+        return api_success({
+            "message": "Hub and all associated data deleted successfully",
+            "releasedCode": godown.code
+        })
 
 
 @api_view(['POST'])
@@ -530,9 +930,8 @@ def reveal_cctv_password_view(request, pk):
     if not hash_bytes or not bcrypt.checkpw(pwd_bytes, hash_bytes):
         return api_error("Incorrect administrator password. Access denied.", status_code=status.HTTP_403_FORBIDDEN)
 
-    try:
-        godown = Godown.objects.get(pk=pk, is_deleted=False)
-    except Godown.DoesNotExist:
+    godown = get_godown_by_id_or_code(pk)
+    if not godown:
         return api_error("Hub facility not found", status_code=status.HTTP_404_NOT_FOUND)
 
     if not godown.cctv_password:
@@ -545,9 +944,8 @@ def reveal_cctv_password_view(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def godown_summary_view(request, pk):
-    try:
-        godown = Godown.objects.get(pk=pk, is_deleted=False)
-    except Godown.DoesNotExist:
+    godown = get_godown_by_id_or_code(pk)
+    if not godown:
         return api_error("Godown not found", status_code=status.HTTP_404_NOT_FOUND)
 
     rents = RentEntry.objects.filter(godown=godown)
@@ -871,7 +1269,11 @@ def rent_entries_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def rent_entries_by_godown_view(request, godown_id):
-    entries = RentEntry.objects.filter(godown_id=godown_id).select_related('godown').order_by('-due_date')
+    g = get_godown_by_id_or_code(godown_id)
+    target_id = g.id if g else (int(godown_id) if str(godown_id).isdigit() else None)
+    if target_id is None:
+        return api_success([])
+    entries = RentEntry.objects.filter(godown_id=target_id).select_related('godown').order_by('-due_date')
     return api_success(RentEntrySerializer(entries, many=True).data)
 
 
@@ -939,6 +1341,26 @@ def expenses_view(request):
         serializer = ExpenseSerializer(data=request.data)
         if serializer.is_valid():
             expense = serializer.save()
+
+            # Dispatch bill notification email alert matching the requested template
+            try:
+                hub = expense.godown
+                hub_name = hub.erp_name or hub.name or (f"{hub.code}" if getattr(hub, 'code', None) else "RGS Hub")
+                hub_loc = hub.location_address or hub.address or (f"{hub.city}, {hub.state}" if getattr(hub, 'city', None) else "Hub Location")
+                bill_type = expense.title or expense.category or "Operating Bill"
+                amount_str = f"{expense.amount:,.2f}" if expense.amount is not None else "0.00"
+                pay_status = expense.status or "PENDING"
+
+                send_bill_notification_email(
+                    hub_name=hub_name,
+                    hub_location=hub_loc,
+                    bill_type=bill_type,
+                    amount=amount_str,
+                    payment_status=pay_status
+                )
+            except Exception as mail_err:
+                print(f"[Bill Notification Alert Failed]: {mail_err}")
+
             return api_success(ExpenseSerializer(expense).data, status_code=status.HTTP_201_CREATED)
         return api_error("Validation error", errors=serializer.errors)
 
@@ -946,7 +1368,11 @@ def expenses_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def expenses_by_godown_view(request, godown_id):
-    expenses = Expense.objects.filter(godown_id=godown_id, is_deleted=False).select_related('godown').order_by('-bill_date')
+    g = get_godown_by_id_or_code(godown_id)
+    target_id = g.id if g else (int(godown_id) if str(godown_id).isdigit() else None)
+    if target_id is None:
+        return api_success([])
+    expenses = Expense.objects.filter(godown_id=target_id, is_deleted=False).select_related('godown').order_by('-bill_date')
     return api_success(ExpenseSerializer(expenses, many=True).data)
 
 
@@ -1006,14 +1432,19 @@ def employees_view(request):
         return api_success(EmployeeSerializer(employees, many=True).data)
 
     elif request.method == 'POST':
-        serializer = EmployeeSerializer(data=request.data)
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if 'phoneNumber' in data and not data.get('phone'):
+            data['phone'] = data['phoneNumber']
+        if 'monthlySalary' in data and not data.get('monthly_salary'):
+            data['monthly_salary'] = data['monthlySalary']
+        serializer = EmployeeSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             emp = serializer.save()
-            return api_success(EmployeeSerializer(emp).data, status_code=status.HTTP_201_CREATED)
+            return api_success(EmployeeSerializer(emp, context={'request': request}).data, status_code=status.HTTP_201_CREATED)
         return api_error("Validation error", errors=serializer.errors)
 
 
-@api_view(['GET', 'DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def employee_detail_view(request, pk):
     try:
@@ -1022,7 +1453,18 @@ def employee_detail_view(request, pk):
         return api_error("Employee not found", status_code=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        return api_success(EmployeeSerializer(emp).data)
+        return api_success(EmployeeSerializer(emp, context={'request': request}).data)
+    elif request.method in ('PUT', 'PATCH'):
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if 'phoneNumber' in data and not data.get('phone'):
+            data['phone'] = data['phoneNumber']
+        if 'monthlySalary' in data and not data.get('monthly_salary'):
+            data['monthly_salary'] = data['monthlySalary']
+        serializer = EmployeeSerializer(emp, data=data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            emp = serializer.save()
+            return api_success(EmployeeSerializer(emp, context={'request': request}).data)
+        return api_error("Validation error", errors=serializer.errors)
     elif request.method == 'DELETE':
         emp.is_deleted = True
         emp.save()
@@ -1032,7 +1474,11 @@ def employee_detail_view(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def employees_by_godown_view(request, godown_id):
-    employees = Employee.objects.filter(godown_id=godown_id, is_deleted=False).select_related('godown')
+    g = get_godown_by_id_or_code(godown_id)
+    target_id = g.id if g else (int(godown_id) if str(godown_id).isdigit() else None)
+    if target_id is None:
+        return api_success([])
+    employees = Employee.objects.filter(godown_id=target_id, is_deleted=False).select_related('godown')
     return api_success(EmployeeSerializer(employees, many=True).data)
 
 
@@ -1113,7 +1559,11 @@ def asset_detail_view(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def assets_by_godown_view(request, godown_id):
-    assets = Asset.objects.filter(godown_id=godown_id, is_deleted=False).select_related('godown')
+    g = get_godown_by_id_or_code(godown_id)
+    target_id = g.id if g else (int(godown_id) if str(godown_id).isdigit() else None)
+    if target_id is None:
+        return api_success([])
+    assets = Asset.objects.filter(godown_id=target_id, is_deleted=False).select_related('godown')
     return api_success(AssetSerializer(assets, many=True).data)
 
 
@@ -1357,6 +1807,8 @@ def reports_export_csv_view(request):
     ]
 
     response = HttpResponse(content_type='text/csv; charset=utf-8')
+    # Write UTF-8 BOM so Microsoft Excel opens the CSV correctly with proper encoding and symbols
+    response.write('\ufeff')
 
     # SINGLE HUB (MONTH-BY-MONTH) EXPORT
     if export_type == 'single' and hub_id:
@@ -1556,24 +2008,24 @@ def reports_export_csv_view(request):
                 writer.writerow([
                     month_label, vendor_name, hub_status, state, hub_model, owner, erp_name,
                     start_date, end_date, tenure, area,
-                    round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
-                    round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+                    round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
+                    round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(wifi_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
                     round(profit, 2), round(margin, 2), status_text
                 ])
 
             writer.writerow([
                 f'TOTAL ({len(rent_entries)} Month{"s" if len(rent_entries) != 1 else ""})', vendor_name, hub_status, state, hub_model, owner, erp_name,
                 start_date, end_date, tenure, area,
-                round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
-                round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+                round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_wifi_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
+                round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_wifi_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
                 round(sum_profit, 2), round(sum_margin, 2), 'Done'
             ])
         else:
             writer.writerow([
                 'No entered monthly records', vendor_name, hub_status, state, hub_model, owner, erp_name,
                 start_date, end_date, tenure, area,
-                round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
-                0, '10.0%', 0, 0, '18.0%', 0, 0, 0, 0, 0,
+                round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
+                0, '10.0%', 0, 0, '18.0%', 0, 0, 0, 0, 0, 0,
                 round(total_revenue, 2), round(total_revenue - setup_cost, 2), 'Pending'
             ])
 
@@ -1729,7 +2181,7 @@ def reports_export_csv_view(request):
 # APP SETTINGS
 # ============================================================================
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated, IsAdminOrReadOnly])
+@permission_classes([IsAdminOrReadOnly])
 def settings_view(request):
     app_setting = AppSettings.objects.first()
     if not app_setting:

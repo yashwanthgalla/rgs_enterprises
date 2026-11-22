@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   FolderLock,
   Search,
@@ -20,11 +23,32 @@ import { DocumentItem, Godown } from '../types';
 export const Documents: React.FC = () => {
   const { success, error } = useToast();
 
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+
+  // Hub facilities reference list (30 min cache)
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
+      const gRes = await godownApi.getAllList().catch(() => godownApi.getAll(0, 100));
+      return Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const godowns: Godown[] = hubsQuery.data || [];
+
+  // Documents list query with keepPreviousData
+  const docsQuery = useQuery({
+    queryKey: queryKeys.documents.list(),
+    queryFn: async () => {
+      const dRes = await documentApi.getAll({ size: 100 });
+      return Array.isArray(dRes) ? dRes : (dRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.STANDARD,
+    placeholderData: keepPreviousData,
+  });
+  const docs: DocumentItem[] = docsQuery.data || [];
+  const loading = docsQuery.isLoading && !docsQuery.data;
 
   // Upload Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,30 +59,6 @@ export const Documents: React.FC = () => {
   });
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-
-  const fetchDocs = async () => {
-    setLoading(true);
-    try {
-      const [dRes, gRes] = await Promise.all([
-        documentApi.getAll({ size: 100 }),
-        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
-      ]);
-
-      const docList = Array.isArray(dRes) ? dRes : (dRes as any)?.content || [];
-      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
-
-      setDocs(docList);
-      setGodowns(gList);
-    } catch (err: any) {
-      error('Failed to load documents: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDocs();
-  }, []);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +81,7 @@ export const Documents: React.FC = () => {
       success('Document securely uploaded to vault');
       setIsModalOpen(false);
       setFile(null);
-      fetchDocs();
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
     } catch (err: any) {
       error('Upload failed: ' + (err.message || 'Error'));
     } finally {
@@ -94,7 +94,7 @@ export const Documents: React.FC = () => {
     try {
       await documentApi.delete(id);
       success('Document removed');
-      setDocs((prev) => prev.filter((d) => d.id !== id));
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
     } catch (err: any) {
       error('Failed to delete document: ' + err.message);
     }
@@ -260,7 +260,7 @@ export const Documents: React.FC = () => {
             />
           </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Document Type">
               <Select
                 value={uploadData.documentType}
@@ -283,7 +283,7 @@ export const Documents: React.FC = () => {
                 <option value="">General (All Hubs)</option>
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.name}
+                    {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                   </option>
                 ))}
               </Select>

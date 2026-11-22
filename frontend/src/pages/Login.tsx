@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Building2, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, Building2, ArrowRight, ShieldCheck, Eye, EyeOff, KeyRound, CheckCircle2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input, FormField } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
+import { authApi } from '../services/api';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +20,18 @@ export const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Forgot Password Modal State
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [sessionToken, setSessionToken] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +64,84 @@ export const Login: React.FC = () => {
       toastError(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenForgotModal = () => {
+    setForgotStep(1);
+    setForgotEmail(username.includes('@') ? username.trim() : '');
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setSessionToken('');
+    setForgotError('');
+    setIsForgotModalOpen(true);
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError('');
+
+    if (!forgotEmail.trim() || !forgotEmail.includes('@')) {
+      setForgotError('Please enter a valid registered administrator email address.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const res: any = await authApi.sendForgotPasswordOtp(forgotEmail.trim().toLowerCase());
+      setSessionToken(res.sessionToken || '');
+      setForgotStep(2);
+      toastSuccess('Verification OTP sent successfully! Please check your inbox.');
+    } catch (err: any) {
+      console.error('Send OTP error:', err);
+      const msg = err.response?.data?.message || err.message || 'Failed to send OTP. Please try again.';
+      setForgotError(msg);
+      toastError(msg);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleVerifyAndResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError('');
+
+    if (!otp.trim() || otp.trim().length !== 6) {
+      setForgotError('Please enter the 6-digit OTP received in your email.');
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      setForgotError('New password must be at least 8 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setForgotError('New password and confirm password do not match.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      await authApi.verifyOtpAndResetPassword({
+        email: forgotEmail.trim().toLowerCase(),
+        otp: otp.trim(),
+        sessionToken,
+        newPassword,
+      });
+
+      toastSuccess('Password reset successfully! Please log in with your new password.');
+      setUsername(forgotEmail.trim());
+      setPassword('');
+      setIsForgotModalOpen(false);
+    } catch (err: any) {
+      console.error('Verify OTP error:', err);
+      const msg = err.response?.data?.message || err.message || 'OTP verification failed or expired.';
+      setForgotError(msg);
+      toastError(msg);
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -137,6 +229,16 @@ export const Login: React.FC = () => {
               </div>
             </FormField>
 
+            <div className="flex items-center justify-end -mt-1">
+              <button
+                type="button"
+                onClick={handleOpenForgotModal}
+                className="text-xs font-semibold text-apple-accent hover:underline transition-colors focus:outline-none"
+              >
+                Forgot password?
+              </button>
+            </div>
+
             <div className="pt-2">
               <Button
                 type="submit"
@@ -160,6 +262,153 @@ export const Login: React.FC = () => {
           © {new Date().getFullYear()} RGS Enterprises. All rights reserved.
         </p>
       </div>
+
+      {/* ========================================================================= */}
+      {/* FORGOT PASSWORD MODAL (Brevo OTP Stateless Verification)                 */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        title={forgotStep === 1 ? 'Reset Password' : 'Enter Verification Code'}
+        description={
+          forgotStep === 1
+            ? 'Enter your authorized email to receive a secure 6-digit one-time password (OTP).'
+            : `Enter the 6-digit OTP sent to ${forgotEmail} and set your new password.`
+        }
+      >
+        <div className="space-y-4">
+          {forgotError && (
+            <div className="p-3.5 rounded-2xl bg-apple-danger/10 border border-apple-danger/20 text-xs font-medium text-apple-danger flex items-start gap-2">
+              <span className="font-bold">•</span>
+              <span>{forgotError}</span>
+            </div>
+          )}
+
+          {forgotStep === 1 ? (
+            <form onSubmit={handleSendOtp} className="space-y-4">
+              <FormField label="Authorized Email Address" required>
+                <div className="relative">
+                  <Input
+                    type="email"
+                    placeholder="e.g. admin@rgsenterprises.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="pl-10"
+                    autoFocus
+                    required
+                  />
+                  <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none" />
+                </div>
+              </FormField>
+
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Security note: OTP dispatch is restricted to authorized administrator accounts. The OTP is valid for 10 minutes and does not require database storage.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsForgotModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  loading={forgotLoading}
+                  icon={<KeyRound className="w-4 h-4" />}
+                >
+                  Send OTP Code
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyAndResetPassword} className="space-y-4">
+              <FormField label="6-Digit Verification Code (OTP)" required>
+                <Input
+                  type="text"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  className="text-center font-mono tracking-widest text-lg font-bold"
+                  autoFocus
+                  required
+                />
+              </FormField>
+
+              <FormField label="New Password (min 8 characters)" required>
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Enter strong new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3.5 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </FormField>
+
+              <FormField label="Confirm New Password" required>
+                <Input
+                  type={showNewPassword ? 'text' : 'password'}
+                  placeholder="Repeat new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </FormField>
+
+              <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setForgotStep(1)}
+                  className="inline-flex items-center gap-1 text-apple-accent hover:underline"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Change Email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={forgotLoading}
+                  className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-apple-accent hover:underline"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Resend OTP
+                </button>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsForgotModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  loading={forgotLoading}
+                  icon={<CheckCircle2 className="w-4 h-4" />}
+                >
+                  Verify & Reset Password
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };

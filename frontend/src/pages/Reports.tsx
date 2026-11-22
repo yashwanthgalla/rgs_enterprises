@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   BarChart3,
   Download,
@@ -25,121 +28,98 @@ export const Reports: React.FC = () => {
   const { success, error } = useToast();
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [summary, setSummary] = useState<ReportSummary | null>(null);
-  const [pnlList, setPnlList] = useState<GodownPnlItem[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // 1. Fetch Hub facilities list once on mount (30 min cache)
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
+      const gList: any = await godownApi.getAllList();
+      return Array.isArray(gList) ? gList : (gList as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const godowns: Godown[] = hubsQuery.data || [];
+
+  // 2. Fetch Yearly Report Data with race condition prevention and instant cache
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.reports.summary(selectedYear),
+    queryFn: () => reportApi.getSummary(selectedYear) as Promise<ReportSummary>,
+    staleTime: STALE_TIMES.STANDARD,
+    placeholderData: keepPreviousData,
+  });
+
+  const pnlQuery = useQuery({
+    queryKey: queryKeys.reports.pnl(selectedYear),
+    queryFn: async () => {
+      const res = await reportApi.getGodownPnl(selectedYear);
+      return Array.isArray(res) ? (res as GodownPnlItem[]) : [];
+    },
+    staleTime: STALE_TIMES.STANDARD,
+    placeholderData: keepPreviousData,
+  });
+
+  const summary = summaryQuery.data || null;
+  const pnlList = pnlQuery.data || [];
+  const loading = (summaryQuery.isLoading && !summaryQuery.data) || (pnlQuery.isLoading && !pnlQuery.data);
+  const fetchError = (summaryQuery.isError || pnlQuery.isError)
+    ? 'Some report data could not be loaded. Please check your network and try again.'
+    : null;
+
+  const handleRetry = () => {
+    summaryQuery.refetch();
+    pnlQuery.refetch();
+  };
 
   // Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [exportScope, setExportScope] = useState<'total' | 'single'>('total');
   const [selectedExportHubId, setSelectedExportHubId] = useState<string>('');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
 
-  // Track active fetch requests to avoid race conditions
-  const activeFetchIdRef = useRef<number>(0);
+  // Set default export hub when godowns load
+  React.useEffect(() => {
+    if (godowns.length > 0 && !selectedExportHubId) {
+      setSelectedExportHubId(String(godowns[0].id));
+    }
+  }, [godowns, selectedExportHubId]);
 
-  // 1. Fetch Hub facilities list once on mount (De-duplicated; not re-queried on year toggle)
-  useEffect(() => {
-    let isCancelled = false;
-
-    godownApi
-      .getAllList()
-      .then((gList: any) => {
-        if (isCancelled) return;
-        const list: Godown[] = Array.isArray(gList) ? gList : (gList as any)?.content || [];
-        setGodowns(list);
-        if (list.length > 0) {
-          setSelectedExportHubId((prev) => prev || String(list[0].id));
-        }
-      })
-      .catch((err) => {
-        if (!isCancelled) {
-          console.error('Failed to load hubs list:', err);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  // 2. Fetch Yearly Report Data with race condition prevention and granular error feedback
-  const fetchReportsForYear = (year: number) => {
-    const fetchId = ++activeFetchIdRef.current;
-    setLoading(true);
-    setFetchError(null);
-
-    Promise.allSettled([
-      reportApi.getSummary(year),
-      reportApi.getGodownPnl(year),
-    ])
-      .then(([sResult, pnlResult]) => {
-        if (fetchId !== activeFetchIdRef.current) return;
-
-        let hasError = false;
-
-        if (sResult.status === 'fulfilled') {
-          setSummary(sResult.value as ReportSummary);
-        } else {
-          hasError = true;
-          console.error('Failed to load summary for year', year, sResult.reason);
-        }
-
-        if (pnlResult.status === 'fulfilled') {
-          setPnlList(Array.isArray(pnlResult.value) ? pnlResult.value : []);
-        } else {
-          hasError = true;
-          console.error('Failed to load PnL list for year', year, pnlResult.reason);
-        }
-
-        if (hasError) {
-          const msg = 'Some report data could not be loaded. Please check your network and try again.';
-          setFetchError(msg);
-          error(msg);
-        }
-      })
-      .catch((err: any) => {
-        if (fetchId !== activeFetchIdRef.current) return;
-        const msg = err.message || 'Failed to load financial reports';
-        setFetchError(msg);
-        error(msg);
-      })
-      .finally(() => {
-        if (fetchId === activeFetchIdRef.current) {
-          setLoading(false);
-        }
-      });
-  };
-
-  useEffect(() => {
-    fetchReportsForYear(selectedYear);
-  }, [selectedYear]);
-
-  const handleRetry = () => {
-    fetchReportsForYear(selectedYear);
-  };
-
-  const handleDownloadCsv = () => {
+  const handleDownloadCsv = async () => {
     if (exportScope === 'single' && !selectedExportHubId) {
       error('Please select a Hub facility to export its monthly data.');
       return;
     }
 
-    const downloadUrl = reportApi.exportCsvUrl({
-      year: exportYear,
-      type: exportScope,
-      hubId: exportScope === 'single' ? selectedExportHubId : undefined,
-    });
-
-    window.open(downloadUrl, '_blank');
-    success(
-      exportScope === 'total'
-        ? 'Exporting Total Hubs financial report matching template...'
-        : 'Exporting Single Hub monthly financial breakdown...'
-    );
-    setIsExportModalOpen(false);
+    try {
+      setIsExporting(true);
+      await reportApi.downloadCsv({
+        year: exportYear,
+        type: exportScope,
+        hubId: exportScope === 'single' ? selectedExportHubId : undefined,
+      });
+      success(
+        exportScope === 'total'
+          ? 'Total Hubs financial report exported successfully.'
+          : 'Single Hub monthly financial breakdown exported successfully.'
+      );
+      setIsExportModalOpen(false);
+    } catch (err: any) {
+      console.error('Direct blob download failed, trying fallback URL with token...', err);
+      try {
+        const downloadUrl = reportApi.exportCsvUrl({
+          year: exportYear,
+          type: exportScope,
+          hubId: exportScope === 'single' ? selectedExportHubId : undefined,
+        });
+        window.open(downloadUrl, '_blank');
+        success('Export initiated.');
+        setIsExportModalOpen(false);
+      } catch (fallbackErr) {
+        error(err?.message || 'Failed to export report. Please try again.');
+      }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Standardized schema metrics with clean fallback (memoized to prevent recalculation)
@@ -503,7 +483,7 @@ export const Reports: React.FC = () => {
               >
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.erpName || g.name} {g.code ? `(${g.code})` : ''} - {g.state || g.city || 'Hub'}
+                    {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                   </option>
                 ))}
               </Select>
@@ -528,6 +508,7 @@ export const Reports: React.FC = () => {
               type="button"
               variant="outline"
               onClick={() => setIsExportModalOpen(false)}
+              disabled={isExporting}
             >
               Cancel
             </Button>
@@ -535,10 +516,14 @@ export const Reports: React.FC = () => {
               type="button"
               variant="primary"
               onClick={handleDownloadCsv}
+              loading={isExporting}
+              disabled={isExporting}
               icon={<Download className="w-4 h-4" />}
               className="rounded-xl shadow-apple-sm font-semibold"
             >
-              {exportScope === 'total'
+              {isExporting
+                ? 'Exporting...'
+                : exportScope === 'total'
                 ? 'Export All Hubs CSV'
                 : `Export ${selectedExportGodown?.erpName || selectedExportGodown?.name || 'Hub'} CSV`}
             </Button>

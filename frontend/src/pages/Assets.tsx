@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   Wrench,
   Search,
@@ -23,11 +26,32 @@ export const Assets: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+
+  // Hub facilities reference list (30 min cache)
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.compact(),
+    queryFn: async () => {
+      const gRes = await godownApi.getAllList().catch(() => godownApi.getAll(0, 100));
+      return Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+  });
+  const godowns: Godown[] = hubsQuery.data || [];
+
+  // Assets list query with keepPreviousData
+  const assetsQuery = useQuery({
+    queryKey: queryKeys.assets.list(),
+    queryFn: async () => {
+      const aRes = await assetApi.getAll({ size: 100 });
+      return Array.isArray(aRes) ? aRes : (aRes as any)?.content || [];
+    },
+    staleTime: STALE_TIMES.STANDARD,
+    placeholderData: keepPreviousData,
+  });
+  const assets: Asset[] = assetsQuery.data || [];
+  const loading = assetsQuery.isLoading && !assetsQuery.data;
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,30 +67,6 @@ export const Assets: React.FC = () => {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
-
-  const fetchAssets = async () => {
-    setLoading(true);
-    try {
-      const [aRes, gRes] = await Promise.all([
-        assetApi.getAll({ size: 100 }),
-        godownApi.getAllList().catch(() => godownApi.getAll(0, 100)),
-      ]);
-
-      const assetList = Array.isArray(aRes) ? aRes : (aRes as any)?.content || [];
-      const gList = Array.isArray(gRes) ? gRes : (gRes as any)?.content || [];
-
-      setAssets(assetList);
-      setGodowns(gList);
-    } catch (err: any) {
-      error('Failed to load assets: ' + (err.message || 'Error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAssets();
-  }, []);
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +97,7 @@ export const Assets: React.FC = () => {
 
       success('Equipment record registered');
       setIsModalOpen(false);
-      fetchAssets();
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
     } catch (err: any) {
       error('Failed to create asset: ' + (err.message || 'Error'));
     } finally {
@@ -110,7 +110,7 @@ export const Assets: React.FC = () => {
     try {
       await assetApi.delete(id);
       success('Asset deleted');
-      setAssets((prev) => prev.filter((a) => a.id !== id));
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
     } catch (err: any) {
       error('Failed to delete asset: ' + err.message);
     }
@@ -277,7 +277,7 @@ export const Assets: React.FC = () => {
             />
           </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Assigned Hub" required>
               <Select
                 value={formData.godownId}
@@ -287,7 +287,7 @@ export const Assets: React.FC = () => {
                 <option value="">-- Choose Hub --</option>
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.name}
+                    {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                   </option>
                 ))}
               </Select>
@@ -309,7 +309,7 @@ export const Assets: React.FC = () => {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Serial Number">
               <Input
                 placeholder="e.g. SN-89218491"
@@ -328,7 +328,7 @@ export const Assets: React.FC = () => {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Purchase Date">
               <Input
                 type="date"

@@ -1,9 +1,14 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    visualizer({ filename: 'dist/stats.json', json: true }),
+    visualizer({ filename: 'dist/stats.html', open: false }),
+  ],
   build: {
     chunkSizeWarningLimit: 600,
     rollupOptions: {

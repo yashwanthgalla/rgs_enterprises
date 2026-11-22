@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { queryClient, STALE_TIMES } from '../api/queryClient';
+import { queryKeys } from '../api/queryKeys';
 import {
   Warehouse,
   Plus,
@@ -24,6 +27,8 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -33,7 +38,7 @@ import { FormField, Input, Select, Textarea } from '../components/ui/Input';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { godownApi } from '../services/api';
+import { godownApi, financeApi } from '../services/api';
 import { Godown, BroadbandConnection } from '../types';
 
 const HUB_STATUS_OPTIONS = [
@@ -49,6 +54,124 @@ const HUB_MODEL_OPTIONS = [
   { value: 'OSH', label: 'OSH' },
   { value: 'ISH', label: 'ISH' },
 ];
+
+const INDIAN_STATES = [
+  'Telangana',
+  'Andhra Pradesh',
+  'Karnataka',
+  'Tamil Nadu',
+  'Maharashtra',
+  'Kerala',
+  'Gujarat',
+  'Delhi',
+  'Uttar Pradesh',
+  'West Bengal',
+  'Rajasthan',
+  'Madhya Pradesh',
+  'Bihar',
+  'Punjab',
+  'Haryana',
+  'Odisha',
+  'Assam',
+  'Jharkhand',
+  'Chhattisgarh',
+  'Uttarakhand',
+  'Himachal Pradesh',
+  'Goa',
+  'Tripura',
+  'Meghalaya',
+  'Manipur',
+  'Nagaland',
+  'Mizoram',
+  'Sikkim',
+  'Arunachal Pradesh',
+  'Jammu and Kashmir',
+  'Ladakh',
+  'Puducherry',
+  'Chandigarh',
+] as const;
+
+const STATE_CODE_PREFIXES: Record<string, string> = {
+  telangana: 'TS',
+  telengana: 'TS',
+  'andhra pradesh': 'AP',
+  karnataka: 'KA',
+  'tamil nadu': 'TN',
+  maharashtra: 'MH',
+  kerala: 'KL',
+  gujarat: 'GJ',
+  delhi: 'DL',
+  'uttar pradesh': 'UP',
+  'west bengal': 'WB',
+  rajasthan: 'RJ',
+  'madhya pradesh': 'MP',
+  bihar: 'BR',
+  punjab: 'PB',
+  haryana: 'HR',
+  odisha: 'OD',
+  orissa: 'OD',
+  assam: 'AS',
+  jharkhand: 'JH',
+  chhattisgarh: 'CG',
+  uttarakhand: 'UK',
+  'himachal pradesh': 'HP',
+  goa: 'GA',
+  tripura: 'TR',
+  meghalaya: 'ML',
+  manipur: 'MN',
+  nagaland: 'NL',
+  mizoram: 'MZ',
+  sikkim: 'SK',
+  'arunachal pradesh': 'AR',
+  'jammu and kashmir': 'JK',
+  ladakh: 'LA',
+  puducherry: 'PY',
+  chandigarh: 'CH',
+};
+
+const getStatePrefix = (stateName: string): string => {
+  if (!stateName) return 'TS';
+  const clean = stateName.trim().toLowerCase();
+  if (STATE_CODE_PREFIXES[clean]) return STATE_CODE_PREFIXES[clean];
+  if (clean.includes('telen') || clean.includes('telan')) return 'TS';
+  if (clean.includes('andhra')) return 'AP';
+  const letters = stateName.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  return letters.slice(0, 2) || 'TS';
+};
+
+const computeNextHubCode = (
+  stateName: string,
+  existingGodowns: Array<{ id?: number | string; code?: string; state?: string }>,
+  excludeId?: number | string
+): string => {
+  const prefix = getStatePrefix(stateName) + '#';
+  const regex = new RegExp(`^${prefix}(\\d+)$`, 'i');
+  let maxNum = 0;
+
+  for (const g of existingGodowns) {
+    if (excludeId && String(g.id) === String(excludeId)) continue;
+    const code = (g.code || '').trim();
+    if (!code) continue;
+    const match = code.match(regex);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (!isNaN(n) && n > maxNum) {
+        maxNum = n;
+      }
+    } else if (g.state && g.state.trim().toLowerCase() === stateName.trim().toLowerCase()) {
+      const m2 = code.match(/(\d+)$/);
+      if (m2) {
+        const n = parseInt(m2[1], 10);
+        if (!isNaN(n) && n > maxNum) {
+          maxNum = n;
+        }
+      }
+    }
+  }
+
+  const nextNum = maxNum + 1;
+  return `${prefix}${String(nextNum).padStart(2, '0')}`;
+};
 
 const calculateMonths = (startDate: string, endDate: string): number => {
   if (!startDate || !endDate) return 0;
@@ -66,7 +189,7 @@ const calculateMonths = (startDate: string, endDate: string): number => {
   return Math.max(0, total);
 };
 
-export const generateGoogleMapsUrl = (address: string): string => {
+const generateGoogleMapsUrl = (address: string): string => {
   const clean = address.trim();
   if (!clean) return '';
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clean)}`;
@@ -79,8 +202,6 @@ export const Godowns: React.FC = () => {
   const { formatCurrency } = useSettings();
   const { success, error } = useToast();
 
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -95,7 +216,9 @@ export const Godowns: React.FC = () => {
   const [formData, setFormData] = useState({
     // 1. Hub Information
     name: '', // ERP Name (required)
-    code: '',
+    code: '', // Sequential Hub Code e.g. TS#01
+    state: 'Telangana', // Required Indian State
+    city: 'Hyderabad', // Required accurate location city
     hubPocName: '', // Required
     hubPocContact: '', // Phone (10 digits, required)
     capacitySqFt: '', // Total Capacity (optional)
@@ -143,30 +266,35 @@ export const Godowns: React.FC = () => {
     notes: '',
   });
 
-  const fetchGodowns = async () => {
-    setLoading(true);
-    try {
-      const res: any = await godownApi.getAll(0, 100);
-      const data = Array.isArray(res) ? res : res?.content || [];
-      setGodowns(data);
-    } catch (err: any) {
-      error('Failed to load hubs: ' + (err.message || 'Unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [showDeleted, setShowDeleted] = useState(false);
 
-  useEffect(() => {
-    fetchGodowns();
-  }, []);
+  const hubsQuery = useQuery({
+    queryKey: queryKeys.hubs.list({ page: 0, size: 100, showDeleted }),
+    queryFn: async () => {
+      const res: any = await godownApi.getAll(0, 100, false, { show_deleted: showDeleted ? 'true' : 'false' });
+      return Array.isArray(res) ? res : res?.content || [];
+    },
+    staleTime: STALE_TIMES.LONG_LIVED,
+    placeholderData: keepPreviousData,
+  });
+
+  const godowns: Godown[] = Array.isArray(hubsQuery.data)
+    ? hubsQuery.data
+    : (hubsQuery.data as any)?.content || [];
+  const isHubsLoading = hubsQuery.isLoading;
+  const refetchGodowns = hubsQuery.refetch;
+  const loading = isHubsLoading && godowns.length === 0;
 
   const openCreateModal = () => {
     setEditingGodown(null);
     setShowPassword(false);
     setIsCustomGoogleLocation(false);
+    const initialCode = computeNextHubCode('Telangana', godowns);
     setFormData({
       name: '',
-      code: '',
+      code: initialCode,
+      state: 'Telangana',
+      city: 'Hyderabad',
       hubPocName: '',
       hubPocContact: '',
       capacitySqFt: '',
@@ -200,6 +328,15 @@ export const Godowns: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleStateChange = (selectedState: string) => {
+    const nextCode = computeNextHubCode(selectedState, godowns, editingGodown?.id);
+    setFormData((prev) => ({
+      ...prev,
+      state: selectedState,
+      code: nextCode,
+    }));
+  };
+
   const openEditModal = (g: Godown, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingGodown(g);
@@ -210,7 +347,9 @@ export const Godowns: React.FC = () => {
     const duration = g.leaseDurationMonths || calculateMonths(g.leaseStartDate || '', g.leaseEndDate || '');
     setFormData({
       name: g.erpName || g.name || '',
-      code: g.code || '',
+      code: g.code || computeNextHubCode(g.state || 'Telangana', godowns, g.id),
+      state: g.state || 'Telangana',
+      city: g.city || '',
       hubPocName: g.hubPocName || '',
       hubPocContact: g.hubPocContact || '',
       capacitySqFt: g.capacitySqFt ? String(g.capacitySqFt) : (g.totalCapacity ? String(g.totalCapacity) : ''),
@@ -244,17 +383,57 @@ export const Godowns: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: number, e: React.MouseEvent) => {
+  // Decommission Hub Safety Confirmation Modal States
+  const [hubToDelete, setHubToDelete] = useState<{ id: number; code: string; name: string } | null>(null);
+  const [checkingFinance, setCheckingFinance] = useState(false);
+  const [financeStats, setFinanceStats] = useState<{ revenueCount: number; rentCount: number } | null>(null);
+  const [deletingHub, setDeletingHub] = useState(false);
+
+  const openDeleteModal = async (g: Godown, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this hub? This will delete associated records.')) {
-      return;
-    }
+    setHubToDelete({
+      id: g.id,
+      code: g.code || '',
+      name: g.erpName || g.name,
+    });
+    setCheckingFinance(true);
+    setFinanceStats(null);
     try {
-      await godownApi.delete(id);
-      success('Hub deleted successfully');
-      setGodowns((prev) => prev.filter((g) => g.id !== id));
+      const [revs, rents] = await Promise.all([
+        financeApi.getTotalRevenues({ hubId: g.id }),
+        financeApi.getRents({ hubId: g.id }),
+      ]);
+      const revList = Array.isArray(revs) ? revs : (revs as any)?.content || [];
+      const rentList = Array.isArray(rents) ? rents : (rents as any)?.content || [];
+      setFinanceStats({
+        revenueCount: revList.length,
+        rentCount: rentList.length,
+      });
+    } catch {
+      setFinanceStats({ revenueCount: 0, rentCount: 0 });
+    } finally {
+      setCheckingFinance(false);
+    }
+  };
+
+  const confirmDeleteHub = async () => {
+    if (!hubToDelete) return;
+    setDeletingHub(true);
+    try {
+      const res: any = await godownApi.delete(hubToDelete.id);
+      const releasedCode = res?.releasedCode || hubToDelete.code;
+      success(`Hub ${hubToDelete.name} decommissioned successfully. All associated data was removed and code ${releasedCode} has been released.`);
+      setHubToDelete(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.hubs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      refetchGodowns();
     } catch (err: any) {
-      error('Failed to delete hub: ' + (err.message || 'Unknown error'));
+      error(err.message || 'Failed to decommission hub');
+    } finally {
+      setDeletingHub(false);
     }
   };
 
@@ -396,6 +575,8 @@ export const Godowns: React.FC = () => {
         name: formData.name.trim(),
         erpName: formData.name.trim(),
         code: formData.code.trim() || undefined,
+        state: formData.state.trim() || 'Telangana',
+        city: formData.city.trim(),
         location: formData.location.trim(),
         locationAddress: formData.location.trim(),
         address: formData.location.trim(),
@@ -461,7 +642,9 @@ export const Godowns: React.FC = () => {
       }
 
       setIsModalOpen(false);
-      fetchGodowns();
+      queryClient.invalidateQueries({ queryKey: queryKeys.hubs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      refetchGodowns();
     } catch (err: any) {
       error('Operation failed: ' + (err.message || 'Unknown error'));
     } finally {
@@ -537,7 +720,7 @@ export const Godowns: React.FC = () => {
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -550,6 +733,18 @@ export const Godowns: React.FC = () => {
               </option>
             ))}
           </Select>
+
+          {user?.role === 'ADMIN' && (
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 cursor-pointer select-none whitespace-nowrap bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700">
+              <input
+                type="checkbox"
+                checked={showDeleted}
+                onChange={(e) => setShowDeleted(e.target.checked)}
+                className="rounded text-[#0071E3] focus:ring-[#0071E3]"
+              />
+              Show Deleted
+            </label>
+          )}
         </div>
       </div>
 
@@ -591,30 +786,40 @@ export const Godowns: React.FC = () => {
                 className="p-5 flex flex-col justify-between cursor-pointer group"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 group-hover:text-apple-accent transition-colors">
+                        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 group-hover:text-apple-accent transition-colors truncate">
                           {g.erpName || g.name}
                         </h3>
                         {g.hubModel && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40 shrink-0">
                             {g.hubModel}
                           </span>
                         )}
                         {g.code && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-gray-500">
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-apple-accent/10 text-apple-accent dark:bg-apple-accent/20 font-bold tracking-wide border border-apple-accent/20 shrink-0">
                             {g.code}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-1.5 line-clamp-1">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        <span>{g.address || g.locationAddress || g.location}</span>
-                      </p>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-2 min-w-0 overflow-hidden">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-apple-accent" />
+                        <span className="font-semibold text-gray-800 dark:text-gray-200 shrink-0 whitespace-nowrap">
+                          {g.city ? `${g.city}` : ''}{g.state ? `, ${g.state}` : ''}
+                        </span>
+                        {(g.address || g.locationAddress || g.location) && (
+                          <>
+                            <span className="text-gray-300 dark:text-gray-600 shrink-0">•</span>
+                            <span className="truncate text-gray-500 dark:text-gray-400">
+                              {g.address || g.locationAddress || g.location}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0 pt-0.5">
                       {getStatusBadge(g.status || g.hubStatus || 'ACTIVE')}
                       <button
                         onClick={(e) => openEditModal(g, e)}
@@ -624,9 +829,9 @@ export const Godowns: React.FC = () => {
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={(e) => handleDelete(g.id, e)}
+                        onClick={(e) => openDeleteModal(g, e)}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-apple-danger hover:bg-apple-danger/10 transition-colors"
-                        title="Delete Hub"
+                        title="Decommission Hub"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -747,6 +952,38 @@ export const Godowns: React.FC = () => {
               </FormField>
             </div>
 
+            {/* State & Accurate City */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                label="State"
+                required
+              >
+                <Select
+                  value={formData.state}
+                  onChange={(e) => handleStateChange(e.target.value)}
+                  required
+                >
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st} ({getStatePrefix(st)})
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField
+                label="City / District"
+                required
+              >
+                <Input
+                  placeholder="e.g. Hyderabad, Warangal, Bengaluru..."
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  required
+                />
+              </FormField>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField label="Hub POC Name" required>
                 <Input
@@ -844,11 +1081,10 @@ export const Godowns: React.FC = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={handleRegenerateGoogleLocation}
                   disabled={!formData.location.trim()}
                   title="Re-generate Google Maps link from Location Address"
-                  className="shrink-0 text-xs font-semibold"
+                  className="shrink-0 text-xs font-semibold h-11 px-3"
                 >
                   Auto-generate
                 </Button>
@@ -857,7 +1093,7 @@ export const Godowns: React.FC = () => {
                     href={formData.googleLocation}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-[#0071E3] shrink-0 flex items-center justify-center transition-colors"
+                    className="h-11 w-11 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-[#0071E3] shrink-0 flex items-center justify-center transition-colors"
                     title="Open Google Location preview in new tab"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -896,11 +1132,8 @@ export const Godowns: React.FC = () => {
                 />
               </FormField>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                  Total Lease Duration (Months)
-                </label>
-                <div className="h-10 px-3.5 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-gray-200">
+              <FormField label="Total Lease Duration">
+                <div className="min-h-[42px] px-3.5 py-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-gray-200">
                   <span className="flex items-center gap-1.5 text-apple-accent">
                     <Clock className="w-3.5 h-3.5" />
                     <span>{formData.leaseDurationMonths} Months</span>
@@ -909,7 +1142,7 @@ export const Godowns: React.FC = () => {
                     Auto-calculated
                   </span>
                 </div>
-              </div>
+              </FormField>
             </div>
           </div>
 
@@ -966,10 +1199,7 @@ export const Godowns: React.FC = () => {
                 />
               </FormField>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                  CCTV Password (Encrypted)
-                </label>
+              <FormField label="CCTV Password (Encrypted)">
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
@@ -981,13 +1211,13 @@ export const Godowns: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                     title={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
+              </FormField>
 
               <FormField label="CCTV Access URL / IP">
                 <Input
@@ -1253,6 +1483,107 @@ export const Godowns: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Decommission Hub Safety Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(hubToDelete)}
+        onClose={() => {
+          if (!deletingHub) setHubToDelete(null);
+        }}
+        title={`Decommission Hub: ${hubToDelete?.name || ''} (${hubToDelete?.code || ''})`}
+        description="Review associated data and manual Finance removal requirements before proceeding."
+        maxWidth="xl"
+      >
+        <div className="space-y-5">
+          {/* Section 1: Associated Data Deletion Notice */}
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>All Associated Hub Data Will Be Permanently Removed</span>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300">
+              Decommissioning this Hub will permanently remove all data linked to this facility across the system:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 pl-1">
+              <li>All registered infrastructure assets & equipment</li>
+              <li>Personnel & security staff assigned to this Hub and their payroll entries</li>
+              <li>Rent ledger records and tenant payment history</li>
+              <li>Operating utility expenses and petty cash ledgers</li>
+              <li>Broadband internet lines and CCTV credentials</li>
+            </ul>
+          </div>
+
+          {/* Section 2: Manual Revenue & Rent Requirements */}
+          {checkingFinance ? (
+            <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] text-center text-xs text-gray-500">
+              <div className="w-5 h-5 border-2 border-apple-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              Checking Finance module for active Revenue and Rent records...
+            </div>
+          ) : financeStats && (financeStats.revenueCount > 0 || financeStats.rentCount > 0) ? (
+            <div className="p-4 rounded-2xl bg-apple-danger/10 border border-apple-danger/25 text-xs space-y-3">
+              <div className="flex items-center gap-2 text-apple-danger font-bold text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Action Required: Delete Revenue & Rent Manually</span>
+              </div>
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                This Hub currently has <span className="font-bold text-apple-danger">{financeStats.revenueCount} Total Revenue</span> and <span className="font-bold text-apple-danger">{financeStats.rentCount} Monthly Rent</span> record(s) recorded in Finance.
+              </p>
+              <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-apple-danger/20 text-gray-800 dark:text-gray-200">
+                <p className="font-semibold text-apple-danger mb-1">
+                  Financial records cannot be deleted automatically.
+                </p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                  To protect enterprise audit trails, you must manually delete the revenue and rent records in the Finance section before this Hub can be removed.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full flex items-center justify-center gap-2 font-semibold text-apple-danger border-apple-danger/30 hover:bg-apple-danger/10"
+                onClick={() => {
+                  setHubToDelete(null);
+                  navigate('/finance');
+                }}
+              >
+                <span>Go to Finance Section to Delete Records</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-2">
+              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Finance Records Cleared</span>
+              </div>
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                No active Revenue or Rent records found for this Hub in Finance. Decommissioning this Hub will permanently clean up all remaining operational data and release code <span className="font-mono font-bold">{hubToDelete?.code}</span>.
+              </p>
+            </div>
+          )}
+
+          {/* Modal Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deletingHub}
+              onClick={() => setHubToDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={checkingFinance || deletingHub || Boolean(financeStats && (financeStats.revenueCount > 0 || financeStats.rentCount > 0))}
+              loading={deletingHub}
+              icon={<Trash2 className="w-4 h-4" />}
+              onClick={confirmDeleteHub}
+            >
+              Permanently Decommission Hub
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

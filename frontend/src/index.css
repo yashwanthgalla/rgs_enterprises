@@ -101,6 +101,9 @@
   .app-shell-watermark {
     left: 16rem;
   }
+  .app-shell-watermark-collapsed {
+    left: 5rem;
+  }
 }
 
 .dark .site-bg-watermark {

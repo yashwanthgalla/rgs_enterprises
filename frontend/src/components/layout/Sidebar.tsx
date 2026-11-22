@@ -11,6 +11,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   TrendingUp,
   LogOut,
   Zap,
@@ -129,6 +130,8 @@ const prefetchRoute = (path: string) => {
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface NavItem {
@@ -142,7 +145,12 @@ interface NavItem {
   }[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  isOpen,
+  onClose,
+  isCollapsed = false,
+  onToggleCollapse,
+}) => {
   const { user, logout } = useAuth();
   const { settings } = useSettings();
   const location = useLocation();
@@ -246,28 +254,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {/* Sidebar Container */}
       <aside
         className={clsx(
-          'fixed top-0 bottom-0 left-0 z-40 w-64 bg-white border-r border-[#E5E7EB] flex flex-col transition-transform duration-150 ease-in-out lg:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed top-0 bottom-0 left-0 z-40 bg-white border-r border-[#E5E7EB] flex flex-col transition-all duration-200 ease-in-out',
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          isCollapsed ? 'w-20' : 'w-64'
         )}
       >
         {/* Brand Header */}
-        <div className="p-5 pb-4 flex items-center gap-3 border-b border-[#E5E7EB]">
-          <div className="w-10 h-10 rounded-2xl overflow-hidden border border-[#E5E7EB] shadow-apple-sm shrink-0 bg-white">
-            <img
-              src="/2.jpeg"
-              alt="RGS Enterprises Logo"
-              className="w-full h-full object-cover"
-            />
+        <div
+          className={clsx(
+            'flex items-center border-b border-[#E5E7EB] transition-all duration-200',
+            isCollapsed
+              ? 'p-3 flex-col items-center justify-center gap-2'
+              : 'p-4 justify-between gap-2'
+          )}
+        >
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-2xl overflow-hidden border border-[#E5E7EB] shadow-apple-sm shrink-0 bg-white">
+              <img
+                src="/2.jpeg"
+                alt="RGS Enterprises Logo"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <h1 className="text-sm font-bold tracking-tight text-[#111827] truncate">
+                  RGS ENTERPRISES
+                </h1>
+              </div>
+            )}
           </div>
-          <div className="overflow-hidden">
-            <h1 className="text-sm font-bold tracking-tight text-[#111827] truncate">
-              RGS ENTERPRISES
-            </h1>
-          </div>
+
+          {/* Desktop Sidebar Collapse Toggle Button */}
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              className="hidden lg:flex items-center justify-center p-1.5 rounded-xl text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] transition-colors shrink-0"
+              aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav
+          className={clsx(
+            'flex-1 py-4 space-y-1.5 overflow-y-auto',
+            isCollapsed ? 'px-2' : 'px-3'
+          )}
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
 
@@ -276,6 +318,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               const isGroupActive = location.pathname.startsWith(item.path);
               const isGroupOpen = openMenu === item.path;
               const defaultChildPath = item.children[0]?.path || item.path;
+
+              if (isCollapsed) {
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={defaultChildPath}
+                    onClick={(e) => handleNavClick(e, defaultChildPath)}
+                    onMouseEnter={() => prefetchRoute(defaultChildPath)}
+                    onFocus={() => prefetchRoute(defaultChildPath)}
+                    title={`${item.label} (${item.children.map((c) => c.label).join(' • ')})`}
+                    className={clsx(
+                      'flex items-center justify-center w-11 h-10 mx-auto rounded-xl transition-all duration-150',
+                      isGroupActive
+                        ? 'bg-[#0071E3] text-white shadow-apple-sm'
+                        : 'text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
+                    )}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                  </NavLink>
+                );
+              }
 
               return (
                 <div key={item.path} className="space-y-1">
@@ -343,6 +406,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             }
 
             // Standard NavItem
+            if (isCollapsed) {
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={(e) => handleNavClick(e, item.path)}
+                  onMouseEnter={() => prefetchRoute(item.path)}
+                  onFocus={() => prefetchRoute(item.path)}
+                  end={item.path === '/'}
+                  title={item.label}
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center justify-center w-11 h-10 mx-auto rounded-xl transition-all duration-150',
+                      isActive
+                        ? 'bg-[#0071E3] text-white shadow-apple-sm'
+                        : 'text-[#4B5563] hover:text-[#111827] hover:bg-[#F3F4F6]'
+                    )
+                  }
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                </NavLink>
+              );
+            }
+
             return (
               <NavLink
                 key={item.path}
@@ -368,35 +455,53 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </nav>
 
         {/* User Profile Card */}
-        <div className="p-3 border-t border-[#E5E7EB]">
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full border border-[#E5E7EB] bg-[#0071E3]/15 text-[#0071E3] font-bold text-xs flex items-center justify-center shrink-0">
+        <div className={clsx('border-t border-[#E5E7EB]', isCollapsed ? 'p-2' : 'p-3')}>
+          {isCollapsed ? (
+            <div className="flex flex-col items-center gap-2 py-1">
+              <div
+                className="w-8 h-8 rounded-full border border-[#E5E7EB] bg-[#0071E3]/15 text-[#0071E3] font-bold text-xs flex items-center justify-center shrink-0 cursor-default"
+                title={`${user?.fullName || user?.username || 'Administrator'} (${userRole})`}
+              >
                 {user?.fullName?.charAt(0) || user?.username?.charAt(0) || 'A'}
               </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-[#111827] truncate">
-                  {user?.fullName || user?.username || 'Administrator'}
-                </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] text-[#6B7280] truncate">
-                    {user?.email || user?.username || 'admin'}
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-[#0071E3]/10 text-[#0071E3] shrink-0">
-                    {userRole}
-                  </span>
+              <button
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2] transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#F9FAFB] border border-[#E5E7EB]">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-8 h-8 rounded-full border border-[#E5E7EB] bg-[#0071E3]/15 text-[#0071E3] font-bold text-xs flex items-center justify-center shrink-0">
+                  {user?.fullName?.charAt(0) || user?.username?.charAt(0) || 'A'}
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-xs font-semibold text-[#111827] truncate">
+                    {user?.fullName || user?.username || 'Administrator'}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] text-[#6B7280] truncate">
+                      {user?.email || user?.username || 'admin'}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-[#0071E3]/10 text-[#0071E3] shrink-0">
+                      {userRole}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <button
-              onClick={handleLogout}
-              title="Sign Out"
-              className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2] transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+              <button
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-1.5 rounded-xl text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2] transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>

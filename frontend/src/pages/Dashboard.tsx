@@ -15,6 +15,7 @@ import {
   Building,
   RefreshCw,
   Info,
+  CreditCard,
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
@@ -142,10 +143,10 @@ export const Dashboard: React.FC = () => {
             />
 
             <StatCard
-              title="Pending Rent"
-              value={formatCurrency(stats?.pendingRent || 0)}
-              subtitle={`Bills: ${formatCurrency(stats?.totalExpensesThisMonth || 0)}`}
-              icon={AlertTriangle}
+              title="Total Rent / Month"
+              value={formatCurrency(stats?.monthlyRentTotal || 0)}
+              subtitle="Monthly portfolio rent outflow"
+              icon={CreditCard}
               color="amber"
               onClick={() => navigate('/finance/rent')}
             />

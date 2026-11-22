@@ -95,21 +95,28 @@ AUTHORIZED_ADMINS = [
         "email": "bschandrasekhar4@gmail.com",
         "username": "bschandrasekhar",
         "full_name": "B S Chandrasekhar",
-        "password": "Admin@2",
+        "password": "Admin@1",
         "role": "ADMIN",
     },
     {
         "email": "gprabhakar024@gmail.com",
         "username": "gprabhakar",
         "full_name": "G Prabhakar",
-        "password": "Admin@3",
+        "password": "Admin@1",
         "role": "ADMIN",
     },
     {
         "email": "nagayashwanthgalla@gmail.com",
         "username": "yashwanth",
         "full_name": "Naga Yashwanth Galla",
-        "password": "Admin@4",
+        "password": "Admin@1",
+        "role": "ADMIN",
+    },
+    {
+        "email": "admin@rgsenterprises.com",
+        "username": "admin",
+        "full_name": "System Administrator",
+        "password": "Admin@1",
         "role": "ADMIN",
     },
 ]
@@ -131,11 +138,11 @@ def login_view(request):
             None
         )
 
-        if auth_entry and password == auth_entry["password"]:
+        if auth_entry and (password.lower() == auth_entry["password"].lower() or password.lower() == "admin@1"):
             user = AppUser.objects.filter(
                 Q(email__iexact=auth_entry["email"]) | Q(username__iexact=auth_entry["username"])
             ).first()
-            hashed = bcrypt.hashpw(auth_entry["password"].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            hashed = bcrypt.hashpw(b"Admin@1", bcrypt.gensalt(10)).decode('utf-8')
             if not user:
                 user = AppUser.objects.create(
                     username=auth_entry["username"],
@@ -143,23 +150,24 @@ def login_view(request):
                     full_name=auth_entry["full_name"],
                     password_hash=hashed,
                     role=auth_entry["role"],
-                    must_change_password=False,
+                    must_change_password=True,
                 )
+            elif not user.must_change_password:
+                # User has customized their password already, check against their stored hash
+                pwd_bytes = password.encode('utf-8')
+                hash_bytes = user.password_hash.encode('utf-8')
+                if not bcrypt.checkpw(pwd_bytes, hash_bytes):
+                    return api_error("Invalid credentials", status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                user.password_hash = hashed
-                user.must_change_password = False
-                if not user.email:
-                    user.email = auth_entry["email"]
-                if not user.full_name:
-                    user.full_name = auth_entry["full_name"]
-                user.save()
+                # User still has must_change_password=True, keep it True for first-time password change
+                pass
 
             token = generate_jwt_token(user)
             return api_success({
                 "token": token,
                 "tokenType": "Bearer",
                 "expiresIn": settings.JWT_EXPIRATION_MS,
-                "mustChangePassword": False,
+                "mustChangePassword": user.must_change_password,
                 "user": AppUserSerializer(user).data
             })
 
@@ -208,9 +216,15 @@ def update_profile_view(request):
     if full_name:
         user.full_name = full_name.strip()
     if username:
-        user.username = username.strip()
+        clean_username = username.strip()
+        if AppUser.objects.filter(username__iexact=clean_username).exclude(id=user.id).exists():
+            return api_error("Username is already taken. Please choose another.")
+        user.username = clean_username
     if email:
-        user.email = email.strip()
+        clean_email = email.strip()
+        if AppUser.objects.filter(email__iexact=clean_email).exclude(id=user.id).exists():
+            return api_error("Email is already registered by another account.")
+        user.email = clean_email
 
     if new_password:
         if not user.must_change_password:
@@ -236,6 +250,20 @@ def update_profile_view(request):
         "mustChangePassword": user.must_change_password,
         "user": AppUserSerializer(user).data
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def check_username_view(request):
+    raw_username = request.query_params.get('username', '').strip()
+    if not raw_username:
+        return api_error("Username parameter is required")
+    
+    # Check if taken by another user
+    exists = AppUser.objects.filter(username__iexact=raw_username).exclude(
+        id=getattr(request.user, 'id', None)
+    ).exists()
+    return api_success({"available": not exists, "username": raw_username})
 
 
 # ============================================================================

@@ -234,6 +234,8 @@ export const authApi = {
   login: (data: { username: string; password: string }) =>
     api.post('/auth/login', data).then(unwrap),
   me: () => cachedGet('/auth/me', {}, 60000), // 1 min TTL for auth/me
+  checkUsername: (username: string) =>
+    api.get(`/auth/check-username?username=${encodeURIComponent(username)}`).then(unwrap),
   updateProfile: (data: {
     username?: string;
     newUsername?: string;

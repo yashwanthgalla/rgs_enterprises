@@ -96,6 +96,7 @@ class FinanceRentSerializer(serializers.ModelSerializer):
 
 class GodownSerializer(serializers.ModelSerializer):
     erpName = serializers.CharField(source='erp_name', required=False, allow_null=True, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True, default='')
     locationAddress = serializers.CharField(source='location_address', required=False, allow_null=True, allow_blank=True)
     totalCapacity = serializers.DecimalField(source='total_capacity', max_digits=12, decimal_places=2, required=False, allow_null=True)
     sizeSqft = serializers.DecimalField(source='size_sqft', max_digits=12, decimal_places=2, required=False, allow_null=True)

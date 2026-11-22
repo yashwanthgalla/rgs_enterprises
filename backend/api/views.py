@@ -724,19 +724,26 @@ def godowns_view(request):
                 lh.code = generate_next_hub_code(lh_state)
                 lh.save(update_fields=['code'])
 
-        page = int(request.GET.get('page', 0))
+        page_raw = int(request.GET.get('page', 0))
+        # Support both 1-indexed (page=1) and 0-indexed (page=0) requests for the first page
+        page_index = max(0, page_raw - 1) if page_raw > 0 else 0
         size = int(request.GET.get('size', 50))
         search = request.GET.get('search', '').strip()
         status_filter = request.GET.get('status', '').strip()
+        show_deleted = str(request.GET.get('show_deleted', 'false')).lower() == 'true'
 
-        qs = Godown.objects.filter(is_deleted=False)
+        if show_deleted:
+            qs = Godown.objects.all()
+        else:
+            qs = Godown.objects.filter(is_deleted=False)
+
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(code__icontains=search) | Q(city__icontains=search) | Q(state__icontains=search))
         if status_filter:
             qs = qs.filter(status=status_filter)
 
         total_count = qs.count()
-        start = page * size
+        start = page_index * size
         end = start + size
         godowns = qs.order_by('id')[start:end]
 
@@ -745,7 +752,7 @@ def godowns_view(request):
             "content": data,
             "totalElements": total_count,
             "totalPages": (total_count + size - 1) // size if size > 0 else 1,
-            "number": page,
+            "number": page_raw,
             "size": size
         })
 
@@ -785,8 +792,14 @@ def godowns_view(request):
                 city = 'Hyderabad' if state.lower() in ('telangana', 'telengana') else state
         data['city'] = city
 
-        # 4. Accurate Google Location: generated directly from the entered location address
-        loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''
+        # 4. Accurate Address & Google Location: generated directly from location/city/state
+        loc = str(data.get('address') or data.get('locationAddress') or data.get('location') or '').strip()
+        if not loc:
+            loc = f"{city}, {state}" if city else state
+        data['address'] = loc
+        if not data.get('locationAddress'):
+            data['locationAddress'] = loc
+
         if not data.get('googleLocation') and not data.get('google_location') and str(loc).strip():
             import urllib.parse
             data['googleLocation'] = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(str(loc).strip())}"
@@ -879,8 +892,12 @@ def godown_detail_view(request, pk):
         else:
             data['code'] = godown.code
             
-        # Autogenerate googleLocation from location/address if not provided
-        loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''
+        # Autogenerate googleLocation and address from location/address if not provided
+        loc = str(data.get('address') or data.get('locationAddress') or data.get('location') or '').strip()
+        if loc:
+            data['address'] = loc
+            if not data.get('locationAddress'):
+                data['locationAddress'] = loc
         if not data.get('googleLocation') and not data.get('google_location') and str(loc).strip():
             import urllib.parse
             data['googleLocation'] = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(str(loc).strip())}"

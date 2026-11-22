@@ -276,10 +276,10 @@ export const Godowns: React.FC = () => {
   const hubsQuery = useQuery({
     queryKey: queryKeys.hubs.list({ page: 0, size: 100, showDeleted }),
     queryFn: async () => {
-      const res: any = await godownApi.getAll(0, 100, false, { show_deleted: showDeleted ? 'true' : 'false' });
+      const res: any = await godownApi.getAll(0, 100, true, { show_deleted: showDeleted ? 'true' : 'false' });
       return Array.isArray(res) ? res : res?.content || [];
     },
-    staleTime: STALE_TIMES.LONG_LIVED,
+    staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });
 

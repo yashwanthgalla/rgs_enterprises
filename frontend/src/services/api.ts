@@ -261,8 +261,8 @@ export const dashboardApi = {
 };
 
 export const godownApi = {
-  getAll: (page = 0, size = 50, skipCache = false, params?: any) =>
-    cachedGet('/hubs/', { params: { page: page + 1, size, ...params }, skipCache }, 20000).then((res: any) => {
+  getAll: (page = 0, size = 50, skipCache = true, params?: any) =>
+    cachedGet('/hubs/', { params: { page: page + 1, size, ...params }, skipCache: skipCache !== false }, 5000).then((res: any) => {
       if (res?.results) {
         return { content: res.results.map(normalizeGodown), totalElements: res.count };
       }
@@ -271,8 +271,8 @@ export const godownApi = {
       }
       return normalizeList(res, normalizeGodown);
     }),
-  getAllList: (skipCache = false) =>
-    cachedGet('/hubs/', { skipCache }, 30000).then((res: any) => {
+  getAllList: (skipCache = true) =>
+    cachedGet('/hubs/', { skipCache: skipCache !== false }, 5000).then((res: any) => {
       const list = res?.results || (Array.isArray(res) ? res : res?.content || []);
       return list.map(normalizeGodown);
     }),
@@ -288,16 +288,20 @@ export const godownApi = {
       ...res,
       cctvPassword: res?.password || res?.cctvPassword || '',
     })),
-  restore: (id: number | string) => api.post(`/hubs/${id}/restore/`).then(unwrap),
+  restore: (id: number | string) => {
+    clearApiCache();
+    return api.post(`/hubs/${id}/restore/`).then(unwrap);
+  },
   create: (data: any) => {
+    const locAddress = data.address || data.locationAddress || data.location || [data.city, data.state].filter(Boolean).join(', ') || 'Main Hub';
     const payload = {
       name: data.name || data.erpName,
       erpName: data.erpName || data.name,
       code: data.code || undefined,
       city: data.city || '',
       state: data.state || 'Telangana',
-      address: data.address || data.locationAddress || data.location || '',
-      locationAddress: data.locationAddress || data.address || data.location || '',
+      address: locAddress,
+      locationAddress: locAddress,
       pincode: data.pincode || '',
       sizeSqft: data.capacitySqFt ? Number(data.capacitySqFt) : (data.sizeSqft ? Number(data.sizeSqft) : 0),
       totalCapacity: data.capacitySqFt ? Number(data.capacitySqFt) : (data.totalCapacity ? Number(data.totalCapacity) : 0),
@@ -336,17 +340,21 @@ export const godownApi = {
       ownerAddress: data.ownerAddress || null,
       notes: data.notes || null,
     };
-    return api.post('/hubs/', payload).then(unwrap).then(normalizeGodown);
+    return api.post('/hubs/', payload).then(unwrap).then((res) => {
+      clearApiCache();
+      return normalizeGodown(res);
+    });
   },
   update: (id: number | string, data: any) => {
+    const locAddress = data.address || data.locationAddress || data.location || [data.city, data.state].filter(Boolean).join(', ') || 'Main Hub';
     const payload = {
       name: data.name || data.erpName,
       erpName: data.erpName || data.name,
       code: data.code || undefined,
       city: data.city || '',
       state: data.state || 'Telangana',
-      address: data.address || data.locationAddress || data.location || '',
-      locationAddress: data.locationAddress || data.address || data.location || '',
+      address: locAddress,
+      locationAddress: locAddress,
       pincode: data.pincode || '',
       sizeSqft: data.capacitySqFt ? Number(data.capacitySqFt) : (data.sizeSqft ? Number(data.sizeSqft) : 0),
       totalCapacity: data.capacitySqFt ? Number(data.capacitySqFt) : (data.totalCapacity ? Number(data.totalCapacity) : 0),
@@ -385,12 +393,23 @@ export const godownApi = {
       ownerAddress: data.ownerAddress || null,
       notes: data.notes || null,
     };
-    return api.put(`/hubs/${id}/`, payload).then(unwrap).then(normalizeGodown);
+    return api.put(`/hubs/${id}/`, payload).then(unwrap).then((res) => {
+      clearApiCache();
+      return normalizeGodown(res);
+    });
   },
   patch: (id: number | string, data: any) => {
-    return api.patch(`/hubs/${id}/`, data).then(unwrap).then(normalizeGodown);
+    return api.patch(`/hubs/${id}/`, data).then(unwrap).then((res) => {
+      clearApiCache();
+      return normalizeGodown(res);
+    });
   },
-  delete: (id: number | string) => api.delete(`/hubs/${id}/`).then(unwrap),
+  delete: (id: number | string) => {
+    return api.delete(`/hubs/${id}/`).then(unwrap).then((res) => {
+      clearApiCache();
+      return res;
+    });
+  },
 };
 
 export const hubApi = godownApi;

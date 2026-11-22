@@ -17,6 +17,10 @@ class AppUser(models.Model):
         managed = False
         db_table = 'auth_users'
 
+    @property
+    def is_authenticated(self):
+        return True
+
     def __str__(self):
         return f"{self.full_name} ({self.username})"
 

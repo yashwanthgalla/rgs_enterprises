@@ -73,10 +73,10 @@ const prefetchRoute = (path: string) => {
       queryClient.prefetchQuery({
         queryKey: queryKeys.hubs.list({ page: 0, size: 100, showDeleted: false }),
         queryFn: async () => {
-          const res: any = await godownApi.getAll(0, 100, false, { show_deleted: 'false' });
+          const res: any = await godownApi.getAll(0, 100, true, { show_deleted: 'false' });
           return Array.isArray(res) ? res : res?.content || [];
         },
-        staleTime: STALE_TIMES.LONG_LIVED,
+        staleTime: STALE_TIMES.DYNAMIC,
       });
     } else if (path.startsWith('/finance')) {
       queryClient.prefetchQuery({

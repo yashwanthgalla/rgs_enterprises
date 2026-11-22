@@ -31,7 +31,6 @@ import {
   ArrowRight,
   CreditCard,
   FileText,
-  Download,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -698,85 +697,6 @@ export const Godowns: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const handleExportHubs = () => {
-    if (godowns.length === 0) {
-      error('No hubs available to export.');
-      return;
-    }
-
-    const headers = [
-      'Hub ID',
-      'ERP Name',
-      'Current Tenant',
-      'Owner Name',
-      'Owner Mobile',
-      'Owner Address',
-      'State',
-      'City',
-      'Location Address',
-      'Google Maps Link',
-      'Total Capacity (Sq Ft)',
-      'Monthly Rent (INR)',
-      'Refundable Advance (INR)',
-      'Tenure (Months)',
-      'Lease Start Date',
-      'Lease End Date',
-      'Hub Status',
-      'Hub Model',
-      'Hub POC Name',
-      'Hub POC Contact',
-      'Operations POC Name',
-      'Operations POC Mobile',
-      'Labour Licence Available',
-      'Trade Licence Available',
-    ];
-
-    const escapeCsv = (val: any) => {
-      if (val === null || val === undefined) return '""';
-      const str = String(val).replace(/"/g, '""');
-      return `"${str}"`;
-    };
-
-    const rows = godowns.map((g) => [
-      escapeCsv(g.code || `HUB#${g.id}`),
-      escapeCsv(g.erpName || g.name),
-      escapeCsv(g.currentTenant || 'Vacant'),
-      escapeCsv(g.ownerName || g.leaseContactName || 'N/A'),
-      escapeCsv(g.leaseContactMobile || 'N/A'),
-      escapeCsv(g.ownerAddress || 'N/A'),
-      escapeCsv(g.state || 'N/A'),
-      escapeCsv(g.city || 'N/A'),
-      escapeCsv(g.locationAddress || g.address || 'N/A'),
-      escapeCsv(g.googleLocation || 'N/A'),
-      escapeCsv(g.totalCapacity || g.sizeSqft || 0),
-      escapeCsv(g.monthlyRent || 0),
-      escapeCsv(g.securityAdvance || g.refundableAdvance || 0),
-      escapeCsv(g.leaseDurationMonths || 'N/A'),
-      escapeCsv(g.leaseStartDate || 'N/A'),
-      escapeCsv(g.leaseEndDate || 'N/A'),
-      escapeCsv(g.status || g.hubStatus || 'ACTIVE'),
-      escapeCsv(g.hubModel || 'LDP'),
-      escapeCsv(g.hubPocName || 'N/A'),
-      escapeCsv(g.hubPocContact || 'N/A'),
-      escapeCsv(g.operationsPocName || g.opsPocName || 'N/A'),
-      escapeCsv(g.operationsPocMobile || g.opsPocMobile || 'N/A'),
-      escapeCsv(g.hasLabourLicence ? 'Yes' : 'No'),
-      escapeCsv(g.hasTradeLicence ? 'Yes' : 'No'),
-    ]);
-
-    const csvContent = '\ufeff' + [headers.map(escapeCsv).join(','), ...rows.map((r) => r.join(','))].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `rgs_hubs_registry_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    success('Hubs registry exported to Excel CSV successfully');
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       {/* Top Controls */}
@@ -794,14 +714,6 @@ export const Godowns: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleExportHubs}
-            icon={<Download className="w-4 h-4" />}
-            className="rounded-xl shadow-apple-sm"
-          >
-            Export Excel
-          </Button>
           {!isViewer && (
             <Button
               onClick={openCreateModal}

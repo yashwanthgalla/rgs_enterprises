@@ -60,3 +60,4 @@ def test_rent_agreement_and_invoice_lifecycle(auth_client_admin, state_ap, admin
     cost_res = client.post("/api/v1/finance/monthly-costs/", cost_payload, format="json")
     assert cost_res.status_code == status.HTTP_201_CREATED
     assert cost_res.data["totalMonthlyCost"] == "14700.00"
+

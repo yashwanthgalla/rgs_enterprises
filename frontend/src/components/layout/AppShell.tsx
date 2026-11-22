@@ -36,7 +36,7 @@ export const AppShell: React.FC = () => {
   return (
     <div className="min-h-screen bg-apple-bg dark:bg-apple-darkBg flex flex-col relative overflow-x-hidden">
       {/* Background Brand Watermark */}
-      <div className="site-bg-watermark" aria-hidden="true" />
+      <div className="site-bg-watermark app-shell-watermark" aria-hidden="true" />
 
       {/* Sidebar for Desktop & Mobile drawer - NEVER unmounts on route changes */}
       <Sidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />

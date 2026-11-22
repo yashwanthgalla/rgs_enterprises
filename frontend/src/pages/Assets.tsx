@@ -117,10 +117,14 @@ export const Assets: React.FC = () => {
   };
 
   const filteredAssets = assets.filter((a) => {
+    const q = searchQuery.toLowerCase();
+    const hub = godowns.find((g) => g.id === a.godownId);
     const matchesSearch =
-      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (a.serialNumber && a.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (a.godownName && a.godownName.toLowerCase().includes(searchQuery.toLowerCase()));
+      a.name.toLowerCase().includes(q) ||
+      (a.serialNumber && a.serialNumber.toLowerCase().includes(q)) ||
+      (a.godownCode && a.godownCode.toLowerCase().includes(q)) ||
+      (hub?.code && hub.code.toLowerCase().includes(q)) ||
+      (a.godownName && a.godownName.toLowerCase().includes(q));
     const matchesCategory = categoryFilter === 'ALL' || a.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -218,7 +222,11 @@ export const Assets: React.FC = () => {
                 <div className="mt-4 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
                   <p className="flex items-center gap-2">
                     <Building className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{asset.godownName || `Hub #${asset.godownId}`}</span>
+                    <span>
+                      {asset.godownId
+                        ? `[${asset.godownCode || (godowns.find((g) => g.id === asset.godownId)?.code) || `Hub #${asset.godownId}`}] ${asset.godownName || (godowns.find((g) => g.id === asset.godownId)?.erpName) || ''}`
+                        : 'General'}
+                    </span>
                   </p>
                   {asset.serialNumber && (
                     <p className="text-gray-400 font-mono text-[11px]">
@@ -287,7 +295,7 @@ export const Assets: React.FC = () => {
                 <option value="">-- Choose Hub --</option>
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
+                    [{g.code || `Hub #${g.id}`}] {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                   </option>
                 ))}
               </Select>

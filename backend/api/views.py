@@ -603,13 +603,14 @@ def generate_next_hub_code(state_name: str) -> str:
     """
     Generates sequential hub code starting with State code followed by # and 2-digit zero-padded number.
     e.g. Telangana -> TS#01, next hub in TS -> TS#02.
+    Uses lowest-gap filling so any deleted/available number is reclaimed first.
     """
     prefix = get_state_code(state_name) + '#'
     existing_codes = list(Godown.objects.filter(is_deleted=False).filter(
         Q(code__istartswith=prefix) | Q(state__iexact=state_name)
     ).values_list('code', flat=True))
 
-    max_num = 0
+    used_numbers = set()
     pattern = re.compile(rf'^{re.escape(prefix)}(\d+)$', re.IGNORECASE)
     for c in existing_codes:
         if not c:
@@ -617,9 +618,7 @@ def generate_next_hub_code(state_name: str) -> str:
         m = pattern.match(c.strip())
         if m:
             try:
-                num = int(m.group(1))
-                if num > max_num:
-                    max_num = num
+                used_numbers.add(int(m.group(1)))
             except ValueError:
                 pass
         else:
@@ -629,15 +628,58 @@ def generate_next_hub_code(state_name: str) -> str:
                 m2 = re.search(r'(\d+)$', c_str)
                 if m2:
                     try:
-                        num = int(m2.group(1))
-                        if num > max_num:
-                            max_num = num
+                        used_numbers.add(int(m2.group(1)))
                     except ValueError:
                         pass
 
-    next_num = max_num + 1
+    # Find lowest available positive integer candidate (gap-filling)
+    candidate = 1
+    while candidate in used_numbers:
+        candidate += 1
+
     # Hub code starts with 0 only (2-digit zero-padded: TS#01, TS#02)
-    return f"{prefix}{next_num:02d}"
+    return f"{prefix}{candidate:02d}"
+
+
+def resequence_hub_codes_for_state(state_name: str):
+    """
+    Ensures all active hubs in a state have contiguous, sequential Hub IDs (e.g. TS#01, TS#02, TS#03)
+    upon addition and deletion, leaving zero gaps.
+    """
+    if not state_name:
+        return
+    prefix = get_state_code(state_name) + '#'
+    pattern = re.compile(rf'^{re.escape(prefix)}(\d+)$', re.IGNORECASE)
+
+    active_hubs = list(Godown.objects.filter(is_deleted=False, state__iexact=state_name))
+    if not active_hubs:
+        return
+
+    def get_sort_key(h):
+        if h.code:
+            m = pattern.match(h.code.strip())
+            if m:
+                return (0, int(m.group(1)))
+            m2 = re.search(r'(\d+)$', h.code.strip())
+            if m2:
+                return (0, int(m2.group(1)))
+        return (1, h.id)
+
+    active_hubs.sort(key=get_sort_key)
+
+    # Pass 1: Set temporary codes to prevent unique constraint collisions
+    for idx, hub in enumerate(active_hubs, start=1):
+        target_code = f"{prefix}{idx:02d}"
+        if hub.code != target_code:
+            hub.code = f"TMP_{hub.id}_{target_code}"
+            hub.save(update_fields=['code'])
+
+    # Pass 2: Set clean contiguous sequential codes
+    for idx, hub in enumerate(active_hubs, start=1):
+        target_code = f"{prefix}{idx:02d}"
+        if hub.code != target_code:
+            hub.code = target_code
+            hub.save(update_fields=['code'])
 
 
 def get_godown_by_id_or_code(pk):
@@ -836,8 +878,15 @@ def godown_detail_view(request, pk):
         if 'locationAddress' in data and not data.get('address'):
             data['address'] = data['locationAddress']
 
-        # Normalize Hub Code if updated
-        if 'code' in data and data['code']:
+        # Check if state is changing
+        old_state = godown.state
+        new_state = data.get('state', godown.state)
+        state_changed = bool(new_state and old_state and str(new_state).strip().lower() != str(old_state).strip().lower())
+
+        # Normalize Hub Code if updated or state changed
+        if state_changed:
+            data['code'] = generate_next_hub_code(str(new_state).strip())
+        elif 'code' in data and data['code']:
             st = str(data.get('state', godown.state) or 'Telangana').strip()
             submitted = str(data['code']).strip()
             m = re.match(r'^([A-Za-z]{2}#)(\d+)$', submitted)
@@ -875,6 +924,11 @@ def godown_detail_view(request, pk):
                                 current_plan_end_date=item.get('currentPlanEndDate') or item.get('current_plan_end_date') or None,
                                 service_contact_number=item.get('serviceContactNumber') or item.get('service_contact_number'),
                             )
+
+                if state_changed:
+                    resequence_hub_codes_for_state(old_state)
+                    resequence_hub_codes_for_state(new_state)
+
             return api_success(GodownSerializer(updated).data)
         return api_error("Validation error", errors=serializer.errors)
 
@@ -889,6 +943,9 @@ def godown_detail_view(request, pk):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        hub_state = godown.state
+        released_code = godown.code
+
         with transaction.atomic():
             # Delete all related operational data
             HubBroadband.objects.filter(hub=godown).delete()
@@ -901,13 +958,18 @@ def godown_detail_view(request, pk):
             SalaryPayment.objects.filter(employee__in=hub_employees).delete()
             hub_employees.delete()
 
-            # Soft-delete the hub
+            # Soft-delete the hub and release the unique code constraint
+            import time
+            godown.code = f"DELETED_{int(time.time())}_{godown.id}_{released_code}"
             godown.is_deleted = True
             godown.save()
 
+            # Auto-resequence remaining active hubs in this state so codes stay contiguous and updated
+            resequence_hub_codes_for_state(hub_state)
+
         return api_success({
             "message": "Hub and all associated data deleted successfully",
-            "releasedCode": godown.code
+            "releasedCode": released_code
         })
 
 

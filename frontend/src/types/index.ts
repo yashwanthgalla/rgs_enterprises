@@ -146,6 +146,7 @@ export interface FinanceTotalRevenue {
   id: number;
   hubId: number;
   hubName?: string;
+  hubCode?: string;
   financialYear: string;
   rent: number;
   setupCostPerMonth: number;
@@ -163,6 +164,7 @@ export interface FinanceRent {
   id: number;
   hubId: number;
   hubName?: string;
+  hubCode?: string;
   period: string;
   rent: number;
   tdsPercent: number;
@@ -237,6 +239,8 @@ export interface Staff {
   godownId?: number;
   hubName?: string;
   godownName?: string;
+  hubCode?: string;
+  godownCode?: string;
   employeeCode?: string;
   fullName: string;
   role: string;
@@ -277,6 +281,8 @@ export interface DocumentItem {
   godownId?: number;
   hubName?: string;
   godownName?: string;
+  hubCode?: string;
+  godownCode?: string;
   title: string;
   documentType: 'LEASE_AGREEMENT' | 'TAX_RECEIPT' | 'UTILITY_BILL' | 'INSURANCE' | 'IDENTITY' | 'LABOUR_LICENCE' | 'TRADE_LICENCE' | 'OTHER';
   fileUrl: string;

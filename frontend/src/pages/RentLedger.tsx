@@ -149,10 +149,14 @@ export const RentLedger: React.FC = () => {
   const totalPending = Math.max(0, totalDue - totalCollected);
 
   const filteredRents = rents.filter((r) => {
+    const q = searchQuery.toLowerCase();
+    const hub = godowns.find((g) => g.id === r.godownId);
     const matchesSearch =
-      (r.tenantName && r.tenantName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (r.godownName && r.godownName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      r.month.toLowerCase().includes(searchQuery.toLowerCase());
+      (r.tenantName && r.tenantName.toLowerCase().includes(q)) ||
+      (r.godownName && r.godownName.toLowerCase().includes(q)) ||
+      (r.godownCode && r.godownCode.toLowerCase().includes(q)) ||
+      (hub?.code && hub.code.toLowerCase().includes(q)) ||
+      r.month.toLowerCase().includes(q);
     const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -283,7 +287,9 @@ export const RentLedger: React.FC = () => {
                     <tr key={r.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
                       <td className="py-3.5 px-3">
                         <p className="font-bold text-gray-900 dark:text-gray-100">{r.tenantName}</p>
-                        <p className="text-[11px] text-gray-400">{r.godownName || `Hub #${r.godownId}`}</p>
+                        <p className="text-[11px] text-gray-400">
+                          [{r.godownCode || (godowns.find((g) => g.id === r.godownId)?.code) || `Hub #${r.godownId}`}] {r.godownName || (godowns.find((g) => g.id === r.godownId)?.erpName) || ''}
+                        </p>
                       </td>
                       <td className="py-3.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
                         {r.month}
@@ -412,7 +418,7 @@ export const RentLedger: React.FC = () => {
               <option value="">-- Choose Hub --</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''} ({g.currentTenant || 'Vacant'})
+                  [{g.code || `Hub #${g.id}`}] {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''} ({g.currentTenant || 'Vacant'})
                 </option>
               ))}
             </Select>

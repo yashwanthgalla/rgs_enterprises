@@ -446,7 +446,7 @@ export const Finance: React.FC = () => {
               <option value="ALL">All Hubs / Portfolio</option>
               {hubs.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
+                  [{h.code || `Hub #${h.id}`}] {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
                 </option>
               ))}
             </select>
@@ -514,7 +514,7 @@ export const Finance: React.FC = () => {
                         className="hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors"
                       >
                         <td className="p-3.5 font-bold text-gray-900 dark:text-gray-100">
-                          {item.hubName || `Hub #${item.hubId}`}
+                          [{item.hubCode || (hubs.find((h) => h.id === item.hubId)?.code) || `Hub #${item.hubId}`}] {item.hubName || (hubs.find((h) => h.id === item.hubId)?.erpName) || ''}
                         </td>
                         <td className="p-3.5">
                           <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold text-[11px]">
@@ -613,7 +613,7 @@ export const Finance: React.FC = () => {
                         className="hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors"
                       >
                         <td className="p-3 font-bold text-gray-900 dark:text-gray-100">
-                          {item.hubName || `Hub #${item.hubId}`}
+                          [{item.hubCode || (hubs.find((h) => h.id === item.hubId)?.code) || `Hub #${item.hubId}`}] {item.hubName || (hubs.find((h) => h.id === item.hubId)?.erpName) || ''}
                         </td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold text-[11px]">
@@ -695,7 +695,7 @@ export const Finance: React.FC = () => {
                 <option value="">Select a Hub</option>
                 {hubs.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
+                    [{h.code || `Hub #${h.id}`}] {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
                   </option>
                 ))}
               </Select>
@@ -871,7 +871,7 @@ export const Finance: React.FC = () => {
                 <option value="">Select a Hub</option>
                 {hubs.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
+                    [{h.code || `Hub #${h.id}`}] {h.erpName || h.name}{h.city ? ` - ${h.city}` : ''}
                   </option>
                 ))}
               </Select>

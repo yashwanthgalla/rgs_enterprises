@@ -261,7 +261,14 @@ export const Dashboard: React.FC = () => {
                         className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] cursor-pointer transition-colors"
                       >
                         <td className="py-3 px-2 font-semibold text-gray-900 dark:text-gray-100">
-                          {g.name}
+                          <div className="flex items-center gap-2">
+                            {g.code && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-apple-accent/10 text-apple-accent dark:bg-apple-accent/20 font-bold shrink-0">
+                                {g.code}
+                              </span>
+                            )}
+                            <span className="truncate">{g.erpName || g.name}</span>
+                          </div>
                         </td>
                         <td className="py-3 px-2 text-gray-500 dark:text-gray-400">
                           {g.location}

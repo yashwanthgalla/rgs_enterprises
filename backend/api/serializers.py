@@ -39,6 +39,7 @@ class HubBroadbandSerializer(serializers.ModelSerializer):
 class FinanceTotalRevenueSerializer(serializers.ModelSerializer):
     hubId = serializers.IntegerField(source='hub_id')
     hubName = serializers.CharField(source='hub.erp_name', read_only=True)
+    hubCode = serializers.CharField(source='hub.code', read_only=True)
     financialYear = serializers.CharField(source='financial_year')
     rent = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
     setupCostPerMonth = serializers.DecimalField(source='setup_cost_per_month', max_digits=12, decimal_places=2, required=False, default=0)
@@ -54,7 +55,7 @@ class FinanceTotalRevenueSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinanceTotalRevenue
         fields = [
-            'id', 'hubId', 'hubName', 'financialYear', 'rent',
+            'id', 'hubId', 'hubName', 'hubCode', 'financialYear', 'rent',
             'setupCostPerMonth', 'electricity', 'wifi', 'manpower', 'housekeeping',
             'wmRefreshmentPettyCash', 'totalRevenue', 'createdAt', 'updatedAt'
         ]
@@ -63,6 +64,7 @@ class FinanceTotalRevenueSerializer(serializers.ModelSerializer):
 class FinanceRentSerializer(serializers.ModelSerializer):
     hubId = serializers.IntegerField(source='hub_id')
     hubName = serializers.CharField(source='hub.erp_name', read_only=True)
+    hubCode = serializers.CharField(source='hub.code', read_only=True)
     period = serializers.CharField()
     rent = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
     tdsPercent = serializers.DecimalField(source='tds_percent', max_digits=5, decimal_places=2, required=False, allow_null=True, default=10)
@@ -84,7 +86,7 @@ class FinanceRentSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinanceRent
         fields = [
-            'id', 'hubId', 'hubName', 'period', 'rent', 'tdsPercent', 'tdsAmount',
+            'id', 'hubId', 'hubName', 'hubCode', 'period', 'rent', 'tdsPercent', 'tdsAmount',
             'totalRentAfterTds', 'gstPercent', 'gstAmount', 'totalRentIncludingGst',
             'electricityBill', 'wifiBill', 'sorterPayments', 'pettyCash', 'total',
             'tdsApplied', 'gstApplied',
@@ -217,6 +219,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
 class EmployeeSerializer(serializers.ModelSerializer):
     godownId = serializers.IntegerField(source='godown_id', required=False, allow_null=True)
     godownName = serializers.CharField(source='godown.name', read_only=True)
+    godownCode = serializers.CharField(source='godown.code', read_only=True)
     fullName = serializers.CharField(source='full_name')
     phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     phoneNumber = serializers.CharField(source='phone', required=False, allow_blank=True, allow_null=True)
@@ -239,7 +242,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            'id', 'godownId', 'godownName', 'fullName', 'role', 'phone', 'phoneNumber', 'email',
+            'id', 'godownId', 'godownName', 'godownCode', 'fullName', 'role', 'phone', 'phoneNumber', 'email',
             'monthlySalary', 'joiningDate', 'status', 'isDeleted', 'createdAt', 'updatedAt'
         ]
 
@@ -248,6 +251,7 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
     employeeId = serializers.IntegerField(source='employee_id')
     employeeName = serializers.CharField(source='employee.full_name', read_only=True)
     godownName = serializers.CharField(source='employee.godown.name', read_only=True)
+    godownCode = serializers.CharField(source='employee.godown.code', read_only=True)
     paymentMonth = serializers.CharField(source='payment_month')
     paymentDate = serializers.DateField(source='payment_date', required=False, allow_null=True)
     paymentMode = serializers.CharField(source='payment_mode', required=False, allow_null=True)
@@ -258,7 +262,7 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalaryPayment
         fields = [
-            'id', 'employeeId', 'employeeName', 'godownName', 'paymentMonth',
+            'id', 'employeeId', 'employeeName', 'godownName', 'godownCode', 'paymentMonth',
             'amount', 'paymentDate', 'status', 'paymentMode', 'transactionRef',
             'notes', 'createdAt', 'updatedAt'
         ]

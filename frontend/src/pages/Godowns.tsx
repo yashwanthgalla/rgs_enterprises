@@ -146,7 +146,7 @@ const computeNextHubCode = (
 ): string => {
   const prefix = getStatePrefix(stateName) + '#';
   const regex = new RegExp(`^${prefix}(\\d+)$`, 'i');
-  let maxNum = 0;
+  const usedNumbers = new Set<number>();
 
   for (const g of existingGodowns) {
     if (excludeId && String(g.id) === String(excludeId)) continue;
@@ -155,22 +155,25 @@ const computeNextHubCode = (
     const match = code.match(regex);
     if (match) {
       const n = parseInt(match[1], 10);
-      if (!isNaN(n) && n > maxNum) {
-        maxNum = n;
+      if (!isNaN(n)) {
+        usedNumbers.add(n);
       }
     } else if (g.state && g.state.trim().toLowerCase() === stateName.trim().toLowerCase()) {
       const m2 = code.match(/(\d+)$/);
       if (m2) {
         const n = parseInt(m2[1], 10);
-        if (!isNaN(n) && n > maxNum) {
-          maxNum = n;
+        if (!isNaN(n)) {
+          usedNumbers.add(n);
         }
       }
     }
   }
 
-  const nextNum = maxNum + 1;
-  return `${prefix}${String(nextNum).padStart(2, '0')}`;
+  let candidate = 1;
+  while (usedNumbers.has(candidate)) {
+    candidate++;
+  }
+  return `${prefix}${String(candidate).padStart(2, '0')}`;
 };
 
 const calculateMonths = (startDate: string, endDate: string): number => {
@@ -674,6 +677,9 @@ export const Godowns: React.FC = () => {
     const matchesSearch =
       (g.name && g.name.toLowerCase().includes(term)) ||
       (g.erpName && g.erpName.toLowerCase().includes(term)) ||
+      (g.code && g.code.toLowerCase().includes(term)) ||
+      (g.city && g.city.toLowerCase().includes(term)) ||
+      (g.state && g.state.toLowerCase().includes(term)) ||
       (g.location && g.location.toLowerCase().includes(term)) ||
       (g.currentTenant && g.currentTenant.toLowerCase().includes(term)) ||
       (g.hubPocName && g.hubPocName.toLowerCase().includes(term));
@@ -932,12 +938,26 @@ export const Godowns: React.FC = () => {
               </h4>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <FormField label="ERP Name" required>
                 <Input
                   placeholder="e.g. Hub-01 IDA Cherlapally"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </FormField>
+
+              <FormField
+                label="Hub ID / Code"
+                required
+                hint="Auto-generated sequential ID based on State"
+              >
+                <Input
+                  placeholder="e.g. TS#01"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  className="font-mono font-bold text-apple-accent"
                   required
                 />
               </FormField>

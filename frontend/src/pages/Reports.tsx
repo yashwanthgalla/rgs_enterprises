@@ -483,7 +483,7 @@ export const Reports: React.FC = () => {
               >
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
+                    [{g.code || `Hub #${g.id}`}] {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                   </option>
                 ))}
               </Select>

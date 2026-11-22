@@ -195,10 +195,15 @@ export const StaffDirectory: React.FC = () => {
   const totalPayroll = staffList.reduce((acc, s) => acc + (s.monthlySalary || 0), 0);
 
   const filteredStaff = staffList.filter((s) => {
+    const q = searchQuery.toLowerCase();
+    const hub = godowns.find((g) => g.id === s.godownId);
     return (
-      s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.phoneNumber.includes(searchQuery)
+      s.fullName.toLowerCase().includes(q) ||
+      s.role.toLowerCase().includes(q) ||
+      s.phoneNumber.includes(q) ||
+      (s.godownCode && s.godownCode.toLowerCase().includes(q)) ||
+      (hub?.code && hub.code.toLowerCase().includes(q)) ||
+      (s.godownName && s.godownName.toLowerCase().includes(q))
     );
   });
 
@@ -299,7 +304,11 @@ export const StaffDirectory: React.FC = () => {
                   )}
                   <p className="flex items-center gap-2">
                     <Building className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{staff.godownName || (staff.godownId ? `Hub #${staff.godownId}` : 'All Hubs')}</span>
+                    <span>
+                      {staff.godownId
+                        ? `[${staff.godownCode || (godowns.find((g) => g.id === staff.godownId)?.code) || `Hub #${staff.godownId}`}] ${staff.godownName || (godowns.find((g) => g.id === staff.godownId)?.erpName) || ''}`
+                        : 'General (All Hubs)'}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -430,7 +439,7 @@ export const StaffDirectory: React.FC = () => {
               <option value="">General (All Hubs)</option>
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
+                  [{g.code || `Hub #${g.id}`}] {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                 </option>
               ))}
             </Select>

@@ -212,7 +212,9 @@ export const Documents: React.FC = () => {
                       </Badge>
                     </td>
                     <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300">
-                      {doc.godownName || (doc.godownId ? `Hub #${doc.godownId}` : 'Portfolio General')}
+                      {doc.godownId
+                        ? `[${doc.godownCode || (godowns.find((g) => g.id === doc.godownId)?.code) || `Hub #${doc.godownId}`}] ${doc.godownName || (godowns.find((g) => g.id === doc.godownId)?.erpName) || ''}`
+                        : 'Portfolio General'}
                     </td>
                     <td className="py-3.5 px-3 text-gray-400">
                       {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'}
@@ -283,7 +285,7 @@ export const Documents: React.FC = () => {
                 <option value="">General (All Hubs)</option>
                 {godowns.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
+                    [{g.code || `Hub #${g.id}`}] {g.erpName || g.name}{g.city ? ` - ${g.city}` : ''}
                   </option>
                 ))}
               </Select>

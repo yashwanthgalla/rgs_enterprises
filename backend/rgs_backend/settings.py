@@ -165,6 +165,25 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+cors_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_env:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_env.split(',') if o.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        'https://rgsenterprise.vercel.app',
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+    ]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://rgsenterprise.vercel.app',
+    'https://rgsenterprises-backend-two.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+]
+
 # REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

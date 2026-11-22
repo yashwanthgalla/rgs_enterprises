@@ -72,12 +72,29 @@ def generate_jwt_token(user):
 
 
 # ============================================================================
-# HEALTH CHECK
+# HEALTH CHECK & ROOT STATUS
 # ============================================================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):
     return Response({"status": "UP", "timestamp": timezone.now().isoformat()})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def root_view(request):
+    return Response({
+        "service": "RGS Enterprises API",
+        "status": "UP",
+        "version": "1.0.0",
+        "message": "RGS Enterprises Backend Service is live and operational.",
+        "endpoints": {
+            "health": "/health",
+            "api_root": "/api/v1/",
+            "auth": "/api/v1/auth/login"
+        },
+        "timestamp": timezone.now().isoformat()
+    })
 
 
 # ============================================================================

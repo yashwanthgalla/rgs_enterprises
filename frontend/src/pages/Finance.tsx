@@ -123,6 +123,7 @@ export const Finance: React.FC = () => {
     manpower: '',
     housekeeping: '',
     wmRefreshmentPettyCash: '',
+    others: '',
     totalRevenue: '',
   });
 
@@ -139,6 +140,7 @@ export const Finance: React.FC = () => {
     wifiBill: '',
     sorterPayments: '',
     pettyCash: '',
+    others: '',
     total: '',
   });
 
@@ -156,7 +158,8 @@ export const Finance: React.FC = () => {
     const manpower = parseFloat(form.manpower) || 0;
     const house = parseFloat(form.housekeeping) || 0;
     const wm = parseFloat(form.wmRefreshmentPettyCash) || 0;
-    return Number((rent + setup + elec + wifi + manpower + house + wm).toFixed(2));
+    const others = parseFloat(form.others) || 0;
+    return Number((rent + setup + elec + wifi + manpower + house + wm + others).toFixed(2));
   };
 
   // Rent Live Auto Calculations with Gated TDS & GST:
@@ -164,7 +167,7 @@ export const Finance: React.FC = () => {
   // Total Rent After TDS = Rent - TDS Amount
   // GST Amount = applyGst ? (Rent * 18%) : 0
   // Total Rent Including GST = Total Rent After TDS + GST Amount
-  // Total = Total Rent Including GST + Electricity Bill + WiFi Bill + Sorter Payments + Petty Cash
+  // Total = Total Rent Including GST + Electricity Bill + WiFi Bill + Sorter Payments + Petty Cash + Others
   const calcRentMath = (form: typeof rentForm) => {
     const rent = parseFloat(form.rent) || 0;
     const tdsAmount = form.applyTds ? Number((rent * 0.10).toFixed(2)) : 0;
@@ -175,7 +178,8 @@ export const Finance: React.FC = () => {
     const wifi = parseFloat(form.wifiBill) || 0;
     const sorter = parseFloat(form.sorterPayments) || 0;
     const petty = parseFloat(form.pettyCash) || 0;
-    const total = Number((totalRentIncludingGst + elec + wifi + sorter + petty).toFixed(2));
+    const others = parseFloat(form.others) || 0;
+    const total = Number((totalRentIncludingGst + elec + wifi + sorter + petty + others).toFixed(2));
 
     return {
       rent,
@@ -187,6 +191,7 @@ export const Finance: React.FC = () => {
       wifi,
       sorter,
       petty,
+      others,
       total,
     };
   };
@@ -204,6 +209,7 @@ export const Finance: React.FC = () => {
       manpower: '',
       housekeeping: '',
       wmRefreshmentPettyCash: '',
+      others: '',
       totalRevenue: '',
     });
     setIsRevenueModalOpen(true);
@@ -221,6 +227,7 @@ export const Finance: React.FC = () => {
       manpower: String(item.manpower || ''),
       housekeeping: String(item.housekeeping || ''),
       wmRefreshmentPettyCash: String(item.wmRefreshmentPettyCash || ''),
+      others: String(item.others || ''),
       totalRevenue: String(item.totalRevenue ?? ''),
     });
     setIsRevenueModalOpen(true);
@@ -258,6 +265,7 @@ export const Finance: React.FC = () => {
         manpower: Number(parseFloat(revenueForm.manpower || '0').toFixed(2)),
         housekeeping: Number(parseFloat(revenueForm.housekeeping || '0').toFixed(2)),
         wmRefreshmentPettyCash: Number(parseFloat(revenueForm.wmRefreshmentPettyCash || '0').toFixed(2)),
+        others: Number(parseFloat(revenueForm.others || '0').toFixed(2)),
         totalRevenue: finalTotal,
       };
 
@@ -307,6 +315,7 @@ export const Finance: React.FC = () => {
       wifiBill: '',
       sorterPayments: '',
       pettyCash: '',
+      others: '',
       total: '',
     });
     setIsRentModalOpen(true);
@@ -333,6 +342,7 @@ export const Finance: React.FC = () => {
       wifiBill: String(item.wifiBill || ''),
       sorterPayments: String(item.sorterPayments || ''),
       pettyCash: String(item.pettyCash || ''),
+      others: String(item.others || ''),
       total: String(item.total ?? ''),
     });
     setIsRentModalOpen(true);
@@ -390,6 +400,7 @@ export const Finance: React.FC = () => {
         wifiBill: math.wifi,
         sorterPayments: math.sorter,
         pettyCash: math.petty,
+        others: math.others,
         total: finalTotal,
       };
 
@@ -514,6 +525,7 @@ export const Finance: React.FC = () => {
                       <th className="p-3.5 text-right">Manpower</th>
                       <th className="p-3.5 text-right">Housekeeping</th>
                       <th className="p-3.5 text-right">WM & Petty Cash</th>
+                      <th className="p-3.5 text-right">Others</th>
                       <th className="p-3.5 text-right font-bold text-apple-accent">Total Revenue</th>
                       <th className="p-3.5 text-center">Actions</th>
                     </tr>
@@ -539,6 +551,7 @@ export const Finance: React.FC = () => {
                         <td className="p-3.5 text-right">{formatCurrency(item.manpower)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.housekeeping)}</td>
                         <td className="p-3.5 text-right">{formatCurrency(item.wmRefreshmentPettyCash)}</td>
+                        <td className="p-3.5 text-right">{formatCurrency(item.others || 0)}</td>
                         <td className="p-3.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(item.totalRevenue)}
                         </td>
@@ -613,6 +626,7 @@ export const Finance: React.FC = () => {
                       <th className="p-3 text-right">WiFi</th>
                       <th className="p-3 text-right">Sorter</th>
                       <th className="p-3 text-right">Petty Cash</th>
+                      <th className="p-3 text-right">Others</th>
                       <th className="p-3 text-right font-bold text-apple-accent">Total</th>
                       <th className="p-3 text-center">Actions</th>
                     </tr>
@@ -656,6 +670,7 @@ export const Finance: React.FC = () => {
                         <td className="p-3 text-right">{formatCurrency(item.wifiBill)}</td>
                         <td className="p-3 text-right">{formatCurrency(item.sorterPayments)}</td>
                         <td className="p-3 text-right">{formatCurrency(item.pettyCash)}</td>
+                        <td className="p-3 text-right">{formatCurrency(item.others || 0)}</td>
                         <td className="p-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(item.total)}
                         </td>
@@ -802,6 +817,17 @@ export const Finance: React.FC = () => {
                 placeholder="0.00"
                 value={revenueForm.wmRefreshmentPettyCash}
                 onChange={(e) => handleRevenueFieldChange('wmRefreshmentPettyCash', e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="Others / Misc Inflow (₹)">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={revenueForm.others}
+                onChange={(e) => handleRevenueFieldChange('others', e.target.value)}
               />
             </FormField>
           </div>
@@ -951,6 +977,17 @@ export const Finance: React.FC = () => {
                 placeholder="e.g. 2500"
                 value={rentForm.pettyCash}
                 onChange={(e) => handleRentFieldChange('pettyCash', e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="Others / Misc Outflow (₹)">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={rentForm.others}
+                onChange={(e) => handleRentFieldChange('others', e.target.value)}
               />
             </FormField>
           </div>

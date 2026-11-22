@@ -155,6 +155,7 @@ export interface FinanceTotalRevenue {
   manpower: number;
   housekeeping: number;
   wmRefreshmentPettyCash: number;
+  others?: number;
   totalRevenue: number;
   createdAt?: string;
   updatedAt?: string;
@@ -177,6 +178,7 @@ export interface FinanceRent {
   wifiBill: number;
   sorterPayments: number;
   pettyCash: number;
+  others?: number;
   total: number;
   tdsApplied?: boolean;
   gstApplied?: boolean;

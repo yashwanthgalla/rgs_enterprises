@@ -1066,7 +1066,8 @@ def finance_total_revenue_view(request):
         manpower = Decimal(str(data.get('manpower') or '0'))
         housekeeping = Decimal(str(data.get('housekeeping') or '0'))
         wm = Decimal(str(data.get('wmRefreshmentPettyCash') or '0'))
-        computed_rev = rent + setup_cost + electricity + wifi + manpower + housekeeping + wm
+        others = Decimal(str(data.get('others') or '0'))
+        computed_rev = rent + setup_cost + electricity + wifi + manpower + housekeeping + wm + others
         if 'totalRevenue' in data and data.get('totalRevenue') is not None and str(data.get('totalRevenue')).strip() != '':
             data['totalRevenue'] = Decimal(str(data.get('totalRevenue')))
         else:
@@ -1107,7 +1108,8 @@ def finance_total_revenue_detail_view(request, pk):
         manpower = Decimal(str(data.get('manpower', obj.manpower) or '0'))
         housekeeping = Decimal(str(data.get('housekeeping', obj.housekeeping) or '0'))
         wm = Decimal(str(data.get('wmRefreshmentPettyCash', obj.wm_refreshment_petty_cash) or '0'))
-        computed_rev = rent + setup_cost + electricity + wifi + manpower + housekeeping + wm
+        others = Decimal(str(data.get('others', getattr(obj, 'others', 0)) or '0'))
+        computed_rev = rent + setup_cost + electricity + wifi + manpower + housekeeping + wm + others
         if 'totalRevenue' in data and data.get('totalRevenue') is not None and str(data.get('totalRevenue')).strip() != '':
             data['totalRevenue'] = Decimal(str(data.get('totalRevenue')))
         else:
@@ -1178,7 +1180,8 @@ def finance_rent_view(request):
         wifi_bill = Decimal(str(data.get('wifiBill') or '0'))
         sorter_pay = Decimal(str(data.get('sorterPayments') or '0'))
         petty_cash = Decimal(str(data.get('pettyCash') or '0'))
-        computed_total = rent_inc_gst + elec_bill + wifi_bill + sorter_pay + petty_cash
+        others = Decimal(str(data.get('others') or '0'))
+        computed_total = rent_inc_gst + elec_bill + wifi_bill + sorter_pay + petty_cash + others
 
         data['tdsApplied'] = tds_applied
         data['gstApplied'] = gst_applied
@@ -1188,6 +1191,7 @@ def finance_rent_view(request):
         data['totalRentIncludingGst'] = rent_inc_gst
         data['electricityBill'] = elec_bill
         data['wifiBill'] = wifi_bill
+        data['others'] = others
         if 'total' in data and data.get('total') is not None and str(data.get('total')).strip() != '':
             data['total'] = Decimal(str(data.get('total')))
         else:
@@ -1255,7 +1259,8 @@ def finance_rent_detail_view(request, pk):
         wifi_bill = Decimal(str(data.get('wifiBill', getattr(obj, 'wifi_bill', 0)) or '0'))
         sorter_pay = Decimal(str(data.get('sorterPayments', obj.sorter_payments) or '0'))
         petty_cash = Decimal(str(data.get('pettyCash', obj.petty_cash) or '0'))
-        computed_total = rent_inc_gst + elec_bill + wifi_bill + sorter_pay + petty_cash
+        others = Decimal(str(data.get('others', getattr(obj, 'others', 0)) or '0'))
+        computed_total = rent_inc_gst + elec_bill + wifi_bill + sorter_pay + petty_cash + others
 
         data['tdsApplied'] = tds_applied
         data['gstApplied'] = gst_applied
@@ -1265,6 +1270,7 @@ def finance_rent_detail_view(request, pk):
         data['totalRentIncludingGst'] = rent_inc_gst
         data['electricityBill'] = elec_bill
         data['wifiBill'] = wifi_bill
+        data['others'] = others
         if 'total' in data and data.get('total') is not None and str(data.get('total')).strip() != '':
             data['total'] = Decimal(str(data.get('total')))
         else:
@@ -1874,8 +1880,8 @@ def reports_export_csv_view(request):
     template_headers = [
         'Vendor', 'Hub Status', 'State', 'Hub Model', 'Owner', 'ERP Name',
         'Start Date', 'End Date', 'Tenure', 'Area',
-        'Rent', 'Setup Cost/Month', 'Electricity', 'WiFi', 'Manpower', 'Housekeeping', 'WM Refreshment/Petty Cash', 'Total Revenue',
-        'Rent', 'TDS 10 %', 'TDS Amount', 'Total Rent After TDS', 'GST 18%', 'Total Rent Including GST', 'Electricity Bill', 'WiFi Bill', 'Sorter Payments', 'Petty Cash', 'Total',
+        'Rent', 'Setup Cost/Month', 'Electricity', 'WiFi', 'Manpower', 'Housekeeping', 'WM Refreshment/Petty Cash', 'Others', 'Total Revenue',
+        'Rent', 'TDS 10 %', 'TDS Amount', 'Total Rent After TDS', 'GST 18%', 'Total Rent Including GST', 'Electricity Bill', 'WiFi Bill', 'Sorter Payments', 'Petty Cash', 'Others', 'Total',
         'Profit', 'Margin', 'Status'
     ]
 
@@ -1914,7 +1920,8 @@ def reports_export_csv_view(request):
         manpower = float(f_rev.manpower) if (f_rev and f_rev.manpower is not None) else 0.0
         housekeeping = float(f_rev.housekeeping) if (f_rev and f_rev.housekeeping is not None) else 0.0
         petty_cash_rev = float(f_rev.wm_refreshment_petty_cash) if (f_rev and f_rev.wm_refreshment_petty_cash is not None) else 0.0
-        total_revenue = float(f_rev.total_revenue) if (f_rev and f_rev.total_revenue is not None) else (rev_rent + setup_cost + electricity_rev + wifi_rev + manpower + housekeeping + petty_cash_rev)
+        others_rev = float(f_rev.others) if (f_rev and getattr(f_rev, 'others', None) is not None) else 0.0
+        total_revenue = float(f_rev.total_revenue) if (f_rev and f_rev.total_revenue is not None) else (rev_rent + setup_cost + electricity_rev + wifi_rev + manpower + housekeeping + petty_cash_rev + others_rev)
 
         sum_rev_rent = 0.0
         sum_setup_cost = 0.0
@@ -1923,6 +1930,7 @@ def reports_export_csv_view(request):
         sum_manpower = 0.0
         sum_housekeeping = 0.0
         sum_petty_rev = 0.0
+        sum_others_rev = 0.0
         sum_total_rev = 0.0
 
         sum_rent_outflow = 0.0
@@ -1933,6 +1941,7 @@ def reports_export_csv_view(request):
         sum_wifi_bill = 0.0
         sum_sorter = 0.0
         sum_petty_rent = 0.0
+        sum_others_rent = 0.0
         sum_total_rent = 0.0
         sum_profit = 0.0
         sum_margin = 0.0
@@ -1991,7 +2000,8 @@ def reports_export_csv_view(request):
                 wifi_bill = float(getattr(f_rent, 'wifi_bill', 0) or 0)
                 sorter_payments = float(f_rent.sorter_payments or 0)
                 petty_cash_rent = float(f_rent.petty_cash or 0)
-                total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + wifi_bill + sorter_payments + petty_cash_rent))
+                others_rent = float(getattr(f_rent, 'others', 0) or 0)
+                total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + wifi_bill + sorter_payments + petty_cash_rent + others_rent))
 
                 profit = total_revenue - total_rent
                 margin = profit - setup_cost
@@ -2004,6 +2014,7 @@ def reports_export_csv_view(request):
                 sum_manpower += manpower
                 sum_housekeeping += housekeeping
                 sum_petty_rev += petty_cash_rev
+                sum_others_rev += others_rev
                 sum_total_rev += total_revenue
 
                 sum_rent_outflow += rent_val
@@ -2014,6 +2025,7 @@ def reports_export_csv_view(request):
                 sum_wifi_bill += wifi_bill
                 sum_sorter += sorter_payments
                 sum_petty_rent += petty_cash_rent
+                sum_others_rent += others_rent
                 sum_total_rent += total_rent
                 sum_profit += profit
                 sum_margin += margin
@@ -2021,8 +2033,8 @@ def reports_export_csv_view(request):
                 writer.writerow([
                     month_label, vendor_name, hub_status, state, hub_model, owner, erp_name,
                     start_date, end_date, tenure, area,
-                    round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
-                    round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(wifi_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+                    round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(others_rev, 2), round(total_revenue, 2),
+                    round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(wifi_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(others_rent, 2), round(total_rent, 2),
                     round(profit, 2), round(margin, 2), status_text
                 ])
 
@@ -2030,8 +2042,8 @@ def reports_export_csv_view(request):
             writer.writerow([
                 f'TOTAL ({len(f_rent_records)} Month{"s" if len(f_rent_records) != 1 else ""})', vendor_name, hub_status, state, hub_model, owner, erp_name,
                 start_date, end_date, tenure, area,
-                round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_wifi_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
-                round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_wifi_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+                round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_wifi_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_others_rev, 2), round(sum_total_rev, 2),
+                round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_wifi_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_others_rent, 2), round(sum_total_rent, 2),
                 round(sum_profit, 2), round(sum_margin, 2), 'Done'
             ])
 
@@ -2097,8 +2109,8 @@ def reports_export_csv_view(request):
             writer.writerow([
                 'No entered monthly records', vendor_name, hub_status, state, hub_model, owner, erp_name,
                 start_date, end_date, tenure, area,
-                round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
-                0, '10.0%', 0, 0, '18.0%', 0, 0, 0, 0, 0, 0,
+                round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(others_rev, 2), round(total_revenue, 2),
+                0, '10.0%', 0, 0, '18.0%', 0, 0, 0, 0, 0, 0, 0,
                 round(total_revenue, 2), round(total_revenue - setup_cost, 2), 'Pending'
             ])
 
@@ -2119,6 +2131,7 @@ def reports_export_csv_view(request):
     sum_manpower = 0.0
     sum_housekeeping = 0.0
     sum_petty_rev = 0.0
+    sum_others_rev = 0.0
     sum_total_rev = 0.0
 
     sum_rent_outflow = 0.0
@@ -2129,6 +2142,7 @@ def reports_export_csv_view(request):
     sum_wifi_bill = 0.0
     sum_sorter = 0.0
     sum_petty_rent = 0.0
+    sum_others_rent = 0.0
     sum_total_rent = 0.0
     sum_profit = 0.0
     sum_margin = 0.0
@@ -2153,7 +2167,8 @@ def reports_export_csv_view(request):
         manpower = float(f_rev.manpower) if (f_rev and f_rev.manpower is not None) else 0.0
         housekeeping = float(f_rev.housekeeping) if (f_rev and f_rev.housekeeping is not None) else 0.0
         petty_cash_rev = float(f_rev.wm_refreshment_petty_cash) if (f_rev and f_rev.wm_refreshment_petty_cash is not None) else 0.0
-        total_revenue = float(f_rev.total_revenue) if (f_rev and f_rev.total_revenue is not None) else (rev_rent + setup_cost + electricity_rev + wifi_rev + manpower + housekeeping + petty_cash_rev)
+        others_rev = float(f_rev.others) if (f_rev and getattr(f_rev, 'others', None) is not None) else 0.0
+        total_revenue = float(f_rev.total_revenue) if (f_rev and f_rev.total_revenue is not None) else (rev_rent + setup_cost + electricity_rev + wifi_rev + manpower + housekeeping + petty_cash_rev + others_rev)
 
         # Rent outflow (current month or latest)
         now_month_str = timezone.now().strftime('%Y-%m')
@@ -2191,7 +2206,8 @@ def reports_export_csv_view(request):
             wifi_bill = float(getattr(f_rent, 'wifi_bill', 0) or 0)
             sorter_payments = float(f_rent.sorter_payments or 0)
             petty_cash_rent = float(f_rent.petty_cash or 0)
-            total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + wifi_bill + sorter_payments + petty_cash_rent))
+            others_rent = float(getattr(f_rent, 'others', 0) or 0)
+            total_rent = float(f_rent.total if f_rent.total is not None else (rent_inc_gst + electricity_bill + wifi_bill + sorter_payments + petty_cash_rent + others_rent))
         else:
             rent_val = float(godown.monthly_rent or 0)
             tds_pct = 10.0
@@ -2203,6 +2219,7 @@ def reports_export_csv_view(request):
             wifi_bill = 0.0
             sorter_payments = 0.0
             petty_cash_rent = 0.0
+            others_rent = 0.0
             total_rent = rent_val
 
         profit = total_revenue - total_rent
@@ -2217,6 +2234,7 @@ def reports_export_csv_view(request):
         sum_manpower += manpower
         sum_housekeeping += housekeeping
         sum_petty_rev += petty_cash_rev
+        sum_others_rev += others_rev
         sum_total_rev += total_revenue
 
         sum_rent_outflow += rent_val
@@ -2227,6 +2245,7 @@ def reports_export_csv_view(request):
         sum_wifi_bill += wifi_bill
         sum_sorter += sorter_payments
         sum_petty_rent += petty_cash_rent
+        sum_others_rent += others_rent
         sum_total_rent += total_rent
         sum_profit += profit
         sum_margin += margin
@@ -2234,16 +2253,16 @@ def reports_export_csv_view(request):
         writer.writerow([
             vendor_name, hub_status, state, hub_model, owner, erp_name,
             start_date, end_date, tenure, area,
-            round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(total_revenue, 2),
-            round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(wifi_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(total_rent, 2),
+            round(rev_rent, 2), round(setup_cost, 2), round(electricity_rev, 2), round(wifi_rev, 2), round(manpower, 2), round(housekeeping, 2), round(petty_cash_rev, 2), round(others_rev, 2), round(total_revenue, 2),
+            round(rent_val, 2), f"{round(tds_pct, 1)}%", round(tds_amt, 2), round(rent_after_tds, 2), f"{round(gst_pct, 1)}%", round(rent_inc_gst, 2), round(electricity_bill, 2), round(wifi_bill, 2), round(sorter_payments, 2), round(petty_cash_rent, 2), round(others_rent, 2), round(total_rent, 2),
             round(profit, 2), round(margin, 2), status_text
         ])
 
     writer.writerow([
         'TOTAL', '', '', '', '', f"{len(godowns)} Hubs",
         '', '', '', round(sum_area, 2),
-        round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_wifi_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_total_rev, 2),
-        round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_wifi_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_total_rent, 2),
+        round(sum_rev_rent, 2), round(sum_setup_cost, 2), round(sum_elec_rev, 2), round(sum_wifi_rev, 2), round(sum_manpower, 2), round(sum_housekeeping, 2), round(sum_petty_rev, 2), round(sum_others_rev, 2), round(sum_total_rev, 2),
+        round(sum_rent_outflow, 2), '', round(sum_tds_amt, 2), round(sum_rent_after_tds, 2), '', round(sum_rent_inc_gst, 2), round(sum_elec_bill, 2), round(sum_wifi_bill, 2), round(sum_sorter, 2), round(sum_petty_rent, 2), round(sum_others_rent, 2), round(sum_total_rent, 2),
         round(sum_profit, 2), round(sum_margin, 2), 'Done'
     ])
 

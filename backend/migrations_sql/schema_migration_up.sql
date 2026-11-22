@@ -103,3 +103,8 @@ CREATE TABLE IF NOT EXISTS finance_rent (
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_rent_hub_period ON finance_rent(hub_id, period);
+
+-- 6. Add 'others' columns to hub finance tables
+ALTER TABLE hub_yearly_revenues ADD COLUMN IF NOT EXISTS others NUMERIC(12,2) DEFAULT 0.00;
+ALTER TABLE hub_monthly_rents ADD COLUMN IF NOT EXISTS others NUMERIC(12,2) DEFAULT 0.00;
+

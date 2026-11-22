@@ -31,7 +31,6 @@ import {
   ArrowRight,
   CreditCard,
   FileText,
-  Lock,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -945,7 +944,7 @@ export const Godowns: React.FC = () => {
               </h4>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField label="ERP Name" required>
                 <Input
                   placeholder="e.g. Hub-01 IDA Cherlapally"
@@ -953,23 +952,6 @@ export const Godowns: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
-              </FormField>
-
-              <FormField
-                label="Hub ID / Code"
-                hint="Auto-generated sequential ID (System Managed)"
-              >
-                <div className="relative">
-                  <Input
-                    placeholder="e.g. TS#01"
-                    value={formData.code}
-                    readOnly
-                    disabled
-                    tabIndex={-1}
-                    className="font-mono font-bold text-apple-accent bg-black/[0.04] dark:bg-white/[0.05] border-black/[0.1] dark:border-white/[0.1] cursor-not-allowed select-none pl-9"
-                  />
-                  <Lock className="w-4 h-4 text-apple-accent/70 absolute left-3 top-3 pointer-events-none" />
-                </div>
               </FormField>
 
               <FormField label="Current Tenant" required>

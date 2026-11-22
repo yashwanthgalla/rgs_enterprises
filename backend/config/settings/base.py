@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'corsheaders',
 
     # Internal Domain Applications
+    'api',
     'apps.core',
     'apps.accounts',
     'apps.hubs',
@@ -50,6 +51,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'config.urls'
+APPEND_SLASH = False
 
 TEMPLATES = [
     {
@@ -112,4 +114,26 @@ BREVO_SMTP_PASSWORD = os.getenv('BREVO_SMTP_KEY', '')
 # Supabase Storage Settings
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
-SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', 'hub-documents')
+SUPABASE_STORAGE_BUCKET = os.getenv('STORAGE_BUCKET', os.getenv('SUPABASE_STORAGE_BUCKET', 'godown-documents'))
+
+# CORS & CSRF Settings
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CSRF_TRUSTED_ORIGINS = [
+    'https://rgsenterprise.vercel.app',
+    'https://rgsenterprises-backend-two.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+]

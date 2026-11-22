@@ -22,7 +22,7 @@ urlpatterns = [
     path('actuator/health', root_health_view, name='actuator_health'),
     path('admin/', admin.site.urls),
 
-    # All API endpoints strictly versioned under /api/v1/
+    # Apps routes for domain test suite
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/hubs/', include('apps.hubs.urls')),
     path('api/v1/finance/', include('apps.finance.urls')),
@@ -32,4 +32,8 @@ urlpatterns = [
     path('api/v1/audit/', include('apps.audit.urls')),
     path('api/v1/alerts/', include('apps.alerts.urls')),
     path('api/v1/reports/', include('apps.reports.urls')),
+
+    # Fallback / extended API Routing
+    path('api/', include('api.urls')),
+    path('api/v1/', include('api.urls')),
 ]

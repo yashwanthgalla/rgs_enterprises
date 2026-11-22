@@ -7,11 +7,17 @@ urlpatterns = [
 
     # Auth
     path('auth/login', views.login_view, name='login'),
+    path('auth/login/', views.login_view, name='login_slash'),
     path('auth/me', views.me_view, name='me'),
+    path('auth/me/', views.me_view, name='me_slash'),
     path('auth/profile', views.update_profile_view, name='update_profile'),
+    path('auth/profile/', views.update_profile_view, name='update_profile_slash'),
     path('auth/check-username', views.check_username_view, name='check_username'),
+    path('auth/check-username/', views.check_username_view, name='check_username_slash'),
     path('auth/forgot-password/send-otp', views.send_forgot_password_otp_view, name='forgot_password_send_otp'),
+    path('auth/forgot-password/send-otp/', views.send_forgot_password_otp_view, name='forgot_password_send_otp_slash'),
     path('auth/forgot-password/verify-reset', views.verify_otp_and_reset_password_view, name='forgot_password_verify_reset'),
+    path('auth/forgot-password/verify-reset/', views.verify_otp_and_reset_password_view, name='forgot_password_verify_reset_slash'),
     path('auth/copy-otp', views.copy_otp_redirect_view, name='copy_otp_redirect'),
     path('auth/copy-otp/', views.copy_otp_redirect_view, name='copy_otp_redirect_slash'),
 

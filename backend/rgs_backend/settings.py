@@ -41,6 +41,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'rgs_backend.urls'
+APPEND_SLASH = False
 
 TEMPLATES = [
     {

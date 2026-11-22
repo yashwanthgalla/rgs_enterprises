@@ -762,18 +762,8 @@ def godowns_view(request):
         state = str(data.get('state') or 'Telangana').strip()
         data['state'] = state
 
-        # 2. Sequential Hub Code: State prefix + # + zero-padded number (e.g. TS#01, TS#02)
-        submitted_code = str(data.get('code') or '').strip()
-        if not submitted_code or submitted_code.upper().startswith('HUB-'):
-            data['code'] = generate_next_hub_code(state)
-        else:
-            # Normalize zero-padding (e.g. TS#1 -> TS#01)
-            prefix = get_state_code(state) + '#'
-            m = re.match(r'^([A-Za-z]{2}#)(\d+)$', submitted_code)
-            if m:
-                data['code'] = f"{m.group(1).upper()}{int(m.group(2)):02d}"
-            else:
-                data['code'] = submitted_code
+        # 2. Sequential Hub Code: Always strictly automated by system based on State (no manual tampering)
+        data['code'] = generate_next_hub_code(state)
 
         # 3. Accurate City: strictly preserved as entered by admin
         city = str(data.get('city') or '').strip()
@@ -883,15 +873,11 @@ def godown_detail_view(request, pk):
         new_state = data.get('state', godown.state)
         state_changed = bool(new_state and old_state and str(new_state).strip().lower() != str(old_state).strip().lower())
 
-        # Normalize Hub Code if updated or state changed
+        # Hub Code: Strictly automated by system (re-calculated if state changes, otherwise preserved)
         if state_changed:
             data['code'] = generate_next_hub_code(str(new_state).strip())
-        elif 'code' in data and data['code']:
-            st = str(data.get('state', godown.state) or 'Telangana').strip()
-            submitted = str(data['code']).strip()
-            m = re.match(r'^([A-Za-z]{2}#)(\d+)$', submitted)
-            if m:
-                data['code'] = f"{m.group(1).upper()}{int(m.group(2)):02d}"
+        else:
+            data['code'] = godown.code
             
         # Autogenerate googleLocation from location/address if not provided
         loc = data.get('address') or data.get('locationAddress') or data.get('location') or ''

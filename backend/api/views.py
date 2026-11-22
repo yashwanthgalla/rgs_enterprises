@@ -950,10 +950,8 @@ def godown_detail_view(request, pk):
             Expense.objects.filter(godown=godown).delete()
             Asset.objects.filter(godown=godown).delete()
 
-            # 3. Delete hub staff and their salary payments
-            hub_employees = Employee.objects.filter(godown=godown)
-            SalaryPayment.objects.filter(employee__in=hub_employees).delete()
-            hub_employees.delete()
+            # 3. Delete hub staff
+            Employee.objects.filter(godown=godown).delete()
 
             # 4. Soft-delete the hub and release the unique code constraint
             import time

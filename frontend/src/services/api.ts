@@ -403,11 +403,19 @@ export const godownApi = {
       return normalizeGodown(res);
     });
   },
-  patch: (id: number | string, data: any) => {
-    return api.patch(`/hubs/${id}/`, data).then(unwrap).then((res) => {
+  patch: async (id: number | string, data: any) => {
+    try {
+      const res = await api.patch(`/hubs/${id}/`, data).then(unwrap);
       clearApiCache();
       return normalizeGodown(res);
-    });
+    } catch (err: any) {
+      if (err?.response?.status === 405) {
+        const res = await api.put(`/hubs/${id}/`, data).then(unwrap);
+        clearApiCache();
+        return normalizeGodown(res);
+      }
+      throw err;
+    }
   },
   delete: (id: number | string) => {
     return api.delete(`/hubs/${id}/`).then(unwrap).then((res) => {

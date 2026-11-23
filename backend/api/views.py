@@ -218,7 +218,7 @@ def me_view(request):
     return api_success(AppUserSerializer(request.user).data)
 
 
-@api_view(['PUT'])
+@api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile_view(request):
     user = request.user
@@ -1019,7 +1019,7 @@ def godowns_cities_view(request):
     return api_success(sorted(list(set(filter(None, cities)))))
 
 
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated, IsManagerOrReadOnly])
 def godown_detail_view(request, pk):
     godown = get_godown_by_id_or_code(pk)
@@ -1029,7 +1029,7 @@ def godown_detail_view(request, pk):
     if request.method == 'GET':
         return api_success(GodownSerializer(godown).data)
 
-    elif request.method == 'PUT':
+    elif request.method in ('PUT', 'PATCH'):
         data = request.data.copy()
         if 'erpName' in data and not data.get('name'):
             data['name'] = data['erpName']
@@ -2415,7 +2415,7 @@ def reports_export_csv_view(request):
 # ============================================================================
 # APP SETTINGS
 # ============================================================================
-@api_view(['GET', 'PUT'])
+@api_view(['GET', 'PUT', 'PATCH'])
 @permission_classes([IsAdminOrReadOnly])
 def settings_view(request):
     app_setting = AppSettings.objects.first()
@@ -2431,7 +2431,7 @@ def settings_view(request):
     if request.method == 'GET':
         return api_success(AppSettingsSerializer(app_setting).data)
 
-    elif request.method == 'PUT':
+    elif request.method in ('PUT', 'PATCH'):
         data = request.data
         if 'companyName' in data:
             app_setting.company_name = data['companyName']
